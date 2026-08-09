@@ -1,0 +1,82 @@
+package com.example.musicon.data.remote
+
+import android.content.Context
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
+import com.google.api.client.http.javanet.NetHttpTransport
+import com.google.api.client.json.gson.GsonFactory
+import com.google.api.client.http.FileContent
+import com.google.api.services.drive.Drive
+import com.google.api.services.drive.DriveScopes
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+
+class CloudStorageManager(private val context: Context) {
+
+    fun getAccessToken(): String? {
+        val account = GoogleSignIn.getLastSignedInAccount(context) ?: return null
+        val credential = GoogleAccountCredential.usingOAuth2(
+            context, listOf(DriveScopes.DRIVE_FILE, DriveScopes.DRIVE_READONLY)
+        )
+        credential.selectedAccount = account.account
+        return try {
+            credential.token
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun getDriveService(): Drive? {
+        val account = GoogleSignIn.getLastSignedInAccount(context) ?: return null
+        val credential = GoogleAccountCredential.usingOAuth2(
+            context, listOf(DriveScopes.DRIVE_FILE, DriveScopes.DRIVE_READONLY)
+        )
+        credential.selectedAccount = account.account
+        return Drive.Builder(
+            NetHttpTransport(),
+            GsonFactory.getDefaultInstance(),
+            credential
+        ).setApplicationName("MusicOn").build()
+    }
+
+    suspend fun listAudioFiles(folderId: String? = "14W_7EbfeM4oTwyXxS1FL7jt5Sf_6siCg"): List<com.google.api.services.drive.model.File> = withContext(Dispatchers.IO) {
+        val service = getDriveService() ?: return@withContext emptyList()
+        
+        var query = "mimeType contains 'audio/'"
+        if (folderId != null) {
+            query += " and '$folderId' in parents"
+        }
+        
+        val result = service.files().list()
+            .setQ(query)
+            .setFields("files(id, name, mimeType, size)")
+            .execute()
+        result.files ?: emptyList()
+    }
+
+    suspend fun downloadFile(fileId: String, destPath: String) = withContext(Dispatchers.IO) {
+        val service = getDriveService() ?: return@withContext
+        val outputStream = FileOutputStream(destPath)
+        service.files().get(fileId).executeMediaAndDownloadTo(outputStream)
+        outputStream.close()
+    }
+
+    suspend fun uploadFile(filePath: String, name: String, folderId: String? = null): String? = withContext(Dispatchers.IO) {
+        val service = getDriveService() ?: return@withContext null
+        val fileMetadata = com.google.api.services.drive.model.File().apply {
+            this.name = name
+            if (folderId != null) {
+                this.parents = listOf(folderId)
+            }
+        }
+        val localFile = File(filePath)
+        val mediaContent = FileContent("audio/mpeg", localFile)
+        
+        val result = service.files().create(fileMetadata, mediaContent)
+            .setFields("id")
+            .execute()
+        result.id
+    }
+}
