@@ -15,15 +15,16 @@ import java.io.FileOutputStream
 
 class CloudStorageManager(private val context: Context) {
 
-    fun getAccessToken(): String? {
-        val account = GoogleSignIn.getLastSignedInAccount(context) ?: return null
+    suspend fun getAccessTokenAsync(): String? = withContext(Dispatchers.IO) {
+        val account = GoogleSignIn.getLastSignedInAccount(context) ?: return@withContext null
         val credential = GoogleAccountCredential.usingOAuth2(
             context, listOf(DriveScopes.DRIVE_FILE, DriveScopes.DRIVE_READONLY)
         )
         credential.selectedAccount = account.account
-        return try {
-            credential.token
+        try {
+            credential.getToken()
         } catch (e: Exception) {
+            android.util.Log.e("CloudStorageManager", "Failed to get token", e)
             null
         }
     }

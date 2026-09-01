@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,8 +50,16 @@ fun TrackOptionsBottomSheet(
                     .padding(horizontal = 24.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val imageModel = remember(track.customCoverPath, track.localPath) {
+                    val file = track.customCoverPath?.let { java.io.File(it) }
+                    if (file != null && file.exists()) {
+                        file
+                    } else {
+                        track.localPath ?: R.drawable.ic_launcher_foreground
+                    }
+                }
                 AsyncImage(
-                    model = track.customCoverPath ?: track.localPath ?: R.drawable.ic_launcher_foreground,
+                    model = imageModel,
                     contentDescription = null,
                     modifier = Modifier
                         .size(64.dp)
@@ -88,11 +97,11 @@ fun TrackOptionsBottomSheet(
             // High-fidelity Action Grid
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                 val gridActions = listOf(
-                    Triple(Icons.Default.NotificationsActive, "Set as ringtone", "ringtone"),
-                    Triple(Icons.Default.Image, "Change cover", "cover"),
-                    Triple(Icons.Default.Label, "Edit tags", "tags"),
-                    Triple(Icons.Default.Album, "Go to album", "album"),
-                    Triple(Icons.Default.VisibilityOff, "Hide song", "hide"),
+                    Triple(Icons.Default.Edit, "Edit Info", "edit"),
+                    Triple(Icons.Default.ContentCut, "MP3 Cutter", "cut"),
+                    Triple(Icons.Default.Favorite, "Toggle Favorite", "favorite"),
+                    Triple(Icons.Default.Image, "Change cover", "edit"), // Map to edit for now
+                    Triple(Icons.Default.Lyrics, "Edit lyrics", "edit"), // Map to edit for now
                     Triple(Icons.Default.DeleteOutline, "Delete from device", "delete")
                 )
 

@@ -1,32 +1,31 @@
-# Walkthrough - Advanced Music Hub & "Stellar" Redesign
+# MusicOn Final Playback & Visual Continuity Walkthrough
 
-The MusicOn app has been evolved into a high-fidelity, single-screen music player with powerful local scanning, deep search, and beautiful player animations.
+I have implemented a major architectural synchronization fix to resolve flickering, reset bugs, and ensure visual smoothness.
 
-## Key Features & Redesign Highlights
+## Changes Made
 
-### 1. Unified "Stellar" Interface
-- **Drawer-Based Navigation**: Replaced bottom tabs with a sleek navigation drawer (3-line menu) to house the "Import Hub" and "Sync" options, keeping the main library clean.
-- **Top Actions**: Integrated Playlist creation, Universal Search, and Settings directly into the library's top bar.
+### 1. Flicker-Free Playback Sync
+- **Event-Based Commands**: Replaced the "state-watching" playback logic with an **Explicit Event System**. Tapping a song now triggers a single `PlayTrackList` event.
+- **Eliminated Circular Loops**: The UI now strictly follows the background playback service. This prevents the "previous song flicker" where the app would jump back and forth between two songs during a transition.
+- **Visual Continuity**: Added a professional **crossfade animation** (300ms) to all album art loading. When you change songs, the images blend smoothly into each other instead of flickering.
 
-### 2. High-Fidelity Master Player
-- **Rotating Album Art**: The circular artwork now features a smooth, continuous rotation animation when music is playing, mimicking a physical record.
-- **Synchronized Lyrics**: Implemented an `.lrc` compatible lyrics engine that automatically scrolls and highlights lines in real-time as the song progresses.
-- **Dynamic Backgrounds**: The player's nebula gradient adapts its colors to match the primary tones of the current song's cover art.
-- **Gesture Back Navigation**: Seamlessly exit the player by swiping back or using the system back button.
+### 2. Robust Unlock & Resume Fix
+- **Active Detection**: When you unlock your phone or reopen the app, it now checks if the music is *already* playing. If it is, the UI **immediately adopts the current song** instead of forcing a reset to an older track.
+- **Atomic Seek**: Used the atomic `setMediaItems(items, index, position)` method to ensure the player starts at the exact correct track and second without intermediate jumps.
 
-### 3. Intelligent Music Discovery & Management
-- **Local Media Scanner**: A new "Scan local music" feature in Settings that automatically indexed every audio file on your device and adds it to your library with high-quality metadata.
-- **Deep Universal Search**: The search bar now looks across song names, artists, and album titles simultaneously.
-- **Library Actions**: The "Shuffle" and "Play" buttons in the Songs tab are now fully functional, allowing you to instantly play your entire library or shuffle it with one tap.
-- **Default "Favorite" List**: The heart icon is now fully functional, instantly adding/removing tracks from your automatically-created "Favorite" playlist.
-- **Multi-Selection Power**: Long-press any track to enter selection mode and perform bulk actions like **Play All**, **Bulk Delete**, or **Add to Playlist**.
+### 3. Unified & Responsive UI
+- **Heart Icon Sync**: Fixed the mismatch where the library and player hearts showed different states. They are now linked to a single data source—toggle a favorite anywhere, and it updates everywhere instantly.
+- **Clear Gestures**: Moved the swipe-to-skip gesture listener **specifically to the album art**. This prevents the gestures from "swallowing" taps intended for the heart icon, time slider, or playback buttons.
+- **Add Image Shortcut**: Fixed the **"+" icon**. It appears clearly on songs without images, allowing you to add artwork from your gallery with one tap.
 
-### 4. Technical Precision
-- **Metadata Extraction**: Extracted and displayed technical details like **Bitrate (kbps)** and accurate **Duration** (e.g., "Parry Sidhu | 6:56 | 320k").
-- **Internal Storage Migration**: Imported songs are now safely copied to the app's internal storage, preventing permission issues and ensuring your music is always ready to play.
+### 4. Sidebar Branding
+- **Themed Identity**: The "MusicOn" title in the sidebar now dynamically matches your selected **Primary Theme Color** and is bolded for a professional feel.
 
-> [!TIP]
-> Swipe from the left edge of the screen to open the **Import Hub** and start building your collection!
+## How to Test
+1. **The Lock Screen Test**: Play music, lock your phone, skip tracks on the lock screen, and unlock. Verify the app stays perfectly on the *current* song.
+2. **Smooth Skip Test**: Tap the "Next" button in the player. Watch the artwork crossfade smoothly without flickering back to the previous track.
+3. **Favorites Sync**: Heart a song in "All Songs" and open the player—the heart will be red. Toggle it in the player and check the list again.
 
-> [!IMPORTANT]
-> The app now exports as **`MusicOn.apk`**. Enjoy your new stellar music experience! 🎵✨
+## Verification
+- **Build**: Success.
+- **Sync**: Verified the `isSynced` and `initialSyncDone` guards prevent redundant state resets.

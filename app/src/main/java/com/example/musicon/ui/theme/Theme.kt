@@ -1,6 +1,5 @@
 package com.example.musicon.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -13,39 +12,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 enum class ThemeMode {
-    SPOTIFY_DARK,
-    LIGHT,
-    SYSTEM,
-    DYNAMIC
+    SPOTIFY_DARK, LIGHT, SYSTEM, DYNAMIC
 }
-
-private val SpotifyDarkColorScheme = darkColorScheme(
-    primary = SpotifyGreen,
-    onPrimary = Color.Black,
-    primaryContainer = SpotifyGreen,
-    onPrimaryContainer = Color.Black,
-    secondary = SpotifyGray,
-    onSecondary = SpotifyWhite,
-    background = SpotifyBlack,
-    onBackground = SpotifyWhite,
-    surface = SpotifyDarkGray,
-    onSurface = SpotifyWhite,
-    surfaceVariant = SpotifyGray,
-    onSurfaceVariant = SpotifyLightGray
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = SpotifyGreen,
-    onPrimary = Color.White,
-    background = Color.White,
-    onBackground = SpotifyBlack,
-    surface = Color.White,
-    onSurface = SpotifyBlack
-)
 
 @Composable
 fun MusicOnTheme(
     themeMode: ThemeMode = ThemeMode.SPOTIFY_DARK,
+    accentColor: Color = Color(0xFFBB86FC),
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -60,9 +33,25 @@ fun MusicOnTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        themeMode == ThemeMode.SPOTIFY_DARK -> SpotifyDarkColorScheme
-        darkTheme -> darkColorScheme(primary = SpotifyGreen) // Fallback dark
-        else -> LightColorScheme
+        darkTheme -> darkColorScheme(
+            primary = accentColor,
+            onPrimary = Color.Black,
+            secondary = accentColor.copy(alpha = 0.8f),
+            onSecondary = Color.Black,
+            tertiary = Color(0xFF03DAC5),
+            background = Color(0xFF0D0B1F),
+            surface = Color(0xFF1E1B36),
+            onSurface = Color.White,
+            onBackground = Color.White,
+            primaryContainer = accentColor.copy(alpha = 0.3f),
+            onPrimaryContainer = Color.White,
+            outline = accentColor.copy(alpha = 0.5f)
+        )
+        else -> lightColorScheme(
+            primary = accentColor,
+            onPrimary = Color.White,
+            secondary = accentColor.copy(alpha = 0.8f)
+        )
     }
 
     MaterialTheme(

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
@@ -23,12 +24,15 @@ import coil.compose.AsyncImage
 fun MiniPlayer(
     onNavigateToPlayer: () -> Unit,
     player: Player?,
+    viewModel: com.example.musicon.ui.viewmodel.MainViewModel,
     modifier: Modifier = Modifier
 ) {
     if (player == null) return
 
+    val currentPlayingTrack by viewModel.currentPlayingTrack.collectAsState()
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var currentMediaItem by remember { mutableStateOf(player.currentMediaItem) }
+    var position by remember { mutableLongStateOf(player.currentPosition) }
 
     val listener = object : Player.Listener {
         override fun onIsPlayingChanged(playing: Boolean) {
@@ -44,13 +48,20 @@ fun MiniPlayer(
         onDispose { player.removeListener(listener) }
     }
 
+    LaunchedEffect(isPlaying) {
+        while (isPlaying) {
+            position = player.currentPosition
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp)
-            .height(60.dp)
+            .height(64.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF1E1B36).copy(alpha = 0.9f))
+            .background(Color(0xFF1E1B36).copy(alpha = 0.95f))
             .clickable { onNavigateToPlayer() }
             .padding(8.dp)
     ) {
@@ -62,7 +73,7 @@ fun MiniPlayer(
                 model = currentMediaItem?.mediaMetadata?.artworkUri,
                 contentDescription = null,
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(48.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color.Gray),
                 contentScale = ContentScale.Crop
@@ -85,8 +96,12 @@ fun MiniPlayer(
                     maxLines = 1
                 )
             }
-            IconButton(onClick = { /* Toggle Favorite */ }) {
-                Icon(Icons.Default.Favorite, contentDescription = null, tint = Color(0xFFC3B1E1))
+            IconButton(onClick = { currentPlayingTrack?.let { viewModel.toggleFavorite(it) } }) {
+                Icon(
+                    if (currentPlayingTrack?.isFavorite == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = null,
+                    tint = if (currentPlayingTrack?.isFavorite == true) Color.Red else Color(0xFFC3B1E1)
+                )
             }
             IconButton(onClick = { if (isPlaying) player.pause() else player.play() }) {
                 Icon(
@@ -98,14 +113,14 @@ fun MiniPlayer(
         }
         
         // Progress Line
-        val progress = if (player.duration > 0) player.currentPosition.toFloat() / player.duration else 0f
+        val progress = if (player.duration > 0) position.toFloat() / player.duration else 0f
         LinearProgressIndicator(
             progress = { progress },
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .height(2.dp),
-            color = Color(0xFFC3B1E1),
+            color = Color.Red,
             trackColor = Color.Transparent
         )
     }

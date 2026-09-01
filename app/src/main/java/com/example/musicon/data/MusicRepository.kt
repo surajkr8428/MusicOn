@@ -25,21 +25,23 @@ class MusicRepository(
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.DISPLAY_NAME,
+            MediaStore.Audio.Media.MIME_TYPE,
             MediaStore.Audio.Media.DATA
         )
         
-        context.contentResolver.query(collection, projection, null, null, null)?.use { cursor ->
+        // Filter for MP3 only and exclude recordings
+        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.MIME_TYPE} = ? AND ${MediaStore.Audio.Media.DATA} NOT LIKE ? AND ${MediaStore.Audio.Media.DATA} NOT LIKE ?"
+        val selectionArgs = arrayOf("audio/mpeg", "%Recordings%", "%voice%")
+        
+        context.contentResolver.query(collection, projection, selection, selectionArgs, null)?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
             
             while (cursor.moveToNext()) {
-                val path = cursor.getString(dataColumn)
-                val file = java.io.File(path)
-                if (file.exists()) {
-                    val track = MediaMetadataUtils.extractMetadata(context, Uri.fromFile(file))
-                    if (track != null) {
-                        trackDao.insertTrack(track.copy(localPath = file.absolutePath))
-                    }
+                val id = cursor.getLong(idColumn)
+                val contentUri = android.content.ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+                val track = MediaMetadataUtils.extractMetadata(context, contentUri, id.toString())
+                if (track != null) {
+                    trackDao.insertTrack(track)
                 }
             }
         }
@@ -106,9 +108,11 @@ class MusicRepository(
         trackDao.updateTrack(track.copy(isFavorite = !track.isFavorite))
     }
 
-    suspend fun createPlaylist(name: String) {
-        val playlist = Playlist(id = java.util.UUID.randomUUID().toString(), name = name)
+    suspend fun createPlaylist(name: String): String {
+        val id = java.util.UUID.randomUUID().toString()
+        val playlist = Playlist(id = id, name = name)
         playlistDao.insertPlaylist(playlist)
+        return id
     }
 
     suspend fun addTrackToPlaylist(playlistId: String, trackId: String) {
@@ -123,6 +127,27 @@ class MusicRepository(
         return playlistDao.getTracksForPlaylist(playlistId)
     }
 
+    suspend fun removeTrack(track: TrackEntity) {
+        trackDao.deleteTrack(track)
+        // Clean up files? 
+    }
+
+    suspend fun recordTrackPlayed(trackId: String) {
+        val track = trackDao.getTrackById(trackId) ?: return
+        val updated = track.copy(
+            playCount = track.playCount + 1,
+            lastPlayed = System.currentTimeMillis()
+        )
+        trackDao.updateTrack(updated)
+    }
+
+    suspend fun getRecentlyPlayed(limit: Int): List<TrackEntity> {
+        return trackDao.getRecentlyPlayed(limit)
+    }
+
+    suspend fun getMostPlayed(limit: Int): List<TrackEntity> {
+        return trackDao.getMostPlayed(limit)
+    }
     suspend fun insertTrack(track: TrackEntity) = trackDao.insertTrack(track)
     suspend fun updateTrack(track: TrackEntity) = trackDao.updateTrack(track)
     suspend fun deleteTrack(track: TrackEntity) = trackDao.deleteTrack(track)
@@ -133,14 +158,16 @@ class MusicRepository(
         title: String?,
         artist: String?,
         album: String?,
-        coverPath: String?
+        coverPath: String?,
+        lyrics: String?
     ) {
         val track = trackDao.getTrackById(trackId) ?: return
         val updatedTrack = track.copy(
             customTitle = title,
             customArtist = artist,
             customAlbum = album,
-            customCoverPath = coverPath
+            customCoverPath = coverPath,
+            lyrics = lyrics
         )
         trackDao.updateTrack(updatedTrack)
     }

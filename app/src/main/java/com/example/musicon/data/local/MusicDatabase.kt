@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [TrackEntity::class, Playlist::class, PlaylistTrack::class],
-    version = 2,
+    version = 5,
     exportSchema = false
 )
 abstract class MusicDatabase : RoomDatabase() {
