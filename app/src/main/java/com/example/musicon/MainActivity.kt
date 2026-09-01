@@ -265,29 +265,43 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            CompositionLocalProvider(com.example.musicon.ui.components.LocalCustomBackground provides customBgUri) {
-                MusicOnTheme(themeMode = themeMode, accentColor = accentColor) {
-                    MusicOnApp(
-                        viewModel = viewModel,
-                        mediaController = mediaController,
-                        onSignInClick = triggerSignIn,
-                        onSignOutClick = { triggerSignOut() },
-                        onScanClick = {
-                            val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                Manifest.permission.READ_MEDIA_AUDIO
-                            } else {
-                                Manifest.permission.READ_EXTERNAL_STORAGE
-                            }
-                            
-                            if (ContextCompat.checkSelfPermission(this@MainActivity, permission) == PackageManager.PERMISSION_GRANTED) {
-                                viewModel.scanLocalStorage()
-                            } else {
-                                permissionLauncher.launch(permission)
-                            }
-                        }
-                    )
-                }
+    CompositionLocalProvider(com.example.musicon.ui.components.LocalCustomBackground provides customBgUri) {
+        MusicOnTheme(themeMode = themeMode, accentColor = accentColor) {
+            // Startup Animation
+            var showApp by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(300) // Small delay for smoother feel
+                showApp = true
             }
+
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showApp,
+                enter = androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(1000)) + 
+                        androidx.compose.animation.scaleIn(initialScale = 0.95f, animationSpec = androidx.compose.animation.core.tween(1000)),
+                exit = androidx.compose.animation.fadeOut()
+            ) {
+                MusicOnApp(
+                    viewModel = viewModel,
+                    mediaController = mediaController,
+                    onSignInClick = triggerSignIn,
+                    onSignOutClick = { triggerSignOut() },
+                    onScanClick = {
+                        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            Manifest.permission.READ_MEDIA_AUDIO
+                        } else {
+                            Manifest.permission.READ_EXTERNAL_STORAGE
+                        }
+                        
+                        if (ContextCompat.checkSelfPermission(this@MainActivity, permission) == PackageManager.PERMISSION_GRANTED) {
+                            viewModel.scanLocalStorage()
+                        } else {
+                            permissionLauncher.launch(permission)
+                        }
+                    }
+                )
+            }
+        }
+    }
         }
     }
 
@@ -332,7 +346,7 @@ private fun com.example.musicon.data.local.TrackEntity.toMediaItem(): MediaItem 
             Uri.fromFile(File(localPath))
         }
     } else if (gDriveId != null) {
-        Uri.parse("https://www.googleapis.com/drive/v3/files/${gDriveId}?alt=media")
+        Uri.parse("https://www.googleapis.com/drive/v3/files/$gDriveId?alt=media")
     } else {
         Uri.EMPTY
     }
@@ -501,6 +515,27 @@ fun MusicOnApp(
                             selected = false,
                             onClick = { scope.launch { drawerState.close() }; isSettingsVisible = true },
                             icon = { Icon(Icons.Default.Settings, null) },
+                            colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = Color.White)
+                        )
+                        NavigationDrawerItem(
+                            label = { Text("Share App (APK)") },
+                            selected = false,
+                            onClick = { 
+                                scope.launch { drawerState.close() }
+                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "application/vnd.android.package-archive"
+                                    val file = java.io.File(context.packageResourcePath)
+                                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        file
+                                    )
+                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(intent, "Share MusicOn APK"))
+                            },
+                            icon = { Icon(Icons.Default.Share, null) },
                             colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = Color.White)
                         )
                         

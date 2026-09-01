@@ -16,6 +16,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -34,6 +37,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import android.content.res.Configuration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +70,9 @@ fun LibraryScreen(
     val customFolders by viewModel.customFolders.collectAsState()
     val searchQuery by viewModel.searchQuery
     val sortOrder by viewModel.songSortOrder.collectAsState()
+    
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     var isRefreshing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -177,6 +185,7 @@ fun LibraryScreen(
                                 0 -> SongsTab(
                                     tracks = tracks,
                                     selectedIds = selectedIds,
+                                    isLandscape = isLandscape,
                                     onTrackClick = { track ->
                                         if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id
                                         else {
@@ -190,21 +199,21 @@ fun LibraryScreen(
                                     onToggleFavorite = { viewModel.toggleFavorite(it) }
                                 )
                                 1 -> PlaylistsTab(playlists, { currentPlaylistDetail = it }, { showCreatePlaylistDialog = true })
-                                2 -> GroupedTab(allTracks, "Album") { viewModel.playSelected(it) }
-                                3 -> GroupedTab(allTracks, "Artist") { viewModel.playSelected(it) }
-                                4 -> GroupedTab(allTracks, "Genre") { viewModel.playSelected(it) }
+                                2 -> GroupedTab(allTracks, "Album", isLandscape) { viewModel.playSelected(it) }
+                                3 -> GroupedTab(allTracks, "Artist", isLandscape) { viewModel.playSelected(it) }
+                                4 -> GroupedTab(allTracks, "Genre", isLandscape) { viewModel.playSelected(it) }
                                 5 -> {
                                     val recent by viewModel.recentlyPlayed.collectAsState()
-                                    SongsTab(recent, selectedIds, { viewModel.playTrackList(recent, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(recent.shuffled()) }, { viewModel.playSelected(recent) }, { viewModel.toggleFavorite(it) })
+                                    SongsTab(recent, selectedIds, isLandscape, { viewModel.playTrackList(recent, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(recent.shuffled()) }, { viewModel.playSelected(recent) }, { viewModel.toggleFavorite(it) })
                                 }
                                 6 -> {
                                     val popular by viewModel.mostPlayed.collectAsState()
-                                    SongsTab(popular, selectedIds, { viewModel.playTrackList(popular, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(popular.shuffled()) }, { viewModel.playSelected(popular) }, { viewModel.toggleFavorite(it) })
+                                    SongsTab(popular, selectedIds, isLandscape, { viewModel.playTrackList(popular, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(popular.shuffled()) }, { viewModel.playSelected(popular) }, { viewModel.toggleFavorite(it) })
                                 }
                                 else -> {
                                     val folderPath = customFolders[page - 7]
                                     val folderTracks = allTracks.filter { it.localPath?.startsWith(folderPath) == true }
-                                    SongsTab(folderTracks, selectedIds, { viewModel.playTrackList(folderTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(folderTracks.shuffled()) }, { viewModel.playSelected(folderTracks) }, { viewModel.toggleFavorite(it) })
+                                    SongsTab(folderTracks, selectedIds, isLandscape, { viewModel.playTrackList(folderTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(folderTracks.shuffled()) }, { viewModel.playSelected(folderTracks) }, { viewModel.toggleFavorite(it) })
                                 }
                             }
                         }
@@ -284,8 +293,8 @@ fun PlaylistDetailScreen(
                     title = { Text(playlist.name, color = Color.White, fontFamily = FontFamily.Cursive, fontSize = 24.sp) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } },
                     actions = {
-                        IconButton(onClick = { /* Add tracks? */ }) { Icon(Icons.Default.Add, null, tint = Color.White) }
-                        IconButton(onClick = { /* More actions? */ }) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
+                        IconButton(onClick = { }) { Icon(Icons.Default.Add, null, tint = Color.White) }
+                        IconButton(onClick = { }) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
                 )
@@ -294,7 +303,6 @@ fun PlaylistDetailScreen(
             LazyColumn(Modifier.fillMaxSize().padding(padding)) {
                 items(playlistTracks) { track ->
                     StellarTrackItem(track, false, { viewModel.playTrackList(playlistTracks, track) }, {}, { 
-                        // options
                     }, { viewModel.toggleFavorite(track) })
                 }
             }
@@ -398,7 +406,17 @@ fun SelectionActionItem(icon: ImageVector, label: String, onClick: () -> Unit) {
 }
 
 @Composable
-fun SongsTab(tracks: List<TrackEntity>, selectedIds: Set<String>, onTrackClick: (TrackEntity) -> Unit, onTrackLongClick: (TrackEntity) -> Unit, onOptions: (TrackEntity) -> Unit, onShuffleAll: () -> Unit, onPlayAll: () -> Unit, onToggleFavorite: (TrackEntity) -> Unit) {
+fun SongsTab(
+    tracks: List<TrackEntity>, 
+    selectedIds: Set<String>, 
+    isLandscape: Boolean,
+    onTrackClick: (TrackEntity) -> Unit, 
+    onTrackLongClick: (TrackEntity) -> Unit, 
+    onOptions: (TrackEntity) -> Unit, 
+    onShuffleAll: () -> Unit, 
+    onPlayAll: () -> Unit, 
+    onToggleFavorite: (TrackEntity) -> Unit
+) {
     Column(Modifier.fillMaxSize()) {
         if (selectedIds.isEmpty()) {
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -406,9 +424,22 @@ fun SongsTab(tracks: List<TrackEntity>, selectedIds: Set<String>, onTrackClick: 
                 StellarActionButton(label = "Play", icon = Icons.Default.PlayArrow, modifier = Modifier.weight(1f), onClick = onPlayAll)
             }
         }
-        LazyColumn(Modifier.fillMaxSize()) {
-            items(tracks) { track ->
-                StellarTrackItem(track, track.id in selectedIds, { onTrackClick(track) }, { onTrackLongClick(track) }, { onOptions(track) }, { onToggleFavorite(track) })
+        
+        if (isLandscape) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 80.dp)
+            ) {
+                items(tracks) { track ->
+                    StellarTrackItem(track, track.id in selectedIds, { onTrackClick(track) }, { onTrackLongClick(track) }, { onOptions(track) }, { onToggleFavorite(track) })
+                }
+            }
+        } else {
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(tracks) { track ->
+                    StellarTrackItem(track, track.id in selectedIds, { onTrackClick(track) }, { onTrackLongClick(track) }, { onOptions(track) }, { onToggleFavorite(track) })
+                }
             }
         }
     }
@@ -446,7 +477,7 @@ fun PlaylistsTab(
 }
 
 @Composable
-fun GroupedTab(tracks: List<TrackEntity>, groupType: String, onPlayGroup: (List<TrackEntity>) -> Unit) {
+fun GroupedTab(tracks: List<TrackEntity>, groupType: String, isLandscape: Boolean, onPlayGroup: (List<TrackEntity>) -> Unit) {
     val grouped = remember(tracks) {
         when (groupType) {
             "Album" -> tracks.groupBy { it.displayAlbum }
@@ -456,16 +487,33 @@ fun GroupedTab(tracks: List<TrackEntity>, groupType: String, onPlayGroup: (List<
         }
     }
     if (grouped.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No $groupType found", color = Color.Gray) }
-    else LazyColumn(Modifier.fillMaxSize()) {
-        grouped.forEach { (name, groupTracks) ->
-            item {
-                ListItem(
-                    headlineContent = { Text(name, color = Color.White, fontWeight = FontWeight.Bold) },
-                    supportingContent = { Text("${groupTracks.size} songs", color = Color.Gray) },
-                    leadingContent = { Box(Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Album, null, tint = Color.Gray) } },
-                    modifier = Modifier.clickable { onPlayGroup(groupTracks) },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                )
+    else {
+        if (isLandscape) {
+            LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize()) {
+                grouped.forEach { (name, groupTracks) ->
+                    item {
+                        ListItem(
+                            headlineContent = { Text(name, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1) },
+                            supportingContent = { Text("${groupTracks.size} songs", color = Color.Gray) },
+                            modifier = Modifier.clickable { onPlayGroup(groupTracks) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+            }
+        } else {
+            LazyColumn(Modifier.fillMaxSize()) {
+                grouped.forEach { (name, groupTracks) ->
+                    item {
+                        ListItem(
+                            headlineContent = { Text(name, color = Color.White, fontWeight = FontWeight.Bold) },
+                            supportingContent = { Text("${groupTracks.size} songs", color = Color.Gray) },
+                            leadingContent = { Box(Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Album, null, tint = Color.Gray) } },
+                            modifier = Modifier.clickable { onPlayGroup(groupTracks) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
             }
         }
     }

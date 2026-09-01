@@ -50,12 +50,15 @@ fun SettingsScreen(
     val keepScreenOn by viewModel.keepScreenOn.collectAsState()
     val showNotifications by viewModel.showNotifications.collectAsState()
     val crossfade by viewModel.crossfade.collectAsState()
+    val autoTheme by viewModel.autoTheme.collectAsState()
     val customBgUri by viewModel.customBgUri.collectAsState()
     val accentColorInt by viewModel.accentColor.collectAsState()
     
     val primaryColor = Color(accentColorInt)
     var hexInput by remember { mutableStateOf("") }
     var showColorWheel by remember { mutableStateOf(false) }
+    var showTimerDialog by remember { mutableStateOf(false) }
+    val remainingTime by viewModel.sleepTimerRemaining.collectAsState()
 
     val bgPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -103,16 +106,19 @@ fun SettingsScreen(
 
                 item {
                     SettingsHeader("Theming")
+                    StellarSettingsToggle(Icons.Default.ColorLens, "Auto Theme Color", "Extract theme color from song image", autoTheme) { 
+                        viewModel.updateAutoTheme(it) 
+                    }
                     Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Primary Theme Color", color = Color.White, fontSize = 14.sp)
+                            Text("Manual Theme Color", color = Color.White, fontSize = 14.sp)
                             IconButton(onClick = { showColorWheel = !showColorWheel }) {
                                 Icon(
-                                    if (showColorWheel) Icons.Default.Close else Icons.Default.ColorLens,
+                                    if (showColorWheel) Icons.Default.Close else Icons.Default.Palette,
                                     null,
                                     tint = primaryColor
                                 )
@@ -175,12 +181,20 @@ fun SettingsScreen(
 
                 item {
                     SettingsHeader("Playback")
+                    StellarSettingsItem(
+                        Icons.Default.Timer, 
+                        "Sleep Timer", 
+                        if (remainingTime != null) "Remaining: ${(remainingTime!! / 60000)}m" else "Set auto-stop timer"
+                    ) {
+                        showTimerDialog = true
+                    }
                     StellarSettingsToggle(Icons.Default.PauseCircle, "Pause on detach", "Pause playback when headphone is detached", pauseOnDetach) { viewModel.updatePauseOnDetach(it) }
                     StellarSettingsToggle(Icons.Default.BlurOn, "Crossfade", "Previous song fades out, next song fades in", crossfade) { viewModel.updateCrossfade(it) }
                 }
 
                 item {
                     SettingsHeader("Preference")
+                    StellarSettingsItem(Icons.Default.HighQuality, "Audio Quality", "High (320kbps)") { }
                     StellarSettingsToggle(Icons.Default.WbSunny, "Keep screen on", "Stay on while on the player screen", keepScreenOn) { viewModel.updateKeepScreenOn(it) }
                     StellarSettingsToggle(Icons.Default.Notifications, "Notifications", "Show playback controls in notification", showNotifications) { viewModel.updateShowNotifications(it) }
                     val shakeState by viewModel.shakeToSkip.collectAsState()
@@ -202,6 +216,35 @@ fun SettingsScreen(
             }
         }
     }
+
+    if (showTimerDialog) {
+        SleepTimerDialog(
+            onDismiss = { showTimerDialog = false },
+            onSet = { viewModel.setSleepTimer(it); showTimerDialog = false }
+        )
+    }
+}
+
+@Composable
+fun SleepTimerDialog(onDismiss: () -> Unit, onSet: (Int) -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Sleep Timer") },
+        text = {
+            Column {
+                val times = listOf(0 to "Off", 15 to "15 minutes", 30 to "30 minutes", 60 to "60 minutes")
+                times.forEach { (mins, label) ->
+                    TextButton(
+                        onClick = { onSet(mins) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(label, color = Color.White)
+                    }
+                }
+            }
+        },
+        confirmButton = {}
+    )
 }
 
 @Composable
