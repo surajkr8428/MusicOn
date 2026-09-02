@@ -5,6 +5,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.musicon.data.local.MusicDatabase
 import com.example.musicon.data.remote.CloudStorageManager
+import com.example.musicon.data.remote.CloudSyncManager
+import com.example.musicon.data.remote.SyncStatus
 import java.io.File
 
 class SyncWorker(
@@ -23,6 +25,7 @@ class SyncWorker(
                 val fileName = inputData.getString("file_name") ?: "temp.mp3"
                 val destFile = File(applicationContext.filesDir, fileName)
                 try {
+                    CloudSyncManager.updateStatus(SyncStatus.Loading("Downloading $fileName...", 0.1f))
                     cloudManager.downloadFile(fileId, destFile.absolutePath)
                     val existingTrack = database.trackDao().getTrackById(fileId)
                     if (existingTrack != null) {
@@ -30,8 +33,10 @@ class SyncWorker(
                             existingTrack.copy(localPath = destFile.absolutePath, isDownloaded = true)
                         )
                     }
+                    CloudSyncManager.updateStatus(SyncStatus.Success("Download complete: $fileName"))
                     Result.success()
                 } catch (e: Exception) {
+                    CloudSyncManager.updateStatus(SyncStatus.Error("Download failed: ${e.message}"))
                     Result.failure()
                 }
             }
@@ -40,15 +45,31 @@ class SyncWorker(
                 val fileName = inputData.getString("file_name") ?: "Uploaded Song"
                 val trackId = inputData.getString("track_id") ?: return Result.failure()
                 try {
-                    val gDriveId = cloudManager.uploadFile(filePath, fileName, null)
+                    CloudSyncManager.updateStatus(SyncStatus.Loading("Checking cloud for $fileName...", 0.05f))
+                    
+                    // Handle Duplicates: Check if file already exists in cloud
+                    val existingFile = cloudManager.findFileByName(fileName)
+                    val gDriveId = if (existingFile != null) {
+                        android.util.Log.d("SyncWorker", "Duplicate found: $fileName, using existing ID: ${existingFile.id}")
+                        existingFile.id
+                    } else {
+                        CloudSyncManager.updateStatus(SyncStatus.Loading("Uploading $fileName...", 0.1f))
+                        cloudManager.uploadFile(filePath, fileName, null)
+                    }
+
                     if (gDriveId != null) {
                         val existingTrack = database.trackDao().getTrackById(trackId)
                         if (existingTrack != null) {
                             database.trackDao().updateTrack(existingTrack.copy(gDriveId = gDriveId))
                         }
+                        CloudSyncManager.updateStatus(SyncStatus.Success("Synced: $fileName"))
+                        Result.success()
+                    } else {
+                        CloudSyncManager.updateStatus(SyncStatus.Error("Cloud sync failed for $fileName"))
+                        Result.failure()
                     }
-                    Result.success()
                 } catch (e: Exception) {
+                    CloudSyncManager.updateStatus(SyncStatus.Error("Sync failed: ${e.message}"))
                     Result.failure()
                 }
             }

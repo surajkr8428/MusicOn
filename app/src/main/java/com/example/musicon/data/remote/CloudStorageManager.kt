@@ -42,12 +42,13 @@ class CloudStorageManager(private val context: Context) {
         ).setApplicationName("MusicOn").build()
     }
 
-    suspend fun listAudioFiles(folderId: String? = "14W_7EbfeM4oTwyXxS1FL7jt5Sf_6siCg"): List<com.google.api.services.drive.model.File> = withContext(Dispatchers.IO) {
+    suspend fun listAudioFiles(folderId: String? = null): List<com.google.api.services.drive.model.File> = withContext(Dispatchers.IO) {
         val service = getDriveService() ?: return@withContext emptyList()
         
-        var query = "mimeType contains 'audio/'"
-        if (folderId != null) {
-            query += " and '$folderId' in parents"
+        val query = if (folderId != null) {
+            "mimeType contains 'audio/' and '$folderId' in parents"
+        } else {
+            "mimeType contains 'audio/'"
         }
         
         val result = service.files().list()
@@ -62,6 +63,24 @@ class CloudStorageManager(private val context: Context) {
         val outputStream = FileOutputStream(destPath)
         service.files().get(fileId).executeMediaAndDownloadTo(outputStream)
         outputStream.close()
+    }
+
+    suspend fun findFileByName(name: String): com.google.api.services.drive.model.File? = withContext(Dispatchers.IO) {
+        val service = getDriveService() ?: return@withContext null
+        val query = "name = '$name' and mimeType contains 'audio/' and trashed = false"
+        val result = service.files().list()
+            .setQ(query)
+            .setFields("files(id, name)")
+            .execute()
+        result.files?.firstOrNull()
+    }
+
+    suspend fun renameFile(fileId: String, newName: String) = withContext(Dispatchers.IO) {
+        val service = getDriveService() ?: return@withContext
+        val fileMetadata = com.google.api.services.drive.model.File().apply {
+            this.name = newName
+        }
+        service.files().update(fileId, fileMetadata).execute()
     }
 
     suspend fun uploadFile(filePath: String, name: String, folderId: String? = null): String? = withContext(Dispatchers.IO) {

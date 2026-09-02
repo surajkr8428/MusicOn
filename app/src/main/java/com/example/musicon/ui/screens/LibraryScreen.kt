@@ -120,7 +120,6 @@ fun LibraryScreen(
         StellarBackground {
             Scaffold(
                 containerColor = Color.Transparent,
-                contentWindowInsets = WindowInsets(0),
                 topBar = {
                     if (isSelectionMode) {
                         SelectionTopBar(count = selectedIds.size, onClose = { selectedIds = emptySet() })
@@ -360,7 +359,6 @@ fun LibraryTopBar(
 ) {
     TopAppBar(
         modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
-        windowInsets = WindowInsets(0),
         title = {
             if (isSearchActive) {
                 TextField(
@@ -382,7 +380,7 @@ fun LibraryTopBar(
                             Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Timer, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("${timerRemaining / 60000}m", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text(formatSleepTime(timerRemaining), color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

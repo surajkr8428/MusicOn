@@ -1,7 +1,9 @@
-- `[x]` Fix Header Overlap in `MainActivity.kt`
-- `[x]` Implement Big Bold HH:MM:SS Sleep Timer below Play Button
-- `[x]` Increase Landscape Queue Icons to 56dp
-- `[x]` Fix Cloud Upload Folder and Add Logging
-- `[x]` Finalize Notification Tap-to-Open
-- `[x]` Verify UI and Functions
+- `[x]` Fix and Export `formatSleepTime`
+- `[x]` Finalize `PlayerScreen.kt` UI:
+    - `[x]` Sleep Timer in Portrait Header
+    - `[x]` Sleep Timer in Landscape (between controls and icons)
+    - `[x]` 56dp Landscape Icons
+- `[x]` Implement Cloud Progress UI in `MainActivity.kt`
+- `[x]` Implement Cloud Actions in Sidebar
+- `[x]` Verify Cloud Upload/Download and UI
 - `[x]` Create final walkthrough

@@ -271,6 +271,10 @@ class MainViewModel(
         }
     }
 
+    fun syncAllLocalToCloud() {
+        bulkUpload(allTracks.value)
+    }
+
     fun downloadTrack(track: TrackEntity) {
         if (track.gDriveId == null) return
         val data = Data.Builder()
@@ -408,6 +412,17 @@ class MainViewModel(
     ) {
         viewModelScope.launch {
             musicRepository.updateTrackMetadata(trackId, title, artist, album, coverPath, lyrics)
+            
+            // If it's a cloud track, rename on Drive too
+            val track = allTracks.value.find { it.id == trackId }
+            if (track?.gDriveId != null && title != null) {
+                try {
+                    val cloudManager = com.example.musicon.data.remote.CloudStorageManager(settingsRepository.context)
+                    cloudManager.renameFile(track.gDriveId, title)
+                } catch (e: Exception) {
+                    android.util.Log.e("MainViewModel", "Cloud rename failed", e)
+                }
+            }
         }
     }
     fun updateThemeMode(themeMode: ThemeMode) = viewModelScope.launch { settingsRepository.updateThemeMode(themeMode) }

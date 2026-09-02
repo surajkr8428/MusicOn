@@ -182,7 +182,16 @@ fun PlayerScreen(
                         Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) Color.White else Color.Gray, fontSize = 14.sp) } )
                     }
 
-                    Row {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        sleepTimerRemaining?.let { remaining ->
+                            Text(
+                                text = formatSleepTime(remaining),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White,
+                                modifier = Modifier.padding(end = 12.dp)
+                            )
+                        }
+
                         var showMoreMenu by remember { mutableStateOf(false) }
                         var showAddToPlaylistDialog by remember { mutableStateOf(false) }
                         val playlists by viewModel.allPlaylists.collectAsState()
@@ -587,35 +596,49 @@ fun PlayerLayoutLandscape(
         }
 
         // Bottom Queue in Landscape
-        LazyRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-                .height(72.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            itemsIndexed(queue) { _, track ->
-                val isCurrent = currentTrack?.id == track.id
-                val imageModel = remember(track.id) {
-                    val path = track.customCoverPath ?: track.localPath
-                    if (path != null) {
-                        if (path.startsWith("content://")) Uri.parse(path) else File(path)
-                    } else {
-                        R.drawable.ic_launcher_foreground
-                    }
-                }
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(imageModel).crossfade(true).build(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.05f))
-                        .clickable { viewModel.playTrack(track) },
-                    contentScale = ContentScale.Crop
+            if (sleepTimerRemaining != null) {
+                Text(
+                    text = formatSleepTime(sleepTimerRemaining),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                    modifier = Modifier.padding(vertical = 16.dp)
                 )
+            }
+            
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp, start = 16.dp, end = 16.dp)
+                    .height(72.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                itemsIndexed(queue) { _, track ->
+                    val isCurrent = currentTrack?.id == track.id
+                    val imageModel = remember(track.id) {
+                        val path = track.customCoverPath ?: track.localPath
+                        if (path != null) {
+                            if (path.startsWith("content://")) Uri.parse(path) else File(path)
+                        } else {
+                            R.drawable.ic_launcher_foreground
+                        }
+                    }
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current).data(imageModel).crossfade(true).build(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(8.dp))
+                            .background(Color.White.copy(alpha = 0.05f))
+                            .clickable { viewModel.playTrack(track) },
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
         }
     }
@@ -648,15 +671,6 @@ fun PlayerControls(
     ) {
         // Sleep Timer and Time Info
         Box(modifier = Modifier.fillMaxWidth()) {
-            if (!isLandscape && sleepTimerRemaining != null) {
-                Text(
-                    text = formatSleepTime(sleepTimerRemaining),
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White,
-                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp)
-                )
-            }
-
             Text(
                 text = "${formatTime(if (isDragging) dragPosition else position)} / ${formatTime(duration)}",
                 style = MaterialTheme.typography.headlineMedium.copy(fontSize = if (isLandscape) 24.sp else 32.sp, fontWeight = FontWeight.Bold),
@@ -717,16 +731,6 @@ fun PlayerControls(
                 val icon = if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
                 Icon(icon, null, tint = if (repeatMode != Player.REPEAT_MODE_OFF) primaryColor else Color.White.copy(alpha = 0.6f)) 
             }
-        }
-
-        if (isLandscape && sleepTimerRemaining != null) {
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = formatSleepTime(sleepTimerRemaining),
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                color = Color.White,
-                textAlign = TextAlign.Center
-            )
         }
 
         if (!isLandscape) {
@@ -840,16 +844,12 @@ fun LyricsView(
     }
 }
 
-private fun formatSleepTime(millis: Long): String {
+fun formatSleepTime(millis: Long): String {
     val totalSeconds = millis / 1000
     val hours = totalSeconds / 3600
     val minutes = (totalSeconds % 3600) / 60
     val seconds = totalSeconds % 60
-    return if (hours > 0) {
-        String.format("%02d:%02d:%02d", hours, minutes, seconds)
-    } else {
-        String.format("%02d:%02d", minutes, seconds)
-    }
+    return String.format("%02d:%02d:%02d", hours, minutes, seconds)
 }
 
 private fun formatTime(millis: Long): String {

@@ -56,6 +56,10 @@ import com.google.common.util.concurrent.MoreExecutors
 import androidx.core.content.ContextCompat
 import androidx.palette.graphics.Palette
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import com.example.musicon.data.remote.CloudSyncManager
+import com.example.musicon.data.remote.SyncStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -387,10 +391,12 @@ fun MusicOnApp(
     val scope = rememberCoroutineScope()
     val isUserSignedIn by viewModel.isUserSignedIn
     val context = LocalContext.current
+    val syncStatus by CloudSyncManager.status.collectAsState()
     
     var isPlayerVisible by rememberSaveable { mutableStateOf(false) }
     var isSettingsVisible by rememberSaveable { mutableStateOf(false) }
     var isEqualizerVisible by rememberSaveable { mutableStateOf(false) }
+    var isCloudBrowserVisible by rememberSaveable { mutableStateOf(false) }
     var cutterTrack by remember { mutableStateOf<com.example.musicon.data.local.TrackEntity?>(null) }
 
     val filePicker = rememberLauncherForActivityResult(
@@ -416,6 +422,11 @@ fun MusicOnApp(
         EqualizerScreen(
             viewModel = viewModel,
             onBack = { isEqualizerVisible = false }
+        )
+    } else if (isCloudBrowserVisible) {
+        CloudBrowserScreen(
+            viewModel = viewModel,
+            onBack = { isCloudBrowserVisible = false }
         )
     } else if (cutterTrack != null) {
         Mp3CutterScreen(
@@ -477,16 +488,29 @@ fun MusicOnApp(
                         
                         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                         
-                        // Branded Title
+                        // Branded Title with Sync
                         val primaryColor = MaterialTheme.colorScheme.primary
-                        Text(
-                            "MusicOn",
-                            modifier = Modifier.padding(16.dp),
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                color = primaryColor,
-                                fontWeight = FontWeight.Bold
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "MusicOn",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    color = primaryColor,
+                                    fontWeight = FontWeight.Bold
+                                )
                             )
-                        )
+                            IconButton(onClick = { 
+                                scope.launch { 
+                                    drawerState.close()
+                                    viewModel.syncAllLocalToCloud()
+                                }
+                            }) {
+                                Icon(Icons.Default.CloudSync, "Sync All to Cloud", tint = primaryColor)
+                            }
+                        }
                         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                         
                         NavigationDrawerItem(
@@ -499,21 +523,7 @@ fun MusicOnApp(
                         NavigationDrawerItem(
                             label = { Text("Cloud Browser") },
                             selected = false,
-                            onClick = { scope.launch { drawerState.close() }; /* Browser Logic */ },
-                            icon = { Icon(Icons.Default.FolderOpen, null) },
-                            colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = Color.White)
-                        )
-                        NavigationDrawerItem(
-                            label = { Text("Cloud Upload") },
-                            selected = false,
-                            onClick = { scope.launch { drawerState.close() }; /* Upload Logic */ },
-                            icon = { Icon(Icons.Default.CloudUpload, null) },
-                            colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = Color.White)
-                        )
-                        NavigationDrawerItem(
-                            label = { Text("Cloud Manager") },
-                            selected = false,
-                            onClick = { scope.launch { drawerState.close() }; /* Manager Logic */ },
+                            onClick = { scope.launch { drawerState.close() }; isCloudBrowserVisible = true },
                             icon = { Icon(Icons.Default.CloudQueue, null) },
                             colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = Color.White)
                         )
@@ -577,7 +587,7 @@ fun MusicOnApp(
         ) {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
-                contentWindowInsets = WindowInsets(0),
+                contentWindowInsets = WindowInsets.statusBars,
                 bottomBar = {
                     MiniPlayer(
                         onNavigateToPlayer = { isPlayerVisible = true },
@@ -587,15 +597,126 @@ fun MusicOnApp(
                 }
             ) { innerPadding ->
                 Box(modifier = Modifier.padding(innerPadding)) {
-                    LibraryScreen(
-                        viewModel = viewModel,
-                        onOpenSettings = { isSettingsVisible = true },
-                        onOpenDrawer = { scope.launch { drawerState.open() } },
-                        onOpenCutter = { cutterTrack = it },
-                        onOpenPlayer = { isPlayerVisible = true }
-                    )
+                    Column {
+                        // Sync Progress Indicator
+                        AnimatedVisibility(visible = syncStatus !is SyncStatus.Idle) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(Modifier.padding(8.dp)) {
+                                    val message = when (val s = syncStatus) {
+                                        is SyncStatus.Loading -> s.message
+                                        is SyncStatus.Success -> s.message
+                                        is SyncStatus.Error -> s.message
+                                        else -> ""
+                                    }
+                                    Text(message, style = MaterialTheme.typography.labelSmall, color = Color.White)
+                                    if (syncStatus is SyncStatus.Loading) {
+                                        Spacer(Modifier.height(4.dp))
+                                        val progress = (syncStatus as SyncStatus.Loading).progress
+                                        if (progress >= 0) {
+                                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                                        } else {
+                                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                        }
+                                    }
+                                    if (syncStatus is SyncStatus.Success || syncStatus is SyncStatus.Error) {
+                                        LaunchedEffect(syncStatus) {
+                                            kotlinx.coroutines.delay(3000)
+                                            CloudSyncManager.clearStatus()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        LibraryScreen(
+                            viewModel = viewModel,
+                            onOpenSettings = { isSettingsVisible = true },
+                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                            onOpenCutter = { cutterTrack = it },
+                            onOpenPlayer = { isPlayerVisible = true }
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CloudBrowserScreen(
+    viewModel: MainViewModel,
+    onBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val cloudManager = remember { com.example.musicon.data.remote.CloudStorageManager(context) }
+    var cloudFiles by remember { mutableStateOf<List<com.google.api.services.drive.model.File>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        scope.launch {
+            cloudFiles = cloudManager.listAudioFiles(null)
+            isLoading = false
+        }
+    }
+
+    com.example.musicon.ui.components.StellarBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            topBar = {
+                TopAppBar(
+                    title = { Text("Cloud Browser", color = Color.White, fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { 
+                            // This would ideally open a file picker to upload something new directly to cloud
+                            // For simplicity, we can trigger a sync of all local tracks here too
+                            viewModel.syncAllLocalToCloud()
+                        }) {
+                            Icon(Icons.Default.CloudUpload, null, tint = Color.White)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
+            }
+        ) { padding ->
+            if (isLoading) {
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            } else {
+                LazyColumn(Modifier.fillMaxSize().padding(padding)) {
+                    items(cloudFiles) { file ->
+                        ListItem(
+                            headlineContent = { Text(file.getName() ?: "Unknown", color = Color.White) },
+                            supportingContent = { Text("${(file.getSize() ?: 0) / 1024} KB", color = Color.Gray) },
+                            leadingContent = { Icon(Icons.Default.MusicNote, null, tint = Color.Gray) },
+                            trailingContent = {
+                                IconButton(onClick = { 
+                                    viewModel.downloadTrack(com.example.musicon.data.local.TrackEntity(
+                                        id = file.getId(), title = file.getName() ?: "Unknown", artist = "Cloud", album = "Cloud", 
+                                        duration = 0, gDriveId = file.getId(), isDownloaded = false, isFavorite = false,
+                                        genre = null, bitrate = null, localPath = null, lastPlayed = 0, playCount = 0,
+                                        customTitle = null, customArtist = null, customAlbum = null, customCoverPath = null, lyrics = null
+                                    ))
+                                }) {
+                                    Icon(Icons.Default.Download, null, tint = Color.White)
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
