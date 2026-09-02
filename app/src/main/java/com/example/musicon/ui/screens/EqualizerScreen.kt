@@ -41,12 +41,22 @@ fun EqualizerScreen(
     StellarBackground {
         Scaffold(
             containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets.statusBars,
             topBar = {
                 TopAppBar(
                     modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
-                    title = { Text("Equalizer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp) },
+                    windowInsets = WindowInsets.statusBars,
+                    title = { 
+                        Text(
+                            "Equalizer", 
+                            color = Color.White, 
+                            fontWeight = FontWeight.Bold, 
+                            fontSize = if (isLandscape) 18.sp else 22.sp,
+                            modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 4.dp)
+                        ) 
+                    },
                     navigationIcon = {
-                        IconButton(onClick = onBack, modifier = if (isLandscape) Modifier.size(36.dp) else Modifier) {
+                        IconButton(onClick = onBack, modifier = if (isLandscape) Modifier.size(36.dp).padding(start = 4.dp) else Modifier) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier)
                         }
                     },
@@ -54,7 +64,7 @@ fun EqualizerScreen(
                         Switch(
                             checked = eqEnabled,
                             onCheckedChange = { viewModel.updateEqEnabled(it) },
-                            modifier = if (isLandscape) Modifier.scale(0.8f) else Modifier,
+                            modifier = if (isLandscape) Modifier.scale(0.8f).padding(end = 8.dp) else Modifier,
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = primaryColor,
                                 checkedTrackColor = primaryColor.copy(alpha = 0.3f),

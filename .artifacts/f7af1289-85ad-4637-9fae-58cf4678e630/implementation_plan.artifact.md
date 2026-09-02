@@ -1,38 +1,39 @@
-# Implementation Plan - Fix Header Spaces and App Sharing
+# Implementation Plan - UI Refinement: Zero Gap Header and Landscape Fixes
 
-The user wants to remove excessive vertical space in the app header (especially visible in landscape) and fix an issue where the shared APK appears as "invalid" when trying to install it.
-
-## User Review Required
-
-> [!IMPORTANT]
-> **Split APK Issue**: The "App not installed as package appears to be invalid" error is most likely caused by the app being installed as a **Split APK** (common in Android Studio debug builds or Play Store installs). When sharing only the `base.apk`, it lacks necessary resources/code for a standalone installation. I will improve the sharing logic to use the cache directory and correct permissions, but if the app is a split install, the recipient may still face issues unless a "Universal APK" is built and shared.
+The goal is to refine the app's UI by placing the header immediately below the status bar, removing vertical space below the app name, eliminating the left-side gap in landscape mode, and restoring song icons to the landscape player.
 
 ## Proposed Changes
 
-### UI Components & Screens
+### UI Layout & Insets
 
-#### [DONE] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
-- Replaced `TopAppBar` with a more compact custom header for landscape.
-- Removed `windowInsets` in the header.
-- Reduced vertical padding in `LibraryTopBar` and `ScrollableTabRow`.
+#### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
+- **Zero Horizontal Insets**: Update the `Scaffold` and `TopAppBar` to ignore horizontal window insets (like display cutouts) in landscape mode to remove the left-side gap.
+- **Tight Header**:
+    - Adjust `LibraryTopBar` to use `WindowInsets.statusBars` for top padding only, ensuring it sits just below the status bar.
+    - Reduce internal vertical padding in the header to minimize space below the "MusicOn" title.
+    - Further reduce `edgePadding` in `ScrollableTabRow` for landscape.
 
-#### [MODIFY] [SettingsScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/SettingsScreen.kt)
-- Apply compact header height and zero insets in landscape mode.
+#### [MODIFY] [SettingsScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/SettingsScreen.kt), [EqualizerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/EqualizerScreen.kt), [Mp3CutterScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/Mp3CutterScreen.kt)
+- Apply similar "status bar only" insets and compact heights to these secondary screens.
 
-#### [MODIFY] [EqualizerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/EqualizerScreen.kt)
-- Apply compact header height and zero insets in landscape mode.
+### Player Screen Refinement
 
-#### [MODIFY] [Mp3CutterScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/Mp3CutterScreen.kt)
-- Apply compact header height and zero insets in landscape mode.
+#### [MODIFY] [PlayerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/PlayerScreen.kt)
+- **Restore Landscape Icons**: Remove the `!isLandscape` check in `PlayerControls` to ensure the song queue (LazyRow) is visible in landscape mode.
+- **Header Alignment**: Update the `PlayerScreen` header to use `statusBarsPadding()` and a more compact height, similar to the library screen.
+- **Landscape Layout Adjustment**: Ensure the queue `LazyRow` fits well within the landscape layout, potentially adjusting its height or padding.
 
-#### [DONE] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
-- Updated `Share App (APK)` logic to use `context.cacheDir` and `applicationInfo.sourceDir`.
-- Set `contentWindowInsets` to zero in the root `Scaffold`.
+### Root Layout
+
+#### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
+- Verify the root `Scaffold` does not introduce unwanted horizontal padding in landscape.
 
 ## Verification Plan
 
 ### Automated Tests
-- Code compilation check for all modified screens.
+- Verify code compiles and builds successfully.
 
 ### Manual Verification
-- Verify all secondary screens (Settings, Equalizer, Cutter) have compact headers in landscape.
+- **Landscape Library**: Check if the header starts from the far left (minimal gap) and if the gap below the title is reduced.
+- **Landscape Player**: Verify the song queue icons are visible and the header is correctly aligned below the status bar.
+- **Secondary Screens**: Verify Settings, Equalizer, and Cutter screens are consistent with the new header style.

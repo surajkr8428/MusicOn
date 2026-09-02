@@ -576,6 +576,7 @@ fun MusicOnApp(
         ) {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
+                contentWindowInsets = WindowInsets.statusBars,
                 bottomBar = {
                     MiniPlayer(
                         onNavigateToPlayer = { isPlayerVisible = true },

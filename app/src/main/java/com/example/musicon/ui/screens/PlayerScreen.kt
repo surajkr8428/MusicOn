@@ -150,10 +150,10 @@ fun PlayerScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .statusBarsPadding(),
+                    .windowInsetsPadding(WindowInsets.statusBars),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header (Restored original alignment)
+                // Header (Restored original alignment, sitting just below status bar)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -664,26 +664,29 @@ fun PlayerControls(
             }
         }
 
-        if (!isLandscape) {
-            Spacer(modifier = Modifier.height(24.dp))
-            LazyRow(modifier = Modifier.fillMaxWidth().height(56.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                itemsIndexed(queue) { _, track ->
-                    val isCurrent = currentTrack?.id == track.id
-                    val imageModel = remember(track.id) {
-                        val path = track.customCoverPath ?: track.localPath
-                        if (path != null) {
-                            if (path.startsWith("content://")) Uri.parse(path) else File(path)
-                        } else {
-                            R.drawable.ic_launcher_foreground
-                        }
+        Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 24.dp))
+        
+        LazyRow(
+            modifier = Modifier.fillMaxWidth().height(if (isLandscape) 48.dp else 56.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            itemsIndexed(queue) { _, track ->
+                val isCurrent = currentTrack?.id == track.id
+                val imageModel = remember(track.id) {
+                    val path = track.customCoverPath ?: track.localPath
+                    if (path != null) {
+                        if (path.startsWith("content://")) Uri.parse(path) else File(path)
+                    } else {
+                        R.drawable.ic_launcher_foreground
                     }
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(imageModel).crossfade(true).build(),
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.05f)).clickable { viewModel.playTrack(track) },
-                        contentScale = ContentScale.Crop
-                    )
                 }
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current).data(imageModel).crossfade(true).build(),
+                    contentDescription = null,
+                    modifier = Modifier.size(if (isLandscape) 40.dp else 48.dp).clip(RoundedCornerShape(8.dp)).border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.05f)).clickable { viewModel.playTrack(track) },
+                    contentScale = ContentScale.Crop
+                )
             }
         }
     }

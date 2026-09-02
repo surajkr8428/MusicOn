@@ -1,30 +1,30 @@
-# Walkthrough - Header Space Optimization and Player UI Restoration
+# Walkthrough - Final UI Refinement and Landscape Optimization
 
-I have refined the header layout to respect status bar spacing, restored the original "perfect" alignment of the Player UI, and updated the player's minimize icon.
+I have finalized the UI refinements, ensuring headers are perfectly aligned, landscape gaps are removed, and all player features are visible in all orientations.
 
 ## Changes Made
 
-### Player UI Restoration
-- **Original Alignment**: Reverted all recent layout tweaks in `PlayerScreen.kt` (such as image scaling and bottom alignment) to restore the UI to its original state.
-- **Minimize Icon**: Replaced the back arrow (`ArrowBack`) with a down angle arrow (`KeyboardArrowDown`) to better represent "minimizing" the player.
-- **Header Height**: Restored the player header height to a consistent **64.dp**.
-- **System Padding**: Added `statusBarsPadding()` to the player content to ensure icons remain visible and correctly aligned below the status bar.
+### Zero-Gap Header Refinement
+- **Status Bar Alignment**: Updated all main screens (**Library**, **Settings**, **Equalizer**, **MP3 Cutter**, and **Player**) to use `WindowInsets.statusBars`. This ensures the header starts *immediately* below the status bar, restoring the professional look.
+- **Minimized Padding Below Name**:
+    - Used `IntrinsicSize.Min` for `TopAppBar` heights in landscape.
+    - Reduced internal padding in the title `Row` to bring content as close as possible to the "MusicOn" name.
+    - Adjusted vertical padding in secondary screens to be consistent with the main view.
 
-### Library Header Refinement
-- **Restored Top Space**: Reverted the removal of window insets at the top of the app. This ensures the status bar area (the space "above" the MusicOn name) is correctly respected.
-- **Minimized Bottom Space**: Used `IntrinsicSize.Min` for the `TopAppBar` in landscape mode across all screens. This removes the excessive vertical gap *below* the title.
+### Landscape Orientation Optimization
+- **Left-Side Gap Removal**: Fixed the issue where landscape mode had excessive space on the left. By managing `WindowInsets` more precisely at the root and screen levels, the UI now extends to the edges while keeping interactive elements safe.
+- **Player Screen Icons**: Restored the song queue `LazyRow` in landscape mode. It now appears below the playback controls, with slightly scaled-down icons (**40dp**) to ensure a perfect fit in the horizontal layout.
+- **Drawer Adjustment**: Added specific padding to the navigation icon in landscape to ensure it's easy to tap but sits tight against the left edge.
 
-### App Sharing Fix
-- **Reliable Source Path**: Switched to `context.applicationInfo.sourceDir` to locate the app's APK.
-- **Cache-Based Sharing**: The APK is now copied to a dedicated `shared_apk` sub-folder in `context.cacheDir` before sharing.
-- **Improved Intent**: Refined the sharing intent with explicit URI permission flags.
+### App Sharing (Stable)
+- The robust APK sharing logic using `cacheDir` and `sourceDir` is confirmed and working.
 
 ## Verification Results
 
 ### Automated Tests
-- Ran `gradle app:assembleDebug` - **Passed**. The project builds without errors.
+- Ran `gradle app:assembleDebug` - **Passed**.
 
 ### Manual Verification
-- Verified the Player UI has its original look and feel.
-- Verified the new "Down Arrow" icon for minimizing the player.
-- Verified that status bar space is preserved while bottom header gaps are minimized in landscape.
+- **Header Alignment**: Verified that "MusicOn" sits high but safe below the status bar.
+- **Landscape Player**: Verified song icons are back and the layout looks balanced.
+- **Edge-to-Edge**: Verified the left-side gap in landscape is gone.

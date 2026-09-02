@@ -120,6 +120,7 @@ fun LibraryScreen(
         StellarBackground {
             Scaffold(
                 containerColor = Color.Transparent,
+                contentWindowInsets = WindowInsets.statusBars,
                 topBar = {
                     if (isSelectionMode) {
                         SelectionTopBar(count = selectedIds.size, onClose = { selectedIds = emptySet() })
@@ -359,6 +360,7 @@ fun LibraryTopBar(
 ) {
     TopAppBar(
         modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
+        windowInsets = WindowInsets.statusBars,
         title = {
             if (isSearchActive) {
                 TextField(
@@ -369,7 +371,10 @@ fun LibraryTopBar(
                     trailingIcon = { IconButton(onClick = onSearchToggle) { Icon(Icons.Default.Close, null, tint = Color.Gray) } }
                 )
             } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 4.dp)
+                ) {
                     Text("MusicOn", color = Color.White, fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp)
                     if (timerRemaining != null) {
                         Spacer(Modifier.width(12.dp))
@@ -387,7 +392,7 @@ fun LibraryTopBar(
         navigationIcon = { 
             IconButton(
                 onClick = onOpenDrawer,
-                modifier = if (isLandscape) Modifier.size(36.dp) else Modifier
+                modifier = if (isLandscape) Modifier.size(36.dp).padding(start = 4.dp) else Modifier
             ) { 
                 Icon(Icons.Default.Menu, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) 
             } 
