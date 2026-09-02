@@ -120,6 +120,7 @@ fun LibraryScreen(
         StellarBackground {
             Scaffold(
                 containerColor = Color.Transparent,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 topBar = {
                     if (isSelectionMode) {
                         SelectionTopBar(count = selectedIds.size, onClose = { selectedIds = emptySet() })
@@ -311,7 +312,8 @@ fun PlaylistDetailScreen(
                         IconButton(onClick = { }) { Icon(Icons.Default.Add, null, tint = Color.White) }
                         IconButton(onClick = { }) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
                     },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent),
+                    windowInsets = WindowInsets(0, 0, 0, 0)
                 )
             }
         ) { padding ->
@@ -391,7 +393,8 @@ fun LibraryTopBar(
                 IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) }
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+        modifier = Modifier.statusBarsPadding()
     )
 }
 

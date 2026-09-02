@@ -2,5 +2,6 @@
 <paths>
     <cache-path name="my_cache" path="." />
     <external-cache-path name="my_external_cache" path="." />
+    <external-files-path name="my_external_files" path="." />
     <root-path name="root" path="." />
 </paths>

@@ -9,6 +9,7 @@ import android.hardware.SensorManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -278,7 +279,7 @@ class MainActivity : ComponentActivity() {
 
                     AnimatedVisibility(
                         visible = showApp,
-                        enter = fadeIn(tween(800)) + scaleIn(initialScale = 0.96f, animationSpec = tween(800, easing = LinearOutSlowInEasing)),
+                        enter = fadeIn(tween(1000, easing = LinearOutSlowInEasing)) + scaleIn(initialScale = 0.94f, animationSpec = tween(1000, easing = LinearOutSlowInEasing)),
                         exit = fadeOut()
                     ) {
                         MusicOnApp(
@@ -527,7 +528,8 @@ fun MusicOnApp(
                                     withContext(Dispatchers.IO) {
                                         try {
                                             val sourceFile = File(context.packageResourcePath)
-                                            val destFile = File(context.cacheDir, "MusicOn.apk")
+                                            val shareDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.cacheDir
+                                            val destFile = File(shareDir, "MusicOn.apk")
                                             sourceFile.copyTo(destFile, overwrite = true)
                                             
                                             val uri = androidx.core.content.FileProvider.getUriForFile(
@@ -561,6 +563,7 @@ fun MusicOnApp(
         ) {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 bottomBar = {
                     MiniPlayer(
                         onNavigateToPlayer = { isPlayerVisible = true },
