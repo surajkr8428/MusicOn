@@ -25,6 +25,9 @@ fun Mp3CutterScreen(
     var startRange by remember { mutableFloatStateOf(0f) }
     var endRange by remember { mutableFloatStateOf(track.duration.toFloat()) }
 
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
     BackHandler(onBack = onBack)
 
     StellarBackground {
@@ -32,10 +35,11 @@ fun Mp3CutterScreen(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    title = { Text("MP3 Cutter", color = Color.White, fontWeight = FontWeight.Bold) },
+                    modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
+                    title = { Text("MP3 Cutter", color = Color.White, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp) },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                        IconButton(onClick = onBack, modifier = if (isLandscape) Modifier.size(36.dp) else Modifier) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)

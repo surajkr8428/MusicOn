@@ -120,7 +120,6 @@ fun LibraryScreen(
         StellarBackground {
             Scaffold(
                 containerColor = Color.Transparent,
-                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 topBar = {
                     if (isSelectionMode) {
                         SelectionTopBar(count = selectedIds.size, onClose = { selectedIds = emptySet() })
@@ -173,8 +172,9 @@ fun LibraryScreen(
                             ScrollableTabRow(
                                 selectedTabIndex = pagerState.currentPage,
                                 containerColor = Color.Transparent,
-                                edgePadding = 16.dp,
+                                edgePadding = if (isLandscape) 8.dp else 16.dp,
                                 divider = {},
+                                modifier = if (isLandscape) Modifier.height(40.dp) else Modifier,
                                 indicator = { tabPositions ->
                                     if (pagerState.currentPage < tabPositions.size) {
                                         TabRowDefaults.SecondaryIndicator(
@@ -188,7 +188,8 @@ fun LibraryScreen(
                                     Tab(
                                         selected = pagerState.currentPage == index,
                                         onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                                        text = { Text(title, color = if (pagerState.currentPage == index) Color.White else Color.Gray, fontSize = if (isLandscape) 14.sp else 17.sp) }
+                                        text = { Text(title, color = if (pagerState.currentPage == index) Color.White else Color.Gray, fontSize = if (isLandscape) 13.sp else 17.sp) },
+                                        modifier = if (isLandscape) Modifier.height(40.dp) else Modifier
                                     )
                                 }
                             }
@@ -200,6 +201,7 @@ fun LibraryScreen(
                                     tracks = tracks,
                                     selectedIds = selectedIds,
                                     viewMode = viewMode,
+                                    isLandscape = isLandscape,
                                     onTrackClick = { track ->
                                         if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id
                                         else {
@@ -218,16 +220,16 @@ fun LibraryScreen(
                                 4 -> GroupedTab(allTracks, "Genre", viewMode) { viewModel.playSelected(it) }
                                 5 -> {
                                     val recent by viewModel.recentlyPlayed.collectAsState()
-                                    SongsTab(recent, selectedIds, viewMode, { viewModel.playTrackList(recent, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(recent.shuffled()) }, { viewModel.playSelected(recent) }, { viewModel.toggleFavorite(it) })
+                                    SongsTab(recent, selectedIds, viewMode, isLandscape, { viewModel.playTrackList(recent, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(recent.shuffled()) }, { viewModel.playSelected(recent) }, { viewModel.toggleFavorite(it) })
                                 }
                                 6 -> {
                                     val popular by viewModel.mostPlayed.collectAsState()
-                                    SongsTab(popular, selectedIds, viewMode, { viewModel.playTrackList(popular, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(popular.shuffled()) }, { viewModel.playSelected(popular) }, { viewModel.toggleFavorite(it) })
+                                    SongsTab(popular, selectedIds, viewMode, isLandscape, { viewModel.playTrackList(popular, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(popular.shuffled()) }, { viewModel.playSelected(popular) }, { viewModel.toggleFavorite(it) })
                                 }
                                 else -> {
                                     val folderPath = customFolders[page - 7]
                                     val folderTracks = allTracks.filter { it.localPath?.startsWith(folderPath) == true }
-                                    SongsTab(folderTracks, selectedIds, viewMode, { viewModel.playTrackList(folderTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(folderTracks.shuffled()) }, { viewModel.playSelected(folderTracks) }, { viewModel.toggleFavorite(it) })
+                                    SongsTab(folderTracks, selectedIds, viewMode, isLandscape, { viewModel.playTrackList(folderTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(folderTracks.shuffled()) }, { viewModel.playSelected(folderTracks) }, { viewModel.toggleFavorite(it) })
                                 }
                             }
                         }
@@ -312,8 +314,7 @@ fun PlaylistDetailScreen(
                         IconButton(onClick = { }) { Icon(Icons.Default.Add, null, tint = Color.White) }
                         IconButton(onClick = { }) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
                     },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent),
-                    windowInsets = WindowInsets(0, 0, 0, 0)
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
                 )
             }
         ) { padding ->
@@ -357,11 +358,12 @@ fun LibraryTopBar(
     isLandscape: Boolean
 ) {
     TopAppBar(
+        modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
         title = {
             if (isSearchActive) {
                 TextField(
                     value = searchQuery, onValueChange = onSearchQueryChange, placeholder = { Text("Search songs...", color = Color.Gray, fontSize = 14.sp) },
-                    modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(end = 8.dp).then(if (isLandscape) Modifier.height(40.dp) else Modifier),
                     colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedTextColor = Color.White, unfocusedTextColor = Color.White),
                     singleLine = true,
                     trailingIcon = { IconButton(onClick = onSearchToggle) { Icon(Icons.Default.Close, null, tint = Color.Gray) } }
@@ -382,19 +384,28 @@ fun LibraryTopBar(
                 }
             }
         },
-        navigationIcon = { IconButton(onClick = onOpenDrawer) { Icon(Icons.Default.Menu, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) } },
+        navigationIcon = { 
+            IconButton(
+                onClick = onOpenDrawer,
+                modifier = if (isLandscape) Modifier.size(36.dp) else Modifier
+            ) { 
+                Icon(Icons.Default.Menu, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) 
+            } 
+        },
         actions = {
             if (!isSearchActive) {
-                IconButton(onClick = onSearchToggle) { Icon(Icons.Default.Search, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) }
-                IconButton(onClick = onViewModeToggle) { 
-                    Icon(if (viewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) 
+                val iconSize = if (isLandscape) 36.dp else 48.dp
+                val innerIconSize = if (isLandscape) 20.dp else 24.dp
+                
+                IconButton(onClick = onSearchToggle, modifier = Modifier.size(iconSize)) { Icon(Icons.Default.Search, null, tint = Color.White, modifier = Modifier.size(innerIconSize)) }
+                IconButton(onClick = onViewModeToggle, modifier = Modifier.size(iconSize)) { 
+                    Icon(if (viewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.White, modifier = Modifier.size(innerIconSize)) 
                 }
-                IconButton(onClick = onSortClick) { Icon(Icons.AutoMirrored.Filled.Sort, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) }
-                IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) }
+                IconButton(onClick = onSortClick, modifier = Modifier.size(iconSize)) { Icon(Icons.AutoMirrored.Filled.Sort, null, tint = Color.White, modifier = Modifier.size(innerIconSize)) }
+                IconButton(onClick = onOpenSettings, modifier = Modifier.size(iconSize)) { Icon(Icons.Default.Settings, null, tint = Color.White, modifier = Modifier.size(innerIconSize)) }
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-        modifier = Modifier.statusBarsPadding()
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
     )
 }
 
@@ -478,6 +489,7 @@ fun SongsTab(
     tracks: List<TrackEntity>, 
     selectedIds: Set<String>, 
     viewMode: LibraryViewMode,
+    isLandscape: Boolean,
     onTrackClick: (TrackEntity) -> Unit, 
     onTrackLongClick: (TrackEntity) -> Unit, 
     onOptions: (TrackEntity) -> Unit, 
@@ -487,7 +499,7 @@ fun SongsTab(
 ) {
     Column(Modifier.fillMaxSize()) {
         if (selectedIds.isEmpty()) {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (isLandscape) 4.dp else 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 StellarActionButton(label = "Shuffle", icon = Icons.Default.Shuffle, modifier = Modifier.weight(1f), onClick = onShuffleAll)
                 StellarActionButton(label = "Play", icon = Icons.Default.PlayArrow, modifier = Modifier.weight(1f), onClick = onPlayAll)
             }

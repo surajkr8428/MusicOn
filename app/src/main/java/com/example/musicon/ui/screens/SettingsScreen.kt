@@ -70,15 +70,19 @@ fun SettingsScreen(
 
     BackHandler(onBack = onBack)
 
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
     StellarBackground {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    title = { Text("Settings", color = Color.White, fontWeight = FontWeight.Bold) },
+                    modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
+                    title = { Text("Settings", color = Color.White, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp) },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                        IconButton(onClick = onBack, modifier = if (isLandscape) Modifier.size(36.dp) else Modifier) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)

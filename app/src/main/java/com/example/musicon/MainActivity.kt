@@ -17,6 +17,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -270,37 +271,47 @@ class MainActivity : ComponentActivity() {
 
             CompositionLocalProvider(com.example.musicon.ui.components.LocalCustomBackground provides customBgUri) {
                 MusicOnTheme(themeMode = themeMode, accentColor = accentColor) {
-                    // Startup Animation
-                    var showApp by remember { mutableStateOf(false) }
+                    // Startup Animation (Play only on first Cold Start)
+                    var isFirstLaunch by rememberSaveable { mutableStateOf(true) }
+                    var showApp by remember { mutableStateOf(!isFirstLaunch) }
+                    
                     LaunchedEffect(Unit) {
-                        kotlinx.coroutines.delay(200)
-                        showApp = true
+                        if (isFirstLaunch) {
+                            kotlinx.coroutines.delay(200)
+                            showApp = true
+                            isFirstLaunch = false
+                        }
                     }
 
-                    AnimatedVisibility(
-                        visible = showApp,
-                        enter = fadeIn(tween(1000, easing = LinearOutSlowInEasing)) + scaleIn(initialScale = 0.94f, animationSpec = tween(1000, easing = LinearOutSlowInEasing)),
-                        exit = fadeOut()
-                    ) {
-                        MusicOnApp(
-                            viewModel = viewModel,
-                            mediaController = mediaController,
-                            onSignInClick = triggerSignIn,
-                            onSignOutClick = { triggerSignOut() },
-                            onScanClick = {
-                                val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    Manifest.permission.READ_MEDIA_AUDIO
-                                } else {
-                                    Manifest.permission.READ_EXTERNAL_STORAGE
+                    if (showApp) {
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn(tween(1000)) + scaleIn(initialScale = 0.96f, animationSpec = tween(1000, easing = LinearOutSlowInEasing)),
+                            exit = fadeOut()
+                        ) {
+                            MusicOnApp(
+                                viewModel = viewModel,
+                                mediaController = mediaController,
+                                onSignInClick = triggerSignIn,
+                                onSignOutClick = { triggerSignOut() },
+                                onScanClick = {
+                                    val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        Manifest.permission.READ_MEDIA_AUDIO
+                                    } else {
+                                        Manifest.permission.READ_EXTERNAL_STORAGE
+                                    }
+                                    
+                                    if (ContextCompat.checkSelfPermission(this@MainActivity, permission) == PackageManager.PERMISSION_GRANTED) {
+                                        viewModel.scanLocalStorage()
+                                    } else {
+                                        permissionLauncher.launch(permission)
+                                    }
                                 }
-                                
-                                if (ContextCompat.checkSelfPermission(this@MainActivity, permission) == PackageManager.PERMISSION_GRANTED) {
-                                    viewModel.scanLocalStorage()
-                                } else {
-                                    permissionLauncher.launch(permission)
-                                }
-                            }
-                        )
+                            )
+                        }
+                    } else {
+                        // Background placeholder during cold start animation delay
+                        Box(Modifier.fillMaxSize().background(Color(0xFF0D0B1F)))
                     }
                 }
             }
@@ -527,8 +538,9 @@ fun MusicOnApp(
                                     drawerState.close()
                                     withContext(Dispatchers.IO) {
                                         try {
-                                            val sourceFile = File(context.packageResourcePath)
-                                            val shareDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.cacheDir
+                                            val sourceFile = File(context.applicationInfo.sourceDir)
+                                            val shareDir = File(context.cacheDir, "shared_apk")
+                                            if (!shareDir.exists()) shareDir.mkdirs()
                                             val destFile = File(shareDir, "MusicOn.apk")
                                             sourceFile.copyTo(destFile, overwrite = true)
                                             
@@ -544,7 +556,8 @@ fun MusicOnApp(
                                                 addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                             }
                                             val chooser = android.content.Intent.createChooser(intent, "Share MusicOn APK")
-                                            chooser.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            // Essential flag for sharing URIs
+                                            chooser.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                             context.startActivity(chooser)
                                         } catch (e: Exception) {
                                             android.util.Log.e("MusicOn", "Failed to share APK", e)
@@ -563,7 +576,6 @@ fun MusicOnApp(
         ) {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
-                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 bottomBar = {
                     MiniPlayer(
                         onNavigateToPlayer = { isPlayerVisible = true },

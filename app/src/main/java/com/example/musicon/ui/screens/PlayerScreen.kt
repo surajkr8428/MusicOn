@@ -149,11 +149,10 @@ fun PlayerScreen(
             // Front Layer: Content
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding(), // Seat flush but avoid clock
+                    .fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header (Fixed Height 64dp, smaller in landscape)
+                // Header (Smaller and sitting top)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -246,7 +245,7 @@ fun PlayerScreen(
                         ) {
                             Text(
                                 text = "Music stops in ${remaining / 60000}m",
-                                color = Color.White, // Match Song Name Color
+                                color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (isLandscape) 18.sp else 14.sp),
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
@@ -754,7 +753,7 @@ fun LyricsView(
                         text = line.text, 
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal, 
-                            fontSize = 24.sp * scale,
+                            fontSize = 22.sp * scale,
                             lineHeight = 36.sp
                         ), 
                         color = color, 

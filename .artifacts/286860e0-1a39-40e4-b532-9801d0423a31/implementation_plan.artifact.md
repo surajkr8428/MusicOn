@@ -1,36 +1,38 @@
-# Implementation Plan - Final Layout Precision & APK Fix
+# Implementation Plan - Precision Landscape UI & Robust Sharing
 
-I will eliminate the unwanted gap in landscape mode, clean up the player's 3-dot menu, fix the timer color, and use a more robust sharing method for the APK.
+I will fix the orientation transition flicker, eliminate the large gaps in the landscape header, and implement a definitive fix for APK sharing to ensure it installs successfully.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> - **Header Gap Fix**: I am removing `systemBarsPadding()` from the root containers in Library and Player. This will stop the "pushed down" look in landscape mode, making the header sit perfectly at the top.
-> - **APK Sharing Fix**: I am switching to `getExternalFilesDir` for the shared APK. This is the most reliable location for Android's installer to read files from when shared via another app.
-> - **Player Menu Clean-up**: "Create & Add" and "Change View" have been removed from the 3-dot menu.
+> - **Zero-Flicker Rotation**: I am fixing the startup logic so the entrance animation only plays once. This will stop the "white screen" effect when rotating the device.
+> - **Maximized Landscape Space**: I am removing the excessive padding above and below the "MusicOn" title in landscape mode. The header will be ultra-compact to leave more room for your music.
+> - **APK Sharing Fix**: I am switching the sharing method to use a more compatible `ClipData` structure and ensuring the recipient device gets full read access to the installer file.
 
 ## Proposed Changes
 
-### UI Geometry Fixes
+### UI & Performance Refinements
+#### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
+- **Animation Fix**: Use `rememberSaveable` to ensure `showApp` state persists across rotations. This prevents the animation (and the white screen) from re-triggering when you turn your phone.
+- **Header Geometry**: Update the `MusicOnApp` and its children to use zero insets where appropriate, allowing content to sit higher.
+- **Robust Sharing**:
+    - Copy the APK to the `cacheDir`.
+    - Explicitly set `Intent.setDataAndType` and `ClipData` on the sharing intent. This helps some installers that require the data to be in the "Data" field of the intent, not just the "Extra" field.
+
 #### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
-- Remove `systemBarsPadding()` where it's double-padding.
-- Ensure the header uses `statusBarsPadding()` only to sit flush at the top.
+- **Compact Header**:
+    - Reduce `LibraryTopBar` height to **40dp** in landscape.
+    - Set `windowInsets = WindowInsets(0, 0, 0, 0)` for the `TopAppBar`.
+    - Reduce internal vertical padding of the title `Row`.
+- **Spacing Cleanup**: Remove redundant `statusBarsPadding()` that was pushing the header down.
 
 #### [MODIFY] [PlayerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/PlayerScreen.kt)
-- Change `systemBarsPadding()` to a more controlled inset handling.
-- Remove unwanted menu items.
-- Set Sleep Timer text color to `Color.White`.
-
-### Sharing Compatibility
-#### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
-- **New Share Logic**:
-    - Use `getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)` to store the temporary `MusicOn.apk`. This directory is publicly readable by installers.
-    - Simplified Intent flags.
+- **Compact Header**: Reduce header height in landscape.
+- **Color Sync**: Ensure Sleep Timer text color is strictly `Color.White`.
 
 ## Verification Plan
 
 ### Manual Verification
-1.  **Landscape Check**: Open the app in landscape. Verify the header is at the very top without a large gap.
-2.  **3-Dot Menu**: Verify "Create & Add" and "Change View" are gone.
-3.  **Timer Color**: Set a timer and verify it matches the white song title.
-4.  **APK Share**: Share the APK and install it on another device.
+1.  **Rotation Check**: Rotate the device rapidly. Verify there is **no white flicker** and the UI updates instantly.
+2.  **Geometry Check**: Verify the "MusicOn" title in landscape is very close to the top edge and the gap below it is minimized.
+3.  **Sharing**: Share the APK via Quick Share or WhatsApp. Verify the recipient can install it without "Package invalid" errors.

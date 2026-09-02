@@ -1,0 +1,11 @@
+- `[x]` Fix APK sharing logic in `MainActivity.kt`
+- `[x]` Compact header UI in `LibraryScreen.kt`
+    - `[x]` Reduce padding in `LibraryTopBar`
+    - `[x]` Remove automatic window insets
+    - `[x]` Adjust `ScrollableTabRow` spacing
+- `[x]` Compact header UI in secondary screens
+    - `[x]` `SettingsScreen.kt`
+    - `[x]` `EqualizerScreen.kt`
+    - `[x]` `Mp3CutterScreen.kt`
+- `[x]` Verify sharing intent and UI layout
+- `[x]` Create walkthrough

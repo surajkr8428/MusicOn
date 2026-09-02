@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,21 +35,26 @@ fun EqualizerScreen(
     val bands = remember(eqBandsStr) { eqBandsStr.split(",").map { it.toInt() } }
     val primaryColor = MaterialTheme.colorScheme.primary
 
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    
     StellarBackground {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
-                    title = { Text("Equalizer", color = Color.White, fontWeight = FontWeight.Bold) },
+                    modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
+                    title = { Text("Equalizer", color = Color.White, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp) },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                        IconButton(onClick = onBack, modifier = if (isLandscape) Modifier.size(36.dp) else Modifier) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier)
                         }
                     },
                     actions = {
                         Switch(
                             checked = eqEnabled,
                             onCheckedChange = { viewModel.updateEqEnabled(it) },
+                            modifier = if (isLandscape) Modifier.scale(0.8f) else Modifier,
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = primaryColor,
                                 checkedTrackColor = primaryColor.copy(alpha = 0.3f),
