@@ -150,7 +150,7 @@ fun PlayerScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.statusBars),
+                    .windowInsetsPadding(WindowInsets(0)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Header (Restored original alignment, sitting just below status bar)
@@ -234,25 +234,27 @@ fun PlayerScreen(
                     }
                 }
 
-                // Sleep Timer Message
-                AnimatedVisibility(
-                    visible = sleepTimerRemaining != null && !isLandscape,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    sleepTimerRemaining?.let { remaining ->
-                        Surface(
-                            color = Color.White.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        ) {
-                            Text(
-                                text = "Music stops in ${remaining / 60000}m",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (isLandscape) 18.sp else 14.sp),
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                            )
+                // Sleep Timer Message (Hidden when in controls)
+                if (false) {
+                    AnimatedVisibility(
+                        visible = sleepTimerRemaining != null && !isLandscape,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        sleepTimerRemaining?.let { remaining ->
+                            Surface(
+                                color = Color.White.copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            ) {
+                                Text(
+                                    text = "Music stops in ${remaining / 60000}m",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.headlineSmall.copy(fontSize = if (isLandscape) 18.sp else 14.sp),
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -297,7 +299,8 @@ fun PlayerScreen(
                                 onDraggingChange = { isDragging = it },
                                 onPositionUpdate = { position = it },
                                 shuffleMode = shuffleMode,
-                                repeatMode = repeatMode
+                                repeatMode = repeatMode,
+                                sleepTimerRemaining = sleepTimerRemaining
                             )
                         }
                     } else {
@@ -365,7 +368,8 @@ fun PlayerLayoutPortrait(
     onDraggingChange: (Boolean) -> Unit,
     onPositionUpdate: (Long) -> Unit,
     shuffleMode: Boolean,
-    repeatMode: Int
+    repeatMode: Int,
+    sleepTimerRemaining: Long?
 ) {
     val rotationTransition = rememberInfiniteTransition(label = "rotation")
     val rotation by rotationTransition.animateFloat(
@@ -468,7 +472,8 @@ fun PlayerLayoutPortrait(
             onPositionUpdate = onPositionUpdate,
             shuffleMode = shuffleMode,
             repeatMode = repeatMode,
-            queue = queue
+            queue = queue,
+            sleepTimerRemaining = sleepTimerRemaining
         )
     }
 }
@@ -586,7 +591,7 @@ fun PlayerLayoutLandscape(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-                .height(48.dp),
+                .height(56.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -604,7 +609,7 @@ fun PlayerLayoutLandscape(
                     model = ImageRequest.Builder(LocalContext.current).data(imageModel).crossfade(true).build(),
                     contentDescription = null,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(48.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(8.dp))
                         .background(Color.White.copy(alpha = 0.05f))
@@ -643,21 +648,21 @@ fun PlayerControls(
     ) {
         // Sleep Timer and Time Info
         Box(modifier = Modifier.fillMaxWidth()) {
+            if (!isLandscape && sleepTimerRemaining != null) {
+                Text(
+                    text = formatSleepTime(sleepTimerRemaining),
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                    modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp)
+                )
+            }
+
             Text(
                 text = "${formatTime(if (isDragging) dragPosition else position)} / ${formatTime(duration)}",
                 style = MaterialTheme.typography.headlineMedium.copy(fontSize = if (isLandscape) 24.sp else 32.sp, fontWeight = FontWeight.Bold),
                 color = Color.White,
                 modifier = Modifier.align(Alignment.Center)
             )
-            
-            if (isLandscape && sleepTimerRemaining != null) {
-                Text(
-                    text = "${sleepTimerRemaining / 60000}m",
-                    style = MaterialTheme.typography.headlineSmall.copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
-                    color = Color.White,
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp)
-                )
-            }
         }
 
         Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 16.dp))
@@ -712,6 +717,16 @@ fun PlayerControls(
                 val icon = if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
                 Icon(icon, null, tint = if (repeatMode != Player.REPEAT_MODE_OFF) primaryColor else Color.White.copy(alpha = 0.6f)) 
             }
+        }
+
+        if (isLandscape && sleepTimerRemaining != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = formatSleepTime(sleepTimerRemaining),
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+                textAlign = TextAlign.Center
+            )
         }
 
         if (!isLandscape) {
@@ -822,6 +837,18 @@ fun LyricsView(
                 }
             }
         }
+    }
+}
+
+private fun formatSleepTime(millis: Long): String {
+    val totalSeconds = millis / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%02d:%02d", minutes, seconds)
     }
 }
 

@@ -1,6 +1,7 @@
-- `[x]` Refine Landscape UI and Force Stop
-    - `[x]` Implement Force Stop in `PlaybackService.kt`
-    - `[x]` Add `configChanges` to `AndroidManifest.xml`
-    - `[x]` Restructure `PlayerLayoutLandscape` and `PlayerControls`
-- `[x]` Verify UI and Orientation Transition
-- `[x]` Create final walkthrough
+- `[ ]` Fix Header Overlap in `MainActivity.kt`
+- `[ ]` Implement Big Bold HH:MM:SS Sleep Timer below Play Button
+- `[ ]` Increase Landscape Queue Icons to 56dp
+- `[ ]` Fix Cloud Upload Folder and Add Logging
+- `[ ]` Finalize Notification Tap-to-Open
+- `[ ]` Verify UI and Functions
+- `[ ]` Create final walkthrough

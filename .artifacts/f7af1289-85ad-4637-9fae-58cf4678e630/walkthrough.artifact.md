@@ -1,19 +1,22 @@
-# Walkthrough - Landscape UI Refinement, Force Stop, and Smooth Transitions
+# Walkthrough - Notification Support, Cloud Fixes, and UI Unification
 
-I have completed the requested UI refinements for landscape mode, implemented the force stop behavior, and optimized the orientation transitions.
+I have finalized the latest round of functional and UI improvements, focusing on a more connected experience and a polished interface.
 
 ## Changes Made
 
-### 1. Smooth Orientation Transitions
-- **No More Flash**: Updated `AndroidManifest.xml` to handle orientation changes manually for `MainActivity`. This eliminates the "white screen" flash and the delay when rotating your device. The app now transitions between portrait and landscape instantly.
+### 1. Functional Connectivity
+- **Notification Tap-to-Open**: Tapping the music notification in your status bar or lock screen now correctly opens the app.
+- **Cloud Upload Fix**: Resolved the issue where songs wouldn't upload to Google Drive by removing a hardcoded folder ID. Songs now upload directly to the root of your Drive for maximum compatibility.
 
-### 2. App Force Stop
-- **Immediate Termination**: Updated `PlaybackService.kt` to always call `stopSelf()` when the app is swiped away from the recent apps list (`onTaskRemoved`). This ensures music stops immediately and the app does not linger in the background.
+### 2. Sidebar Evolution
+- **Modernized Drawer**:
+    - Removed the redundant "Scan Local Music" option (scanning is now done via a simple pull-down on the library).
+    - Added dedicated management options: **Cloud Browser**, **Cloud Upload**, and **Cloud Manager**.
 
-### 3. Landscape UI Refinement (Player)
-- **Bottom Song Queue**: Moved the song queue icons to the very bottom of the screen in landscape mode, spanning the full width as per your request.
-- **Bold Sleep Timer**: The sleep timer countdown in landscape has been moved to the top-right of the controls section. It now uses a **bold** font style, consistent with the song name.
-- **Improved Layout**: Balanced the artwork and controls weights in landscape to provide a cleaner, more professional look.
+### 3. UI Unification and Refinement
+- **Zero-Gap Header**: Removed the top status bar gap in the **Library** and **Player** screens. The app title now sits flush against the top area, maximizing vertical space.
+- **Icon Size Standardization**: Increased the song icons in the landscape player queue to **48dp**, making them consistent with the "All Songs" tab.
+- **Sleep Timer Visibility**: Fixed the sleep timer display. It now appears in both portrait and landscape player controls with a **bold font** matching the song name's prominence.
 
 ## Verification Results
 
@@ -21,6 +24,6 @@ I have completed the requested UI refinements for landscape mode, implemented th
 - Ran `gradle app:assembleDebug` - **Passed**.
 
 ### Manual Verification
-- **Orientation**: Rotated the device multiple times; transitions are smooth and instant.
-- **Force Stop**: Played music and swiped the app away; music stopped immediately.
-- **Landscape UI**: Verified the new positions for the song icons and the sleep timer.
+- **App Opening**: Verified tap-on-notification opens the MainActivity.
+- **Landscape Player**: Confirmed larger 48dp icons and visible bold sleep timer.
+- **Edge-to-Edge**: Confirmed the library header has no top gap.

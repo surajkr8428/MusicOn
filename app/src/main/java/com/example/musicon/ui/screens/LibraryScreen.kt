@@ -120,7 +120,7 @@ fun LibraryScreen(
         StellarBackground {
             Scaffold(
                 containerColor = Color.Transparent,
-                contentWindowInsets = WindowInsets.statusBars,
+                contentWindowInsets = WindowInsets(0),
                 topBar = {
                     if (isSelectionMode) {
                         SelectionTopBar(count = selectedIds.size, onClose = { selectedIds = emptySet() })
@@ -360,7 +360,7 @@ fun LibraryTopBar(
 ) {
     TopAppBar(
         modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
-        windowInsets = WindowInsets.statusBars,
+        windowInsets = WindowInsets(0),
         title = {
             if (isSearchActive) {
                 TextField(

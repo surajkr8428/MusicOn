@@ -393,12 +393,6 @@ fun MusicOnApp(
     var isEqualizerVisible by rememberSaveable { mutableStateOf(false) }
     var cutterTrack by remember { mutableStateOf<com.example.musicon.data.local.TrackEntity?>(null) }
 
-    val folderPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
-        uri?.let { viewModel.addCustomFolder(it.toString()) }
-    }
-
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
@@ -503,17 +497,24 @@ fun MusicOnApp(
                             colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = Color.White)
                         )
                         NavigationDrawerItem(
-                            label = { Text("Scan Local Music") },
+                            label = { Text("Cloud Browser") },
                             selected = false,
-                            onClick = { scope.launch { drawerState.close() }; onScanClick() },
-                            icon = { Icon(Icons.Default.Scanner, null) },
+                            onClick = { scope.launch { drawerState.close() }; /* Browser Logic */ },
+                            icon = { Icon(Icons.Default.FolderOpen, null) },
                             colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = Color.White)
                         )
                         NavigationDrawerItem(
-                            label = { Text("Add Folder Tab") },
+                            label = { Text("Cloud Upload") },
                             selected = false,
-                            onClick = { scope.launch { drawerState.close() }; folderPicker.launch(null) },
-                            icon = { Icon(Icons.Default.CreateNewFolder, null) },
+                            onClick = { scope.launch { drawerState.close() }; /* Upload Logic */ },
+                            icon = { Icon(Icons.Default.CloudUpload, null) },
+                            colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = Color.White)
+                        )
+                        NavigationDrawerItem(
+                            label = { Text("Cloud Manager") },
+                            selected = false,
+                            onClick = { scope.launch { drawerState.close() }; /* Manager Logic */ },
+                            icon = { Icon(Icons.Default.CloudQueue, null) },
                             colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = Color.White)
                         )
                         NavigationDrawerItem(
@@ -576,7 +577,7 @@ fun MusicOnApp(
         ) {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
-                contentWindowInsets = WindowInsets.statusBars,
+                contentWindowInsets = WindowInsets(0),
                 bottomBar = {
                     MiniPlayer(
                         onNavigateToPlayer = { isPlayerVisible = true },

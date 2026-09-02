@@ -1,5 +1,6 @@
 package com.example.musicon.service
 
+import android.app.PendingIntent
 import android.content.Intent
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
@@ -91,7 +92,12 @@ class PlaybackService : MediaSessionService() {
             }
         })
         
-        mediaSession = MediaSession.Builder(this, player).build()
+        val intent = Intent(this, com.example.musicon.MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        
+        mediaSession = MediaSession.Builder(this, player)
+            .setSessionActivity(pendingIntent)
+            .build()
     }
 
     private fun observeEffectsSettings(settings: SettingsRepository) {

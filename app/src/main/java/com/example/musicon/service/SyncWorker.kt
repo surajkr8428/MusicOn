@@ -40,7 +40,7 @@ class SyncWorker(
                 val fileName = inputData.getString("file_name") ?: "Uploaded Song"
                 val trackId = inputData.getString("track_id") ?: return Result.failure()
                 try {
-                    val gDriveId = cloudManager.uploadFile(filePath, fileName, "14W_7EbfeM4oTwyXxS1FL7jt5Sf_6siCg")
+                    val gDriveId = cloudManager.uploadFile(filePath, fileName, null)
                     if (gDriveId != null) {
                         val existingTrack = database.trackDao().getTrackById(trackId)
                         if (existingTrack != null) {
