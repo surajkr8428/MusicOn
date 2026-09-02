@@ -236,7 +236,7 @@ fun PlayerScreen(
 
                 // Sleep Timer Message
                 AnimatedVisibility(
-                    visible = sleepTimerRemaining != null,
+                    visible = sleepTimerRemaining != null && !isLandscape,
                     enter = fadeIn() + expandVertically(),
                     exit = fadeOut() + shrinkVertically()
                 ) {
@@ -277,7 +277,8 @@ fun PlayerScreen(
                                 onDraggingChange = { isDragging = it },
                                 onPositionUpdate = { position = it },
                                 shuffleMode = shuffleMode,
-                                repeatMode = repeatMode
+                                repeatMode = repeatMode,
+                                sleepTimerRemaining = sleepTimerRemaining
                             )
                         } else {
                             PlayerLayoutPortrait(
@@ -489,7 +490,8 @@ fun PlayerLayoutLandscape(
     onDraggingChange: (Boolean) -> Unit,
     onPositionUpdate: (Long) -> Unit,
     shuffleMode: Boolean,
-    repeatMode: Int
+    repeatMode: Int,
+    sleepTimerRemaining: Long?
 ) {
     val rotationTransition = rememberInfiniteTransition(label = "rotation")
     val rotation by rotationTransition.animateFloat(
@@ -500,80 +502,116 @@ fun PlayerLayoutLandscape(
     
     var hasSkippedInSession by remember { mutableStateOf(false) }
 
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight()
-                .pointerInput(currentTrack?.id) {
-                    detectTapGestures(onDoubleTap = { currentTrack?.let { viewModel.toggleFavorite(it) } })
-                }
-                .pointerInput(Unit) {
-                    detectHorizontalDragGestures(
-                        onDragStart = { hasSkippedInSession = false },
-                        onHorizontalDrag = { change, dragAmount ->
-                            change.consume()
-                            if (!hasSkippedInSession) {
-                                if (dragAmount > 50) { player.seekToPrevious(); hasSkippedInSession = true }
-                                else if (dragAmount < -50) { player.seekToNext(); hasSkippedInSession = true }
-                            }
-                        }
-                    )
-                },
-            contentAlignment = Alignment.Center
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            if (imageMode != PlayerImageMode.FULL_SCREEN && currentTrack != null) {
-                val artworkUri = remember(currentTrack.id) {
-                    val path = currentTrack.customCoverPath ?: currentTrack.localPath
-                    if (path != null) {
-                        if (path.startsWith("content://")) Uri.parse(path) else File(path)
-                    } else null
-                }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .pointerInput(currentTrack?.id) {
+                        detectTapGestures(onDoubleTap = { currentTrack?.let { viewModel.toggleFavorite(it) } })
+                    }
+                    .pointerInput(Unit) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { hasSkippedInSession = false },
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+                                if (!hasSkippedInSession) {
+                                    if (dragAmount > 50) { player.seekToPrevious(); hasSkippedInSession = true }
+                                    else if (dragAmount < -50) { player.seekToNext(); hasSkippedInSession = true }
+                                }
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (imageMode != PlayerImageMode.FULL_SCREEN && currentTrack != null) {
+                    val artworkUri = remember(currentTrack.id) {
+                        val path = currentTrack.customCoverPath ?: currentTrack.localPath
+                        if (path != null) {
+                            if (path.startsWith("content://")) Uri.parse(path) else File(path)
+                        } else null
+                    }
 
-                Box(contentAlignment = Alignment.Center) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(artworkUri ?: R.drawable.ic_launcher_foreground)
-                            .crossfade(true)
-                            .build(),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxHeight(0.9f)
-                            .aspectRatio(1f)
-                            .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
-                            .rotate(if (imageMode == PlayerImageMode.ROTATION && isPlaying) rotation else 0f),
-                        contentScale = ContentScale.Crop
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(artworkUri ?: R.drawable.ic_launcher_foreground)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxHeight(0.9f)
+                                .aspectRatio(1f)
+                                .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
+                                .rotate(if (imageMode == PlayerImageMode.ROTATION && isPlaying) rotation else 0f),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
                 }
+            }
+
+            Spacer(Modifier.width(32.dp))
+
+            Box(modifier = Modifier.weight(1.5f)) { 
+                PlayerControls(
+                    currentTrack = currentTrack,
+                    player = player,
+                    viewModel = viewModel,
+                    primaryColor = primaryColor,
+                    isPlaying = isPlaying,
+                    position = position,
+                    duration = duration,
+                    isDragging = isDragging,
+                    dragPosition = dragPosition,
+                    onDragPositionChange = onDragPositionChange,
+                    onDraggingChange = onDraggingChange,
+                    onPositionUpdate = onPositionUpdate,
+                    shuffleMode = shuffleMode,
+                    repeatMode = repeatMode,
+                    queue = queue,
+                    isLandscape = true,
+                    sleepTimerRemaining = sleepTimerRemaining
+                )
             }
         }
 
-        Spacer(Modifier.width(32.dp))
-
-        Box(modifier = Modifier.weight(1.5f)) { // Adjusted weight for better landscape visibility
-            PlayerControls(
-                currentTrack = currentTrack,
-                player = player,
-                viewModel = viewModel,
-                primaryColor = primaryColor,
-                isPlaying = isPlaying,
-                position = position,
-                duration = duration,
-                isDragging = isDragging,
-                dragPosition = dragPosition,
-                onDragPositionChange = onDragPositionChange,
-                onDraggingChange = onDraggingChange,
-                onPositionUpdate = onPositionUpdate,
-                shuffleMode = shuffleMode,
-                repeatMode = repeatMode,
-                queue = queue,
-                isLandscape = true
-            )
+        // Bottom Queue in Landscape
+        LazyRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+                .height(48.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            itemsIndexed(queue) { _, track ->
+                val isCurrent = currentTrack?.id == track.id
+                val imageModel = remember(track.id) {
+                    val path = track.customCoverPath ?: track.localPath
+                    if (path != null) {
+                        if (path.startsWith("content://")) Uri.parse(path) else File(path)
+                    } else {
+                        R.drawable.ic_launcher_foreground
+                    }
+                }
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current).data(imageModel).crossfade(true).build(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(8.dp))
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .clickable { viewModel.playTrack(track) },
+                    contentScale = ContentScale.Crop
+                )
+            }
         }
     }
 }
@@ -595,20 +633,32 @@ fun PlayerControls(
     shuffleMode: Boolean,
     repeatMode: Int,
     queue: List<com.example.musicon.data.local.TrackEntity>,
-    isLandscape: Boolean = false
+    isLandscape: Boolean = false,
+    sleepTimerRemaining: Long? = null
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().wrapContentHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Duration Text (Touching artwork)
-        Text(
-            text = "${formatTime(if (isDragging) dragPosition else position)} / ${formatTime(duration)}",
-            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 32.sp, fontWeight = FontWeight.Bold),
-            color = Color.White,
-            modifier = Modifier.padding(top = 0.dp)
-        )
+        // Sleep Timer and Time Info
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "${formatTime(if (isDragging) dragPosition else position)} / ${formatTime(duration)}",
+                style = MaterialTheme.typography.headlineMedium.copy(fontSize = if (isLandscape) 24.sp else 32.sp, fontWeight = FontWeight.Bold),
+                color = Color.White,
+                modifier = Modifier.align(Alignment.Center)
+            )
+            
+            if (isLandscape && sleepTimerRemaining != null) {
+                Text(
+                    text = "${sleepTimerRemaining / 60000}m",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontSize = 18.sp, fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp)
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 16.dp))
 
@@ -664,29 +714,30 @@ fun PlayerControls(
             }
         }
 
-        Spacer(modifier = Modifier.height(if (isLandscape) 8.dp else 24.dp))
-        
-        LazyRow(
-            modifier = Modifier.fillMaxWidth().height(if (isLandscape) 48.dp else 56.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            itemsIndexed(queue) { _, track ->
-                val isCurrent = currentTrack?.id == track.id
-                val imageModel = remember(track.id) {
-                    val path = track.customCoverPath ?: track.localPath
-                    if (path != null) {
-                        if (path.startsWith("content://")) Uri.parse(path) else File(path)
-                    } else {
-                        R.drawable.ic_launcher_foreground
+        if (!isLandscape) {
+            Spacer(modifier = Modifier.height(24.dp))
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                itemsIndexed(queue) { _, track ->
+                    val isCurrent = currentTrack?.id == track.id
+                    val imageModel = remember(track.id) {
+                        val path = track.customCoverPath ?: track.localPath
+                        if (path != null) {
+                            if (path.startsWith("content://")) Uri.parse(path) else File(path)
+                        } else {
+                            R.drawable.ic_launcher_foreground
+                        }
                     }
+                    AsyncImage(
+                        model = ImageRequest.Builder(LocalContext.current).data(imageModel).crossfade(true).build(),
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.05f)).clickable { viewModel.playTrack(track) },
+                        contentScale = ContentScale.Crop
+                    )
                 }
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(imageModel).crossfade(true).build(),
-                    contentDescription = null,
-                    modifier = Modifier.size(if (isLandscape) 40.dp else 48.dp).clip(RoundedCornerShape(8.dp)).border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.05f)).clickable { viewModel.playTrack(track) },
-                    contentScale = ContentScale.Crop
-                )
             }
         }
     }

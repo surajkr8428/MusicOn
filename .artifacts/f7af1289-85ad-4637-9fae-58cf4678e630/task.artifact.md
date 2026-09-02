@@ -1,5 +1,6 @@
-- `[x]` Refine Library Screen Header and Landscape Padding
-- `[x]` Restore Song Icons in Landscape Player
-- `[x]` Update Secondary Screens Headers (Settings, Equalizer, Cutter)
-- `[x]` Verify UI and APK Sharing
+- `[x]` Refine Landscape UI and Force Stop
+    - `[x]` Implement Force Stop in `PlaybackService.kt`
+    - `[x]` Add `configChanges` to `AndroidManifest.xml`
+    - `[x]` Restructure `PlayerLayoutLandscape` and `PlayerControls`
+- `[x]` Verify UI and Orientation Transition
 - `[x]` Create final walkthrough

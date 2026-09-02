@@ -1,39 +1,47 @@
-# Implementation Plan - UI Refinement: Zero Gap Header and Landscape Fixes
+# Implementation Plan - App Force Stop, UI Refinement, and Transition Optimization
 
-The goal is to refine the app's UI by placing the header immediately below the status bar, removing vertical space below the app name, eliminating the left-side gap in landscape mode, and restoring song icons to the landscape player.
+This plan addresses the requirement to force stop the app on closure, refines the Player UI in landscape mode, and eliminates the flash/delay during orientation changes.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Force Stop Behavior**: By changing the `onTaskRemoved` behavior to always `stopSelf()`, the music will stop immediately when the user swipes the app away from the recent apps list. This is what was requested, but it differs from many standard music players that keep playing in the background until paused.
+
+> [!NOTE]
+> **Smooth Transitions**: I will prevent Activity recreation on orientation changes. This will remove the "white screen" flash and significantly speed up the transition between portrait and landscape modes.
 
 ## Proposed Changes
 
-### UI Layout & Insets
+### Media Service & Configuration
 
-#### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
-- **Zero Horizontal Insets**: Update the `Scaffold` and `TopAppBar` to ignore horizontal window insets (like display cutouts) in landscape mode to remove the left-side gap.
-- **Tight Header**:
-    - Adjust `LibraryTopBar` to use `WindowInsets.statusBars` for top padding only, ensuring it sits just below the status bar.
-    - Reduce internal vertical padding in the header to minimize space below the "MusicOn" title.
-    - Further reduce `edgePadding` in `ScrollableTabRow` for landscape.
+#### [MODIFY] [PlaybackService.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/service/PlaybackService.kt)
+- Update `onTaskRemoved` to always call `stopSelf()`, ensuring the service (and music) terminates when the app task is removed from recents.
 
-#### [MODIFY] [SettingsScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/SettingsScreen.kt), [EqualizerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/EqualizerScreen.kt), [Mp3CutterScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/Mp3CutterScreen.kt)
-- Apply similar "status bar only" insets and compact heights to these secondary screens.
+#### [MODIFY] [AndroidManifest.xml](file:///D:/MusicOn/app/src/main/AndroidManifest.xml)
+- Add `android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"` to `MainActivity`. This prevents the Activity from being destroyed and recreated during rotation, removing the white screen/delay.
 
-### Player Screen Refinement
+### UI Components & Screens
 
 #### [MODIFY] [PlayerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/PlayerScreen.kt)
-- **Restore Landscape Icons**: Remove the `!isLandscape` check in `PlayerControls` to ensure the song queue (LazyRow) is visible in landscape mode.
-- **Header Alignment**: Update the `PlayerScreen` header to use `statusBarsPadding()` and a more compact height, similar to the library screen.
-- **Landscape Layout Adjustment**: Ensure the queue `LazyRow` fits well within the landscape layout, potentially adjusting its height or padding.
-
-### Root Layout
-
-#### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
-- Verify the root `Scaffold` does not introduce unwanted horizontal padding in landscape.
+- **Sleep Timer Display**:
+    - Update `PlayerLayoutLandscape` and `PlayerControls` to accept `sleepTimerRemaining: Long?`.
+    - In `PlayerScreen`, hide the top-level sleep timer message when `isLandscape` is true.
+    - In `PlayerControls`, add a bold sleep timer display in the top-right corner of the controls section for landscape mode.
+- **Landscape Layout Restructuring**:
+    - In `PlayerLayoutLandscape`, wrap the artwork/controls `Row` and the song queue `LazyRow` in a `Column`.
+    - Move the song queue `LazyRow` to the bottom of this new `Column`, spanning the full width of the screen.
+    - Adjust padding and sizes to ensure the layout matches the provided image.
 
 ## Verification Plan
 
 ### Automated Tests
-- Verify code compiles and builds successfully.
+- Verify code compiles successfully.
+- Ensure all parameters are correctly passed through the composable hierarchy.
 
 ### Manual Verification
-- **Landscape Library**: Check if the header starts from the far left (minimal gap) and if the gap below the title is reduced.
-- **Landscape Player**: Verify the song queue icons are visible and the header is correctly aligned below the status bar.
-- **Secondary Screens**: Verify Settings, Equalizer, and Cutter screens are consistent with the new header style.
+- **Force Stop**: Open the app, play music, then swipe it away from the recent apps list. The music should stop immediately.
+- **Smooth Transition**: Rotate the device. There should be no white flash or significant delay.
+- **Landscape UI**:
+    - Rotate the device to landscape.
+    - Verify the sleep timer appears in the top-right area of the controls with bold text.
+    - Verify the song queue icons are at the very bottom of the screen.
