@@ -591,7 +591,7 @@ fun PlayerLayoutLandscape(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
-                .height(56.dp),
+                .height(72.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -609,7 +609,7 @@ fun PlayerLayoutLandscape(
                     model = ImageRequest.Builder(LocalContext.current).data(imageModel).crossfade(true).build(),
                     contentDescription = null,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(56.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(8.dp))
                         .background(Color.White.copy(alpha = 0.05f))

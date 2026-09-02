@@ -1,7 +1,7 @@
-- `[ ]` Fix Header Overlap in `MainActivity.kt`
-- `[ ]` Implement Big Bold HH:MM:SS Sleep Timer below Play Button
-- `[ ]` Increase Landscape Queue Icons to 56dp
-- `[ ]` Fix Cloud Upload Folder and Add Logging
-- `[ ]` Finalize Notification Tap-to-Open
-- `[ ]` Verify UI and Functions
-- `[ ]` Create final walkthrough
+- `[x]` Fix Header Overlap in `MainActivity.kt`
+- `[x]` Implement Big Bold HH:MM:SS Sleep Timer below Play Button
+- `[x]` Increase Landscape Queue Icons to 56dp
+- `[x]` Fix Cloud Upload Folder and Add Logging
+- `[x]` Finalize Notification Tap-to-Open
+- `[x]` Verify UI and Functions
+- `[x]` Create final walkthrough

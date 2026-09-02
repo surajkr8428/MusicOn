@@ -65,19 +65,33 @@ class CloudStorageManager(private val context: Context) {
     }
 
     suspend fun uploadFile(filePath: String, name: String, folderId: String? = null): String? = withContext(Dispatchers.IO) {
-        val service = getDriveService() ?: return@withContext null
-        val fileMetadata = com.google.api.services.drive.model.File().apply {
-            this.name = name
-            if (folderId != null) {
-                this.parents = listOf(folderId)
-            }
+        android.util.Log.d("CloudStorageManager", "Starting upload: $name from $filePath")
+        val service = getDriveService() ?: run {
+            android.util.Log.e("CloudStorageManager", "Failed to get Drive service")
+            return@withContext null
         }
-        val localFile = File(filePath)
-        val mediaContent = FileContent("audio/mpeg", localFile)
-        
-        val result = service.files().create(fileMetadata, mediaContent)
-            .setFields("id")
-            .execute()
-        result.id
+        try {
+            val fileMetadata = com.google.api.services.drive.model.File().apply {
+                this.name = name
+                if (folderId != null) {
+                    this.parents = listOf(folderId)
+                }
+            }
+            val localFile = File(filePath)
+            if (!localFile.exists()) {
+                android.util.Log.e("CloudStorageManager", "Local file does not exist: $filePath")
+                return@withContext null
+            }
+            val mediaContent = FileContent("audio/mpeg", localFile)
+            
+            val result = service.files().create(fileMetadata, mediaContent)
+                .setFields("id")
+                .execute()
+            android.util.Log.d("CloudStorageManager", "Upload successful, ID: ${result.id}")
+            result.id
+        } catch (e: Exception) {
+            android.util.Log.e("CloudStorageManager", "Upload failed", e)
+            null
+        }
     }
 }
