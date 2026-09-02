@@ -149,19 +149,22 @@ fun PlayerScreen(
             // Front Layer: Content
             Column(
                 modifier = Modifier
-                    .fillMaxSize(),
+                    .fillMaxSize()
+                    .statusBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header (Smaller and sitting top)
+                // Header (Restored original alignment)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
-                        .height(if (isLandscape) 48.dp else 64.dp),
+                        .height(64.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) }
+                    IconButton(onClick = onBack) { 
+                        Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.White, modifier = Modifier.size(32.dp)) 
+                    }
                     
                     TabRow(
                         selectedTabIndex = selectedTab,
@@ -173,7 +176,7 @@ fun PlayerScreen(
                                 color = primaryColor
                             )
                         },
-                        modifier = Modifier.width(if (isLandscape) 240.dp else 160.dp)
+                        modifier = Modifier.width(160.dp)
                     ) {
                         Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Player", color = if (selectedTab == 0) Color.White else Color.Gray, fontSize = 14.sp) } )
                         Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) Color.White else Color.Gray, fontSize = 14.sp) } )
@@ -387,7 +390,7 @@ fun PlayerLayoutPortrait(
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Flexible Image Area (Aligned to BOTTOM to touch duration)
+        // Flexible Image Area
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -409,7 +412,7 @@ fun PlayerLayoutPortrait(
                         }
                     )
                 },
-            contentAlignment = Alignment.BottomCenter
+            contentAlignment = Alignment.Center
         ) {
             if (imageMode != PlayerImageMode.FULL_SCREEN && currentTrack != null) {
                 val trackForImg = currentTrack
@@ -428,7 +431,7 @@ fun PlayerLayoutPortrait(
                             .build(), 
                         contentDescription = null,
                         modifier = Modifier
-                            .fillMaxSize(0.95f) // Take full available height to touch duration
+                            .fillMaxSize(0.85f)
                             .aspectRatio(1f)
                             .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
                             .rotate(if (imageMode == PlayerImageMode.ROTATION && isPlaying) rotation else 0f),
@@ -540,7 +543,7 @@ fun PlayerLayoutLandscape(
                             .build(),
                         contentDescription = null,
                         modifier = Modifier
-                            .fillMaxHeight(1f) // Maximize in landscape
+                            .fillMaxHeight(0.9f)
                             .aspectRatio(1f)
                             .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
                             .rotate(if (imageMode == PlayerImageMode.ROTATION && isPlaying) rotation else 0f),

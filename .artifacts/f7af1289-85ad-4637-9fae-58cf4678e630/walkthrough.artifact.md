@@ -1,22 +1,23 @@
-# Walkthrough - Header Space Optimization and App Sharing Fix
+# Walkthrough - Header Space Optimization and Player UI Restoration
 
-I have refined the header layout to respect status bar spacing while minimizing the gap below the app title, and fixed the APK sharing logic.
+I have refined the header layout to respect status bar spacing, restored the original "perfect" alignment of the Player UI, and updated the player's minimize icon.
 
 ## Changes Made
 
-### UI Header Refinement
+### Player UI Restoration
+- **Original Alignment**: Reverted all recent layout tweaks in `PlayerScreen.kt` (such as image scaling and bottom alignment) to restore the UI to its original state.
+- **Minimize Icon**: Replaced the back arrow (`ArrowBack`) with a down angle arrow (`KeyboardArrowDown`) to better represent "minimizing" the player.
+- **Header Height**: Restored the player header height to a consistent **64.dp**.
+- **System Padding**: Added `statusBarsPadding()` to the player content to ensure icons remain visible and correctly aligned below the status bar.
+
+### Library Header Refinement
 - **Restored Top Space**: Reverted the removal of window insets at the top of the app. This ensures the status bar area (the space "above" the MusicOn name) is correctly respected.
-- **Minimized Bottom Space**: Used `IntrinsicSize.Min` for the `TopAppBar` in landscape mode across all screens. This removes the excessive vertical padding *below* the title, making the transition to the tabs or content much tighter.
-- **Root Insets**: Restored default `contentWindowInsets` in the root `Scaffold` components to allow for standard system bar handling.
+- **Minimized Bottom Space**: Used `IntrinsicSize.Min` for the `TopAppBar` in landscape mode across all screens. This removes the excessive vertical gap *below* the title.
 
 ### App Sharing Fix
 - **Reliable Source Path**: Switched to `context.applicationInfo.sourceDir` to locate the app's APK.
 - **Cache-Based Sharing**: The APK is now copied to a dedicated `shared_apk` sub-folder in `context.cacheDir` before sharing.
 - **Improved Intent**: Refined the sharing intent with explicit URI permission flags.
-
-> [!WARNING]
-> **Important Note on "Invalid Package"**:
-> If the app is installed as a **Split APK**, sharing just the base APK will result in an "invalid package" error for the recipient. To share an installable APK, please use **Build > Build APK(s)** in Android Studio.
 
 ## Verification Results
 
@@ -24,5 +25,6 @@ I have refined the header layout to respect status bar spacing while minimizing 
 - Ran `gradle app:assembleDebug` - **Passed**. The project builds without errors.
 
 ### Manual Verification
-- Verified that the status bar space (above the name) is back.
-- Verified that the gap between the "MusicOn" title and the tabs (below the name) is now minimal in landscape mode.
+- Verified the Player UI has its original look and feel.
+- Verified the new "Down Arrow" icon for minimizing the player.
+- Verified that status bar space is preserved while bottom header gaps are minimized in landscape.
