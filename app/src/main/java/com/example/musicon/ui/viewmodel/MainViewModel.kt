@@ -159,11 +159,15 @@ class MainViewModel(
             }
         }
         when(sort) {
-            "NAME" -> list.sortedBy { it.displayName }
-            "ARTIST" -> list.sortedBy { it.displayArtist }
-            "DURATION" -> list.sortedByDescending { it.duration }
-            "RECENT" -> list.sortedByDescending { it.id } // Replace with date added if available
-            else -> list
+            "NAME_ASC" -> list.sortedBy { it.displayName }
+            "NAME_DESC" -> list.sortedByDescending { it.displayName }
+            "ARTIST_ASC" -> list.sortedBy { it.displayArtist }
+            "ARTIST_DESC" -> list.sortedByDescending { it.displayArtist }
+            "DURATION_ASC" -> list.sortedBy { it.duration }
+            "DURATION_DESC" -> list.sortedByDescending { it.duration }
+            "RECENT_ASC" -> list.sortedBy { it.id }
+            "RECENT_DESC" -> list.sortedByDescending { it.id }
+            else -> list.sortedBy { it.displayName }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

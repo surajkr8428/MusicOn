@@ -41,11 +41,13 @@ import androidx.compose.ui.platform.LocalConfiguration
 import android.content.res.Configuration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.musicon.R
+import com.example.musicon.data.LibraryViewMode
 import com.example.musicon.data.local.TrackEntity
 import com.example.musicon.ui.components.StellarBackground
 import com.example.musicon.ui.components.TrackOptionsBottomSheet
@@ -70,6 +72,8 @@ fun LibraryScreen(
     val customFolders by viewModel.customFolders.collectAsState()
     val searchQuery by viewModel.searchQuery
     val sortOrder by viewModel.songSortOrder.collectAsState()
+    val viewMode by viewModel.libraryViewMode.collectAsState()
+    val sleepTimerRemaining by viewModel.sleepTimerRemaining.collectAsState()
     
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -108,7 +112,9 @@ fun LibraryScreen(
         PlaylistDetailScreen(
             playlist = currentPlaylistDetail!!,
             viewModel = viewModel,
-            onBack = { currentPlaylistDetail = null }
+            onBack = { currentPlaylistDetail = null },
+            viewMode = viewMode,
+            isLandscape = isLandscape
         )
     } else {
         StellarBackground {
@@ -125,7 +131,14 @@ fun LibraryScreen(
                             onSearchQueryChange = { viewModel.updateSearchQuery(it) },
                             onOpenDrawer = onOpenDrawer,
                             onOpenSettings = onOpenSettings,
-                            onSortClick = { showSortMenu = true }
+                            onSortClick = { showSortMenu = true },
+                            onViewModeToggle = {
+                                val next = if (viewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST
+                                viewModel.updateLibraryViewMode(next)
+                            },
+                            viewMode = viewMode,
+                            timerRemaining = sleepTimerRemaining,
+                            isLandscape = isLandscape
                         )
                     }
                 },
@@ -174,7 +187,7 @@ fun LibraryScreen(
                                     Tab(
                                         selected = pagerState.currentPage == index,
                                         onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-                                        text = { Text(title, color = if (pagerState.currentPage == index) Color.White else Color.Gray, fontSize = 17.sp) }
+                                        text = { Text(title, color = if (pagerState.currentPage == index) Color.White else Color.Gray, fontSize = if (isLandscape) 14.sp else 17.sp) }
                                     )
                                 }
                             }
@@ -185,7 +198,7 @@ fun LibraryScreen(
                                 0 -> SongsTab(
                                     tracks = tracks,
                                     selectedIds = selectedIds,
-                                    isLandscape = isLandscape,
+                                    viewMode = viewMode,
                                     onTrackClick = { track ->
                                         if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id
                                         else {
@@ -198,22 +211,22 @@ fun LibraryScreen(
                                     onPlayAll = { viewModel.playSelected(tracks) },
                                     onToggleFavorite = { viewModel.toggleFavorite(it) }
                                 )
-                                1 -> PlaylistsTab(playlists, { currentPlaylistDetail = it }, { showCreatePlaylistDialog = true })
-                                2 -> GroupedTab(allTracks, "Album", isLandscape) { viewModel.playSelected(it) }
-                                3 -> GroupedTab(allTracks, "Artist", isLandscape) { viewModel.playSelected(it) }
-                                4 -> GroupedTab(allTracks, "Genre", isLandscape) { viewModel.playSelected(it) }
+                                1 -> PlaylistsTab(playlists, viewMode, { currentPlaylistDetail = it }, { showCreatePlaylistDialog = true })
+                                2 -> GroupedTab(allTracks, "Album", viewMode) { viewModel.playSelected(it) }
+                                3 -> GroupedTab(allTracks, "Artist", viewMode) { viewModel.playSelected(it) }
+                                4 -> GroupedTab(allTracks, "Genre", viewMode) { viewModel.playSelected(it) }
                                 5 -> {
                                     val recent by viewModel.recentlyPlayed.collectAsState()
-                                    SongsTab(recent, selectedIds, isLandscape, { viewModel.playTrackList(recent, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(recent.shuffled()) }, { viewModel.playSelected(recent) }, { viewModel.toggleFavorite(it) })
+                                    SongsTab(recent, selectedIds, viewMode, { viewModel.playTrackList(recent, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(recent.shuffled()) }, { viewModel.playSelected(recent) }, { viewModel.toggleFavorite(it) })
                                 }
                                 6 -> {
                                     val popular by viewModel.mostPlayed.collectAsState()
-                                    SongsTab(popular, selectedIds, isLandscape, { viewModel.playTrackList(popular, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(popular.shuffled()) }, { viewModel.playSelected(popular) }, { viewModel.toggleFavorite(it) })
+                                    SongsTab(popular, selectedIds, viewMode, { viewModel.playTrackList(popular, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(popular.shuffled()) }, { viewModel.playSelected(popular) }, { viewModel.toggleFavorite(it) })
                                 }
                                 else -> {
                                     val folderPath = customFolders[page - 7]
                                     val folderTracks = allTracks.filter { it.localPath?.startsWith(folderPath) == true }
-                                    SongsTab(folderTracks, selectedIds, isLandscape, { viewModel.playTrackList(folderTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(folderTracks.shuffled()) }, { viewModel.playSelected(folderTracks) }, { viewModel.toggleFavorite(it) })
+                                    SongsTab(folderTracks, selectedIds, viewMode, { viewModel.playTrackList(folderTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(folderTracks.shuffled()) }, { viewModel.playSelected(folderTracks) }, { viewModel.toggleFavorite(it) })
                                 }
                             }
                         }
@@ -281,7 +294,9 @@ fun LibraryScreen(
 fun PlaylistDetailScreen(
     playlist: com.example.musicon.data.local.Playlist,
     viewModel: MainViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewMode: LibraryViewMode,
+    isLandscape: Boolean
 ) {
     val playlistTracks by viewModel.getTracksForPlaylist(playlist.id).collectAsState(emptyList())
 
@@ -290,7 +305,7 @@ fun PlaylistDetailScreen(
             containerColor = Color.Transparent,
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text(playlist.name, color = Color.White, fontFamily = FontFamily.Cursive, fontSize = 24.sp) },
+                    title = { Text(playlist.name, color = Color.White, fontFamily = FontFamily.Cursive, fontSize = if (isLandscape) 18.sp else 24.sp) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } },
                     actions = {
                         IconButton(onClick = { }) { Icon(Icons.Default.Add, null, tint = Color.White) }
@@ -300,10 +315,24 @@ fun PlaylistDetailScreen(
                 )
             }
         ) { padding ->
-            LazyColumn(Modifier.fillMaxSize().padding(padding)) {
-                items(playlistTracks) { track ->
-                    StellarTrackItem(track, false, { viewModel.playTrackList(playlistTracks, track) }, {}, { 
-                    }, { viewModel.toggleFavorite(track) })
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                if (viewMode == LibraryViewMode.GRID) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 100.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(8.dp)
+                    ) {
+                        items(playlistTracks) { track ->
+                            StellarGridItem(track, false, { viewModel.playTrackList(playlistTracks, it) }, {}, { viewModel.toggleFavorite(track) })
+                        }
+                    }
+                } else {
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(playlistTracks) { track ->
+                            StellarTrackItem(track, false, { viewModel.playTrackList(playlistTracks, track) }, {}, { 
+                            }, { viewModel.toggleFavorite(track) })
+                        }
+                    }
                 }
             }
         }
@@ -319,7 +348,11 @@ fun LibraryTopBar(
     onSearchQueryChange: (String) -> Unit, 
     onOpenDrawer: () -> Unit, 
     onOpenSettings: () -> Unit,
-    onSortClick: () -> Unit
+    onSortClick: () -> Unit,
+    onViewModeToggle: () -> Unit,
+    viewMode: LibraryViewMode,
+    timerRemaining: Long?,
+    isLandscape: Boolean
 ) {
     TopAppBar(
         title = {
@@ -332,15 +365,30 @@ fun LibraryTopBar(
                     trailingIcon = { IconButton(onClick = onSearchToggle) { Icon(Icons.Default.Close, null, tint = Color.Gray) } }
                 )
             } else {
-                Text("MusicOn", color = Color.White, fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("MusicOn", color = Color.White, fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp)
+                    if (timerRemaining != null) {
+                        Spacer(Modifier.width(12.dp))
+                        Surface(color = MaterialTheme.colorScheme.primary.copy(0.2f), shape = RoundedCornerShape(8.dp)) {
+                            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Timer, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("${timerRemaining / 60000}m", color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
             }
         },
-        navigationIcon = { IconButton(onClick = onOpenDrawer) { Icon(Icons.Default.Menu, null, tint = Color.White) } },
+        navigationIcon = { IconButton(onClick = onOpenDrawer) { Icon(Icons.Default.Menu, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) } },
         actions = {
             if (!isSearchActive) {
-                IconButton(onClick = onSearchToggle) { Icon(Icons.Default.Search, null, tint = Color.White) }
-                IconButton(onClick = onSortClick) { Icon(Icons.AutoMirrored.Filled.Sort, null, tint = Color.White) }
-                IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, null, tint = Color.White) }
+                IconButton(onClick = onSearchToggle) { Icon(Icons.Default.Search, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) }
+                IconButton(onClick = onViewModeToggle) { 
+                    Icon(if (viewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) 
+                }
+                IconButton(onClick = onSortClick) { Icon(Icons.AutoMirrored.Filled.Sort, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) }
+                IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier) }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -355,28 +403,45 @@ fun SortMenu(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Sort Songs By") },
+        title = { Text("Sort Songs By", fontSize = 16.sp, fontWeight = FontWeight.Bold) },
         text = {
-            Column {
-                SortOption("Name (A-Z)", "NAME", currentOrder, onSortSelected)
-                SortOption("Artist", "ARTIST", currentOrder, onSortSelected)
-                SortOption("Recently Added", "RECENT", currentOrder, onSortSelected)
-                SortOption("Duration", "DURATION", currentOrder, onSortSelected)
+            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) { // Compact
+                SortCategory("Name", "NAME", currentOrder, onSortSelected)
+                SortCategory("Artist", "ARTIST", currentOrder, onSortSelected)
+                SortCategory("Recent", "RECENT", currentOrder, onSortSelected)
+                SortCategory("Duration", "DURATION", currentOrder, onSortSelected)
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        shape = RoundedCornerShape(12.dp)
     )
 }
 
 @Composable
-fun SortOption(label: String, value: String, current: String, onSelect: (String) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable { onSelect(value) }.padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+fun SortCategory(label: String, baseValue: String, current: String, onSelect: (String) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text(label, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            SortMiniButton(if (baseValue == "RECENT") "Newest" else if (baseValue == "DURATION") "Longest" else "A-Z", "${baseValue}_ASC", current, onSelect, Modifier.weight(1f))
+            SortMiniButton(if (baseValue == "RECENT") "Oldest" else if (baseValue == "DURATION") "Shortest" else "Z-A", "${baseValue}_DESC", current, onSelect, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+fun SortMiniButton(label: String, value: String, current: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
+    val isSelected = value == current
+    Button(
+        onClick = { onSelect(value) },
+        modifier = modifier.height(36.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(0.05f),
+            contentColor = if (isSelected) Color.Black else Color.White
+        ),
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        shape = RoundedCornerShape(8.dp)
     ) {
-        RadioButton(selected = value == current, onClick = { onSelect(value) })
-        Spacer(Modifier.width(12.dp))
-        Text(label, color = if (value == current) MaterialTheme.colorScheme.primary else Color.White)
+        Text(label, fontSize = 11.sp, maxLines = 1)
     }
 }
 
@@ -409,7 +474,7 @@ fun SelectionActionItem(icon: ImageVector, label: String, onClick: () -> Unit) {
 fun SongsTab(
     tracks: List<TrackEntity>, 
     selectedIds: Set<String>, 
-    isLandscape: Boolean,
+    viewMode: LibraryViewMode,
     onTrackClick: (TrackEntity) -> Unit, 
     onTrackLongClick: (TrackEntity) -> Unit, 
     onOptions: (TrackEntity) -> Unit, 
@@ -419,20 +484,20 @@ fun SongsTab(
 ) {
     Column(Modifier.fillMaxSize()) {
         if (selectedIds.isEmpty()) {
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 StellarActionButton(label = "Shuffle", icon = Icons.Default.Shuffle, modifier = Modifier.weight(1f), onClick = onShuffleAll)
                 StellarActionButton(label = "Play", icon = Icons.Default.PlayArrow, modifier = Modifier.weight(1f), onClick = onPlayAll)
             }
         }
         
-        if (isLandscape) {
+        if (viewMode == LibraryViewMode.GRID) {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Adaptive(minSize = 100.dp),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 80.dp)
+                contentPadding = PaddingValues(8.dp)
             ) {
                 items(tracks) { track ->
-                    StellarTrackItem(track, track.id in selectedIds, { onTrackClick(track) }, { onTrackLongClick(track) }, { onOptions(track) }, { onToggleFavorite(track) })
+                    StellarGridItem(track, track.id in selectedIds, onTrackClick, onTrackLongClick, { onToggleFavorite(track) })
                 }
             }
         } else {
@@ -448,6 +513,7 @@ fun SongsTab(
 @Composable
 fun PlaylistsTab(
     playlists: List<com.example.musicon.data.local.Playlist>, 
+    viewMode: LibraryViewMode,
     onPlaylistClick: (com.example.musicon.data.local.Playlist) -> Unit,
     onCreatePlaylist: () -> Unit
 ) {
@@ -456,28 +522,42 @@ fun PlaylistsTab(
             label = "Create New Playlist", 
             icon = Icons.Default.Add, 
             modifier = Modifier.fillMaxWidth().padding(16.dp), 
-            onClick = onCreatePlaylist
+            onCreatePlaylist
         )
         
         if (playlists.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("No playlists", color = Color.Gray) }
-        else LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-            items(playlists) { playlist ->
-                ListItem(
-                    headlineContent = { Text(playlist.name, color = Color.White) },
-                    leadingContent = { 
-                        val icon = if (playlist.name == "Favorite") Icons.Default.Favorite else Icons.AutoMirrored.Filled.PlaylistAdd
-                        Icon(icon, null, tint = if (playlist.name == "Favorite") Color.Red else Color.White)
-                    },
-                    modifier = Modifier.clickable { onPlaylistClick(playlist) },
-                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                )
+        else {
+            if (viewMode == LibraryViewMode.GRID) {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 100.dp),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(8.dp)
+                ) {
+                    items(playlists) { playlist ->
+                        PlaylistGridItem(playlist, onPlaylistClick)
+                    }
+                }
+            } else {
+                LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                    items(playlists) { playlist ->
+                        ListItem(
+                            headlineContent = { Text(playlist.name, color = Color.White) },
+                            leadingContent = { 
+                                val icon = if (playlist.name == "Favorite") Icons.Default.Favorite else Icons.AutoMirrored.Filled.PlaylistAdd
+                                Icon(icon, null, tint = if (playlist.name == "Favorite") Color.Red else Color.White)
+                            },
+                            modifier = Modifier.clickable { onPlaylistClick(playlist) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun GroupedTab(tracks: List<TrackEntity>, groupType: String, isLandscape: Boolean, onPlayGroup: (List<TrackEntity>) -> Unit) {
+fun GroupedTab(tracks: List<TrackEntity>, groupType: String, viewMode: LibraryViewMode, onPlayGroup: (List<TrackEntity>) -> Unit) {
     val grouped = remember(tracks) {
         when (groupType) {
             "Album" -> tracks.groupBy { it.displayAlbum }
@@ -488,16 +568,11 @@ fun GroupedTab(tracks: List<TrackEntity>, groupType: String, isLandscape: Boolea
     }
     if (grouped.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No $groupType found", color = Color.Gray) }
     else {
-        if (isLandscape) {
-            LazyVerticalGrid(columns = GridCells.Fixed(3), modifier = Modifier.fillMaxSize()) {
+        if (viewMode == LibraryViewMode.GRID) {
+            LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 100.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
                 grouped.forEach { (name, groupTracks) ->
                     item {
-                        ListItem(
-                            headlineContent = { Text(name, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1) },
-                            supportingContent = { Text("${groupTracks.size} songs", color = Color.Gray) },
-                            modifier = Modifier.clickable { onPlayGroup(groupTracks) },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                        )
+                        GroupGridItem(name, groupTracks, onPlayGroup)
                     }
                 }
             }
@@ -522,7 +597,7 @@ fun GroupedTab(tracks: List<TrackEntity>, groupType: String, isLandscape: Boolea
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun StellarTrackItem(track: TrackEntity, isSelected: Boolean, onPlay: () -> Unit, onLongClick: () -> Unit, onOptions: () -> Unit, onToggleFavorite: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().background(if (isSelected) Color.White.copy(alpha = 0.1f) else Color.Transparent).combinedClickable(onClick = onPlay, onLongClick = onLongClick, onDoubleClick = onToggleFavorite).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = Modifier.fillMaxWidth().background(if (isSelected) Color.White.copy(alpha = 0.1f) else Color.Transparent).combinedClickable(onClick = onPlay, onLongClick = onLongClick, onDoubleClick = onToggleFavorite).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box {
             val imageModel = remember(track.customCoverPath, track.localPath) {
                 val file = track.customCoverPath?.let { File(it) }
@@ -532,20 +607,86 @@ fun StellarTrackItem(track: TrackEntity, isSelected: Boolean, onPlay: () -> Unit
                     track.localPath ?: R.drawable.ic_launcher_foreground
                 }
             }
-            AsyncImage(model = imageModel, contentDescription = null, modifier = Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
-            if (isSelected) Box(modifier = Modifier.size(52.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) }
+            AsyncImage(model = imageModel, contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+            if (isSelected) Box(modifier = Modifier.size(48.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) }
         }
         Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = track.displayName, style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Cursive, color = LavenderTitle, fontSize = 19.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(text = track.displayName, style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Cursive, color = LavenderTitle, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 // Red heart icon next to name
                 IconButton(onClick = onToggleFavorite, modifier = Modifier.size(24.dp)) { 
-                    Icon(if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, modifier = Modifier.size(18.dp), tint = if (track.isFavorite) Color.Red else Color.Gray) 
+                    Icon(if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, modifier = Modifier.size(16.dp), tint = if (track.isFavorite) Color.Red else Color.Gray) 
                 }
             }
-            Text(text = "${track.displayArtist} | ${formatDuration(track.duration)} | ${track.bitrate ?: "320k"}", style = MaterialTheme.typography.labelSmall, color = Color.LightGray, maxLines = 1)
+            Text(text = "${track.displayArtist} | ${formatDuration(track.duration)}", style = MaterialTheme.typography.labelSmall, color = Color.LightGray, maxLines = 1)
         }
-        IconButton(onClick = onOptions) { Icon(Icons.Default.MoreVert, null, tint = Color.Gray) }
+        IconButton(onClick = onOptions) { Icon(Icons.Default.MoreVert, null, tint = Color.Gray, modifier = Modifier.size(20.dp)) }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun StellarGridItem(track: TrackEntity, isSelected: Boolean, onPlay: (TrackEntity) -> Unit, onLongClick: (TrackEntity) -> Unit, onToggleFavorite: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .padding(4.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(onClick = { onPlay(track) }, onLongClick = { onLongClick(track) }, onDoubleClick = onToggleFavorite)
+            .padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box {
+            val imageModel = remember(track.customCoverPath, track.localPath) {
+                val file = track.customCoverPath?.let { File(it) }
+                if (file != null && file.exists()) file else track.localPath ?: R.drawable.ic_launcher_foreground
+            }
+            AsyncImage(
+                model = imageModel, contentDescription = null,
+                modifier = Modifier.aspectRatio(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop
+            )
+            if (isSelected) Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) }
+            
+            if (track.isFavorite) {
+                Icon(Icons.Default.Favorite, null, tint = Color.Red, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(16.dp))
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(text = track.displayName, color = LavenderTitle, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(text = track.displayArtist, color = Color.Gray, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+fun PlaylistGridItem(playlist: com.example.musicon.data.local.Playlist, onClick: (com.example.musicon.data.local.Playlist) -> Unit) {
+    Column(
+        modifier = Modifier.padding(6.dp).clickable { onClick(playlist) },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(Modifier.size(70.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(0.05f)), contentAlignment = Alignment.Center) {
+            Icon(
+                if (playlist.name == "Favorite") Icons.Default.Favorite else Icons.AutoMirrored.Filled.PlaylistAdd,
+                null, tint = if (playlist.name == "Favorite") Color.Red else Color.Gray,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(playlist.name, color = Color.White, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center)
+    }
+}
+
+@Composable
+fun GroupGridItem(name: String, tracks: List<TrackEntity>, onClick: (List<TrackEntity>) -> Unit) {
+    Column(
+        modifier = Modifier.padding(6.dp).clickable { onClick(tracks) },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(Modifier.size(70.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(0.05f)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Album, null, tint = Color.Gray, modifier = Modifier.size(32.dp))
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(name, color = Color.White, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center)
+        Text("${tracks.size} songs", color = Color.Gray, fontSize = 9.sp, textAlign = TextAlign.Center)
     }
 }
 
@@ -553,16 +694,16 @@ fun StellarTrackItem(track: TrackEntity, isSelected: Boolean, onPlay: () -> Unit
 fun StellarActionButton(label: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Button(
         onClick = onClick, 
-        modifier = modifier.height(44.dp), 
+        modifier = modifier.height(38.dp), 
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
             contentColor = Color.Black
         ), 
         shape = RoundedCornerShape(22.dp)
     ) {
-        Icon(icon, null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(label, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Icon(icon, null, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }
 

@@ -1,39 +1,46 @@
-# Implementation Plan - Advanced UI Features & APK Sharing Fix
+# Implementation Plan - Comprehensive UI Refinement & Interaction
 
-I will implement a set of high-impact features including a top-level sleep timer, adaptive view modes (List/Grid), professional startup animations, and a fix for the APK sharing system.
+I will resolve the layout issues, implement the enhanced sorting system, add dynamic view modes to all tabs, and fix the APK sharing system. I will also add a dedicated Sleep Timer display to both the Library and Player screens.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> - **APK Sharing Fix**: To ensure the shared app can be installed easily, I will copy the APK to a temporary file named `MusicOn.apk` before sharing. This gives the recipient a clear filename and helps Android's installer identify it correctly.
-> - **View Modes**: You can now switch between **List** and **Grid** views in every tab. The Grid view will show large artwork with the name underneath.
-> - **Top Timer**: If a sleep timer is active, the remaining time will be displayed at the top of the library for easy tracking.
+> - **Landscape Header**: I am reducing the top bar height in landscape mode to **48dp** and decreasing the padding to maximize content space on phones.
+> - **Player Timer Message**: If a Sleep Timer is active, a message (e.g., "Music stops in 14m") will be displayed as a subtle badge in the Player UI.
+> - **Dynamic Sorting**: The Sorting menu will offer "Increase/Decrease" and "A-Z/Z-A" options in a compact, low-padding list.
+> - **Adaptive Grid**: I will use `GridCells.Adaptive` to ensure the Grid view works perfectly on tablets and large-screen phones.
 
 ## Proposed Changes
 
-### Library UI & Navigation
+### Adaptive & Responsive UI
 #### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
-- **TopBar Timer**: Add an indicator next to the search icon showing `Remaining: XXm` if the sleep timer is active.
-- **View Mode Switcher**: Add a List/Grid toggle in the `LibraryTopBar`.
-- **Adaptive Grid**: Implement `StellarGridItem` for the grid view mode.
-- **Sorting Logic**: Ensure sorting works seamlessly with both List and Grid views.
+- **Compact Landscape Header**: Detect orientation and shrink the `TopAppBar` height and text size when rotated.
+- **Top Sleep Timer**: Add a high-visibility badge next to the title.
+- **Universal View Mode**: Apply the List/Grid toggle to **Playlists**, **Albums**, **Artists**, and **Genres** tabs.
+- **Grid Density**: Switch to `GridCells.Adaptive(minSize = 100.dp)` to make thumbnails smaller and more high-density.
+- **Enhanced Sorting**:
+    - Redesign `SortMenu` to be compact with zero wasted space.
+    - Add sub-options for Descending/Ascending (A-Z vs Z-A).
 
-### Startup & Aesthetics
+#### [MODIFY] [PlayerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/PlayerScreen.kt)
+- **Sleep Timer Message**: Add a `Surface` badge at the top of the player content that says "Sleep Timer: XXm remaining."
+- **Landscape Refinement**: Adjust split-screen weights to ensure lyrics and controls have optimal spacing.
+
+### Core Fixes & Sharing
 #### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
-- **Startup Animation**: Wrap the `MusicOnApp` in an `AnimatedVisibility` block to create a professional fade-in and subtle scale-up effect when the app first loads.
 - **APK Share Fix**:
-    - Copy `packageResourcePath` to `cacheDir/MusicOn.apk`.
-    - Use `FileProvider` on the new named file.
-    - This ensures the recipient sees "MusicOn.apk" instead of "base.apk".
+    - Copy APK to `externalCacheDir` for better permission handling.
+    - Use `ClipData` on the Intent to ensure WhatsApp and other apps can read the file.
+- **Startup Animation**: Fine-tune the scale/fade duration for a snappier feel.
 
-### Data & State
-#### [MODIFY] [SettingsRepository.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/data/SettingsRepository.kt)
-- Ensure `LIBRARY_VIEW_MODE` is correctly persisted for the new manual switcher.
+#### [MODIFY] [MainViewModel.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/viewmodel/MainViewModel.kt)
+- Update `filteredTracks` to support complex sort orders (e.g., `NAME_ASC`, `NAME_DESC`).
 
 ## Verification Plan
 
 ### Manual Verification
-1.  **Timer Check**: Set a sleep timer for 15 minutes. Verify "15m" appears at the top of the library.
-2.  **View Toggle**: Switch to Grid view. Verify artwork is large and titles are centered below. Switch back to List.
-3.  **Share Test**: Tap "Share App" in the sidebar. Verify the sharing dialog shows the file name as "MusicOn.apk".
-4.  **Startup**: Kill the app and reopen. Observe the smooth entrance animation.
+1.  **Landscape Spacing**: Rotate the phone. Verify the top bar is significantly smaller and content fills the screen.
+2.  **Sorting**: Verify "Name Z-A" and "Duration (Shortest first)" work correctly.
+3.  **Player Timer**: Set a timer and verify the message appears at the top of the Player screen.
+4.  **Tab Device**: Test the List/Grid toggle on a tablet profile to ensure the adaptive grid fills the width.
+5.  **Share Fix**: Share the APK and verify it installs on a second device.

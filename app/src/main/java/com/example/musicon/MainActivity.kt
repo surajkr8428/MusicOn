@@ -14,6 +14,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -265,43 +267,42 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-    CompositionLocalProvider(com.example.musicon.ui.components.LocalCustomBackground provides customBgUri) {
-        MusicOnTheme(themeMode = themeMode, accentColor = accentColor) {
-            // Startup Animation
-            var showApp by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) {
-                kotlinx.coroutines.delay(300) // Small delay for smoother feel
-                showApp = true
-            }
-
-            androidx.compose.animation.AnimatedVisibility(
-                visible = showApp,
-                enter = androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(1000)) + 
-                        androidx.compose.animation.scaleIn(initialScale = 0.95f, animationSpec = androidx.compose.animation.core.tween(1000)),
-                exit = androidx.compose.animation.fadeOut()
-            ) {
-                MusicOnApp(
-                    viewModel = viewModel,
-                    mediaController = mediaController,
-                    onSignInClick = triggerSignIn,
-                    onSignOutClick = { triggerSignOut() },
-                    onScanClick = {
-                        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            Manifest.permission.READ_MEDIA_AUDIO
-                        } else {
-                            Manifest.permission.READ_EXTERNAL_STORAGE
-                        }
-                        
-                        if (ContextCompat.checkSelfPermission(this@MainActivity, permission) == PackageManager.PERMISSION_GRANTED) {
-                            viewModel.scanLocalStorage()
-                        } else {
-                            permissionLauncher.launch(permission)
-                        }
+            CompositionLocalProvider(com.example.musicon.ui.components.LocalCustomBackground provides customBgUri) {
+                MusicOnTheme(themeMode = themeMode, accentColor = accentColor) {
+                    // Startup Animation
+                    var showApp by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        kotlinx.coroutines.delay(200)
+                        showApp = true
                     }
-                )
+
+                    AnimatedVisibility(
+                        visible = showApp,
+                        enter = fadeIn(tween(800)) + scaleIn(initialScale = 0.96f, animationSpec = tween(800, easing = LinearOutSlowInEasing)),
+                        exit = fadeOut()
+                    ) {
+                        MusicOnApp(
+                            viewModel = viewModel,
+                            mediaController = mediaController,
+                            onSignInClick = triggerSignIn,
+                            onSignOutClick = { triggerSignOut() },
+                            onScanClick = {
+                                val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    Manifest.permission.READ_MEDIA_AUDIO
+                                } else {
+                                    Manifest.permission.READ_EXTERNAL_STORAGE
+                                }
+                                
+                                if (ContextCompat.checkSelfPermission(this@MainActivity, permission) == PackageManager.PERMISSION_GRANTED) {
+                                    viewModel.scanLocalStorage()
+                                } else {
+                                    permissionLauncher.launch(permission)
+                                }
+                            }
+                        )
+                    }
+                }
             }
-        }
-    }
         }
     }
 
@@ -521,19 +522,33 @@ fun MusicOnApp(
                             label = { Text("Share App (APK)") },
                             selected = false,
                             onClick = { 
-                                scope.launch { drawerState.close() }
-                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                    type = "application/vnd.android.package-archive"
-                                    val file = java.io.File(context.packageResourcePath)
-                                    val uri = androidx.core.content.FileProvider.getUriForFile(
-                                        context,
-                                        "${context.packageName}.fileprovider",
-                                        file
-                                    )
-                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                scope.launch { 
+                                    drawerState.close()
+                                    withContext(Dispatchers.IO) {
+                                        try {
+                                            val sourceFile = File(context.packageResourcePath)
+                                            val destFile = File(context.cacheDir, "MusicOn.apk")
+                                            sourceFile.copyTo(destFile, overwrite = true)
+                                            
+                                            val uri = androidx.core.content.FileProvider.getUriForFile(
+                                                context,
+                                                "${context.packageName}.fileprovider",
+                                                destFile
+                                            )
+                                            
+                                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                type = "application/vnd.android.package-archive"
+                                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            val chooser = android.content.Intent.createChooser(intent, "Share MusicOn APK")
+                                            chooser.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            context.startActivity(chooser)
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("MusicOn", "Failed to share APK", e)
+                                        }
+                                    }
                                 }
-                                context.startActivity(android.content.Intent.createChooser(intent, "Share MusicOn APK"))
                             },
                             icon = { Icon(Icons.Default.Share, null) },
                             colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = Color.White)
