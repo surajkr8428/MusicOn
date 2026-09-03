@@ -241,9 +241,12 @@ fun SettingsScreen(
 
 @Composable
 fun SleepTimerDialog(onDismiss: () -> Unit, onSet: (Int) -> Unit) {
+    var customMinutes by remember { mutableStateOf("") }
+    
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Sleep Timer") },
+        title = { Text("Sleep Timer", color = Color.White, fontWeight = FontWeight.Bold) },
+        containerColor = Color(0xFF1E1B36),
         text = {
             Column {
                 val times = listOf(0 to "Off", 15 to "15 minutes", 30 to "30 minutes", 60 to "60 minutes")
@@ -255,9 +258,43 @@ fun SleepTimerDialog(onDismiss: () -> Unit, onSet: (Int) -> Unit) {
                         Text(label, color = Color.White)
                     }
                 }
+                
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.1f))
+                
+                OutlinedTextField(
+                    value = customMinutes,
+                    onValueChange = { if (it.all { char -> char.isDigit() }) customMinutes = it },
+                    label = { Text("Custom Minutes", color = Color.Gray) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = Color.Gray
+                    ),
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                    )
+                )
             }
         },
-        confirmButton = {}
+        confirmButton = {
+            Button(
+                onClick = { 
+                    val mins = customMinutes.toIntOrNull() ?: 0
+                    if (mins > 0) onSet(mins)
+                },
+                enabled = customMinutes.isNotEmpty()
+            ) {
+                Text("Set Custom")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = Color.Gray)
+            }
+        }
     )
 }
 

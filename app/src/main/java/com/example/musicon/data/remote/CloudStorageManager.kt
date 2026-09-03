@@ -42,13 +42,13 @@ class CloudStorageManager(private val context: Context) {
         ).setApplicationName("MusicOn").build()
     }
 
-    suspend fun listAudioFiles(folderId: String? = null): List<com.google.api.services.drive.model.File> = withContext(Dispatchers.IO) {
+    suspend fun listAudioFiles(folderId: String? = "14W_7EbfeM4oTwyXxS1FL7jt5Sf_6siCg"): List<com.google.api.services.drive.model.File> = withContext(Dispatchers.IO) {
         val service = getDriveService() ?: return@withContext emptyList()
         
         val query = if (folderId != null) {
-            "mimeType contains 'audio/' and '$folderId' in parents"
+            "mimeType contains 'audio/' and '$folderId' in parents and trashed = false"
         } else {
-            "mimeType contains 'audio/'"
+            "mimeType contains 'audio/' and trashed = false"
         }
         
         val result = service.files().list()
@@ -75,6 +75,11 @@ class CloudStorageManager(private val context: Context) {
         result.files?.firstOrNull()
     }
 
+    suspend fun deleteFile(fileId: String) = withContext(Dispatchers.IO) {
+        val service = getDriveService() ?: return@withContext
+        service.files().delete(fileId).execute()
+    }
+
     suspend fun renameFile(fileId: String, newName: String) = withContext(Dispatchers.IO) {
         val service = getDriveService() ?: return@withContext
         val fileMetadata = com.google.api.services.drive.model.File().apply {
@@ -83,8 +88,8 @@ class CloudStorageManager(private val context: Context) {
         service.files().update(fileId, fileMetadata).execute()
     }
 
-    suspend fun uploadFile(filePath: String, name: String, folderId: String? = null): String? = withContext(Dispatchers.IO) {
-        android.util.Log.d("CloudStorageManager", "Starting upload: $name from $filePath")
+    suspend fun uploadFile(filePath: String, name: String, folderId: String? = "14W_7EbfeM4oTwyXxS1FL7jt5Sf_6siCg"): String? = withContext(Dispatchers.IO) {
+        android.util.Log.d("CloudStorageManager", "Starting upload: $name from $filePath to $folderId")
         val service = getDriveService() ?: run {
             android.util.Log.e("CloudStorageManager", "Failed to get Drive service")
             return@withContext null

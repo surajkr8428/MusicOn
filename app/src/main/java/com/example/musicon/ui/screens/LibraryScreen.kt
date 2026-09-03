@@ -273,6 +273,7 @@ fun LibraryScreen(
                     "add_to_playlist" -> { showBulkPlaylistDialog = false; selectedIds = setOf(selectedTrackOptions!!.id); showBulkPlaylistDialog = true }
                     "cut" -> onOpenCutter(selectedTrackOptions!!)
                     "edit" -> trackToEdit = selectedTrackOptions
+                    "location" -> viewModel.openFileLocation(selectedTrackOptions!!)
                     "remove" -> viewModel.removeFromLibrary(listOf(selectedTrackOptions!!))
                 }
                 selectedTrackOptions = null

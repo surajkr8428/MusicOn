@@ -1,9 +1,9 @@
-- `[x]` Fix and Export `formatSleepTime`
-- `[x]` Finalize `PlayerScreen.kt` UI:
-    - `[x]` Sleep Timer in Portrait Header
-    - `[x]` Sleep Timer in Landscape (between controls and icons)
-    - `[x]` 56dp Landscape Icons
-- `[x]` Implement Cloud Progress UI in `MainActivity.kt`
-- `[x]` Implement Cloud Actions in Sidebar
-- `[x]` Verify Cloud Upload/Download and UI
+- `[x]` Update `MusicRepository.kt`: Remove missing tracks during scan
+- `[x]` Update `MainViewModel.kt`:
+    - `[x]` Implement `openFileLocation`
+    - `[x]` Implement `ContentObserver` for real-time local sync
+- `[x]` Update `TrackOptionsBottomSheet.kt`: Add "Open file location" button
+- `[x]` Update `LibraryScreen.kt`: Link context menu to ViewModel
+- `[x]` Update `MainActivity.kt`: Initialize/cleanup real-time sync
+- `[x]` Verify UI and auto-update functionality
 - `[x]` Create final walkthrough

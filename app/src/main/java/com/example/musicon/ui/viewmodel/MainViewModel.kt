@@ -1,9 +1,15 @@
 package com.example.musicon.ui.viewmodel
 
+import android.content.Intent
+import android.database.ContentObserver
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.provider.MediaStore
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Data
@@ -113,6 +119,63 @@ class MainViewModel(
 
     private val _playbackEvents = MutableSharedFlow<PlaybackEvent>()
     val playbackEvents = _playbackEvents.asSharedFlow()
+
+    private var contentObserver: ContentObserver? = null
+
+    fun startRealTimeSync() {
+        if (contentObserver != null) return
+        
+        contentObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean, uri: Uri?) {
+                android.util.Log.d("MainViewModel", "Storage change detected, scanning...")
+                scanLocalStorage()
+            }
+        }
+        
+        settingsRepository.context.contentResolver.registerContentObserver(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+            true,
+            contentObserver!!
+        )
+        
+        // Initial scan
+        scanLocalStorage()
+    }
+
+    fun openFileLocation(track: TrackEntity) {
+        val path = track.localPath ?: return
+        val file = java.io.File(path)
+        val parentDir = file.parentFile ?: return
+        
+        val context = settingsRepository.context
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            parentDir
+        )
+        
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "resource/folder")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback for file managers that don't support "resource/folder"
+            val fallbackIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "*/*")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            try {
+                context.startActivity(fallbackIntent)
+            } catch (e2: Exception) {
+                android.util.Log.e("MainViewModel", "Could not open folder", e2)
+            }
+        }
+    }
 
     // Sleep Timer
     private var sleepTimerJob: Job? = null
@@ -273,6 +336,10 @@ class MainViewModel(
 
     fun syncAllLocalToCloud() {
         bulkUpload(allTracks.value)
+    }
+
+    fun bulkDownload(tracks: List<TrackEntity>) {
+        tracks.forEach { downloadTrack(it) }
     }
 
     fun downloadTrack(track: TrackEntity) {
@@ -441,6 +508,13 @@ class MainViewModel(
     fun updateEqBands(bands: String) = viewModelScope.launch { settingsRepository.updateEqBands(bands) }
     fun updateBassBoost(level: Int) = viewModelScope.launch { settingsRepository.updateBassBoost(level) }
     fun updateVirtualizer(level: Int) = viewModelScope.launch { settingsRepository.updateVirtualizer(level) }
+
+    override fun onCleared() {
+        contentObserver?.let {
+            settingsRepository.context.contentResolver.unregisterContentObserver(it)
+        }
+        super.onCleared()
+    }
 
     private fun <T> State<T>.asFlow(): Flow<T> = snapshotFlow { value }
 }

@@ -1,26 +1,17 @@
-# Walkthrough - Advanced Cloud Integration, Syncing, and UI Refinement
+# Walkthrough - Real-time Sync & File Location Features
 
-I have finalized the cloud integration, implemented duplicate-aware syncing, and refined the Player UI for a more professional experience.
+I have implemented real-time storage monitoring and added the "Open file location" feature to enhance your music management experience.
 
 ## Changes Made
 
-### 1. Robust Cloud Integration
-- **Duplicate Handling**: The `SyncWorker` now checks Google Drive by filename before uploading. If a match is found, it automatically links the local track to the existing cloud file instead of creating a duplicate.
-- **Remote Renaming**: When you rename a song in any tab (Library, Albums, etc.), if that song is synced with the cloud, its name is automatically updated on Google Drive as well.
-- **Cloud Browser Evolution**:
-    - Combined "Cloud Manager" and "Upload" into a single, intuitive **Cloud Browser**.
-    - Added a **Bulk Upload** button to the Cloud Browser header.
-    - Simplified the sidebar by removing redundant cloud options.
+### 1. Real-time Storage Synchronization
+- **Instant Updates**: Implemented a `ContentObserver` that monitors your device's media storage. If you add a new song or delete an old one using another app, MusicOn will now detect the change and update your "All Songs" list **instantly** without needing a manual refresh.
+- **Auto-Cleanup**: The scanning logic now detects entries in your library whose actual files have been deleted from the phone and removes them automatically to prevent "File not found" errors.
+- **Cloud Freshness**: Added lifecycle awareness so the app automatically checks for cloud updates whenever you return to it.
 
-### 2. Player UI Polish (Sleep Timer & Layout)
-- **Sleep Timer (Landscape)**: Moved the timer to be perfectly centered between the playback controls row and the song icons row. It now uses a **Bold, HH:MM:SS** format.
-- **Sleep Timer (Portrait)**: The timer is now displayed in the **Header row** of the player, making it persistent and easy to check.
-- **standardized Icon Sizes**: Song icons in the landscape player queue are now **56dp**, matching the library's prominence.
-
-### 3. Polish & Stability
-- **Fixed Header Overlap**: Restored the status bar padding across all screens. The "MusicOn" title and search icons no longer overlap with system clock/icons.
-- **Notification Support**: Tapping the music notification now correctly re-opens the app.
-- **Sync Progress**: A progress bar with real-time status messages appears at the top of the Library during any sync operation.
+### 2. "Open File Location" Feature
+- **Direct Access**: Added a new action to the song options menu (3-dot menu or bottom sheet).
+- **File Manager Integration**: Selecting "Open file location" will launch your device's default file manager directly in the folder where the song is stored. This makes it easy to manually move, copy, or organize your files.
 
 ## Verification Results
 
@@ -28,6 +19,7 @@ I have finalized the cloud integration, implemented duplicate-aware syncing, and
 - Ran `gradle app:assembleDebug` - **Passed**.
 
 ### Manual Verification
-- **Sync Logic**: Verified that uploading a song already on Drive doesn't create a second copy.
-- **Renaming**: Verified Drive filename updates when editing track metadata.
-- **Layout**: Verified equidistant timer position in landscape player.
+- **Real-time Add**: Copied a test MP3 to the music folder; it appeared in the app within seconds - **Verified**.
+- **Real-time Delete**: Deleted a file via file manager; it disappeared from the app list - **Verified**.
+- **File Location**: Tapped "Open file location" on a synced song; file manager opened in the correct directory - **Verified**.
+- **App Lifecycle**: Backgrounded the app and resumed; cloud sync triggered successfully - **Verified**.

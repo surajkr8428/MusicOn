@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -56,10 +57,14 @@ import com.google.common.util.concurrent.MoreExecutors
 import androidx.core.content.ContextCompat
 import androidx.palette.graphics.Palette
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import com.example.musicon.data.remote.CloudSyncManager
 import com.example.musicon.data.remote.SyncStatus
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -142,7 +147,35 @@ class MainActivity : ComponentActivity() {
                 ActivityResultContracts.RequestPermission()
             ) { isGranted ->
                 if (isGranted) {
-                    viewModel.scanLocalStorage()
+                    viewModel.startRealTimeSync()
+                }
+            }
+            
+            LaunchedEffect(Unit) {
+                val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    Manifest.permission.READ_MEDIA_AUDIO
+                } else {
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                }
+                
+                if (ContextCompat.checkSelfPermission(this@MainActivity, permission) == PackageManager.PERMISSION_GRANTED) {
+                    viewModel.startRealTimeSync()
+                } else {
+                    permissionLauncher.launch(permission)
+                }
+            }
+
+            // Sync cloud on resume
+            val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+            DisposableEffect(lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        viewModel.syncCloudTracks()
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
                 }
             }
 
@@ -604,7 +637,7 @@ fun MusicOnApp(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(Modifier.padding(8.dp)) {
+                                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                                     val message = when (val s = syncStatus) {
                                         is SyncStatus.Loading -> s.message
                                         is SyncStatus.Success -> s.message
@@ -645,7 +678,40 @@ fun MusicOnApp(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RenameDialog(
+    initialName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var name by remember { mutableStateOf(initialName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename", color = Color.White, fontWeight = FontWeight.Bold) },
+        containerColor = Color(0xFF1E1B36),
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = Color.Gray
+                )
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(name) }) { Text("Rename") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CloudBrowserScreen(
     viewModel: MainViewModel,
@@ -655,68 +721,178 @@ fun CloudBrowserScreen(
     val cloudManager = remember { com.example.musicon.data.remote.CloudStorageManager(context) }
     var cloudFiles by remember { mutableStateOf<List<com.google.api.services.drive.model.File>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    
+    // Multi-selection state
+    var selectedIds by remember { mutableStateOf(setOf<String>()) }
+    val isSelectionMode = selectedIds.isNotEmpty()
+    
+    var trackToRename by remember { mutableStateOf<com.google.api.services.drive.model.File?>(null) }
 
-    LaunchedEffect(Unit) {
+    fun refresh() {
         scope.launch {
+            isRefreshing = true
             cloudFiles = cloudManager.listAudioFiles(null)
+            isRefreshing = false
             isLoading = false
         }
     }
+
+    LaunchedEffect(Unit) { refresh() }
+    
+    BackHandler(onBack = onBack)
 
     com.example.musicon.ui.components.StellarBackground {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                TopAppBar(
-                    title = { Text("Cloud Browser", color = Color.White, fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { 
-                            // This would ideally open a file picker to upload something new directly to cloud
-                            // For simplicity, we can trigger a sync of all local tracks here too
-                            viewModel.syncAllLocalToCloud()
-                        }) {
-                            Icon(Icons.Default.CloudUpload, null, tint = Color.White)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-                )
+                if (isSelectionMode) {
+                    TopAppBar(
+                        title = { Text("${selectedIds.size} selected", color = Color.White) },
+                        navigationIcon = {
+                            IconButton(onClick = { selectedIds = emptySet() }) {
+                                Icon(Icons.Default.Close, null, tint = Color.White)
+                            }
+                        },
+                        actions = {
+                            IconButton(onClick = { 
+                                selectedIds.forEach { id ->
+                                    val file = cloudFiles.find { it.id == id }
+                                    if (file != null) {
+                                        viewModel.downloadTrack(com.example.musicon.data.local.TrackEntity(
+                                            id = file.getId(), title = file.getName() ?: "Unknown", artist = "Cloud", album = "Cloud", 
+                                            duration = 0, gDriveId = file.getId(), isDownloaded = false, isFavorite = false,
+                                            genre = null, bitrate = null, localPath = null, lastPlayed = 0, playCount = 0,
+                                            customTitle = null, customArtist = null, customAlbum = null, customCoverPath = null, lyrics = null
+                                        ))
+                                    }
+                                }
+                                selectedIds = emptySet()
+                            }) {
+                                Icon(Icons.Default.Download, "Download Selected", tint = Color.White)
+                            }
+                            IconButton(onClick = {
+                                scope.launch {
+                                    selectedIds.forEach { cloudManager.deleteFile(it) }
+                                    selectedIds = emptySet()
+                                    refresh()
+                                }
+                            }) {
+                                Icon(Icons.Default.Delete, "Delete Selected", tint = Color.Red)
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(0.1f))
+                    )
+                } else {
+                    TopAppBar(
+                        title = { Text("Cloud Browser", color = Color.White, fontWeight = FontWeight.Bold) },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                            }
+                        },
+                        actions = {
+                            IconButton(onClick = { viewModel.syncAllLocalToCloud() }) {
+                                Icon(Icons.Default.CloudUpload, "Upload All Local", tint = Color.White)
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                    )
+                }
             }
         ) { padding ->
-            if (isLoading) {
-                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color.White)
-                }
-            } else {
-                LazyColumn(Modifier.fillMaxSize().padding(padding)) {
-                    items(cloudFiles) { file ->
-                        ListItem(
-                            headlineContent = { Text(file.getName() ?: "Unknown", color = Color.White) },
-                            supportingContent = { Text("${(file.getSize() ?: 0) / 1024} KB", color = Color.Gray) },
-                            leadingContent = { Icon(Icons.Default.MusicNote, null, tint = Color.Gray) },
-                            trailingContent = {
-                                IconButton(onClick = { 
-                                    viewModel.downloadTrack(com.example.musicon.data.local.TrackEntity(
-                                        id = file.getId(), title = file.getName() ?: "Unknown", artist = "Cloud", album = "Cloud", 
-                                        duration = 0, gDriveId = file.getId(), isDownloaded = false, isFavorite = false,
-                                        genre = null, bitrate = null, localPath = null, lastPlayed = 0, playCount = 0,
-                                        customTitle = null, customArtist = null, customAlbum = null, customCoverPath = null, lyrics = null
-                                    ))
-                                }) {
-                                    Icon(Icons.Default.Download, null, tint = Color.White)
-                                }
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                        )
+            androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = { refresh() },
+                modifier = Modifier.padding(padding).fillMaxSize()
+            ) {
+                if (isLoading && !isRefreshing) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = Color.White)
+                    }
+                } else {
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(cloudFiles) { file ->
+                            val isSelected = file.id in selectedIds
+                            ListItem(
+                                headlineContent = { Text(file.getName() ?: "Unknown", color = Color.White) },
+                                supportingContent = { Text("${(file.getSize() ?: 0) / 1024} KB", color = Color.Gray) },
+                                leadingContent = { 
+                                    if (isSelectionMode) {
+                                        Checkbox(checked = isSelected, onCheckedChange = {
+                                            selectedIds = if (it) selectedIds + file.id else selectedIds - file.id
+                                        })
+                                    } else {
+                                        Icon(Icons.Default.MusicNote, null, tint = Color.Gray) 
+                                    }
+                                },
+                                trailingContent = {
+                                    var showMenu by remember { mutableStateOf(false) }
+                                    Box {
+                                        IconButton(onClick = { showMenu = true }) {
+                                            Icon(Icons.Default.MoreVert, null, tint = Color.White)
+                                        }
+                                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                            DropdownMenuItem(
+                                                text = { Text("Download") },
+                                                leadingIcon = { Icon(Icons.Default.Download, null) },
+                                                onClick = {
+                                                    viewModel.downloadTrack(com.example.musicon.data.local.TrackEntity(
+                                                        id = file.getId(), title = file.getName() ?: "Unknown", artist = "Cloud", album = "Cloud", 
+                                                        duration = 0, gDriveId = file.getId(), isDownloaded = false, isFavorite = false,
+                                                        genre = null, bitrate = null, localPath = null, lastPlayed = 0, playCount = 0,
+                                                        customTitle = null, customArtist = null, customAlbum = null, customCoverPath = null, lyrics = null
+                                                    ))
+                                                    showMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Rename") },
+                                                leadingIcon = { Icon(Icons.Default.Edit, null) },
+                                                onClick = { trackToRename = file; showMenu = false }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Delete", color = Color.Red) },
+                                                leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) },
+                                                onClick = { scope.launch { cloudManager.deleteFile(file.id); refresh() }; showMenu = false }
+                                            )
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.combinedClickable(
+                                    onClick = {
+                                        if (isSelectionMode) {
+                                            selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id
+                                        }
+                                    },
+                                    onLongClick = {
+                                        if (!isSelectionMode) selectedIds = setOf(file.id)
+                                    }
+                                ),
+                                colors = ListItemDefaults.colors(
+                                    containerColor = if (isSelected) Color.White.copy(0.1f) else Color.Transparent
+                                )
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+
+    if (trackToRename != null) {
+        RenameDialog(
+            initialName = trackToRename!!.getName() ?: "",
+            onDismiss = { trackToRename = null },
+            onConfirm = { newName ->
+                scope.launch {
+                    cloudManager.renameFile(trackToRename!!.id, newName)
+                    trackToRename = null
+                    refresh()
+                }
+            }
+        )
     }
 }
 

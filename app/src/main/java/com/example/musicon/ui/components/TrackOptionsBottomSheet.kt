@@ -124,6 +124,7 @@ fun TrackOptionsBottomSheet(
             ListItemAction(Icons.AutoMirrored.Filled.PlaylistPlay, "Play next") { onAction("play_next") }
             ListItemAction(Icons.AutoMirrored.Filled.QueueMusic, "Add to queue") { onAction("add_to_queue") }
             ListItemAction(Icons.AutoMirrored.Filled.PlaylistAdd, "Add to playlist") { onAction("add_to_playlist") }
+            ListItemAction(Icons.Default.Folder, "Open file location") { onAction("location") }
             ListItemAction(Icons.Default.RemoveCircleOutline, "Remove from library") { onAction("remove") }
         }
     }

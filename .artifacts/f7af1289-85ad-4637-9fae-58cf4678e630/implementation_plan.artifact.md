@@ -1,47 +1,37 @@
-# Implementation Plan - Enhanced Cloud Browser & UI Refinement
+# Implementation Plan - Metadata, Sync, and Filtering Fixes
 
-This plan focuses on making the Cloud Browser a full-featured management tool, enabling multi-selection for sync operations, and further polishing the Player UI.
+This plan addresses issues with missing song images, sync failures, and unwanted call recordings in the library.
 
 ## Proposed Changes
 
-### Cloud Storage & Management
+### Core Logic & Metadata
 
-#### [MODIFY] [CloudStorageManager.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/data/remote/CloudStorageManager.kt)
-- Set the default folder ID to `14W_7EbfeM4oTwyXxS1FL7jt5Sf_6siCg` for all cloud operations.
-- Add `deleteFile(fileId: String)` to support remote management.
+#### [MODIFY] [MediaMetadataUtils.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/logic/MediaMetadataUtils.kt)
+- Enhance image extraction:
+    - First, try `embeddedPicture` (already implemented).
+    - Second, if not found, look for "cover.jpg" or "album.jpg" in the same directory as the song file.
+    - Third, use a default fallback if all else fails.
 
-#### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
-- **Cloud Browser Upgrade**:
-    - Implement **Pull-to-Refresh** using `PullToRefreshBox`.
-    - Implement **Multi-selection** for cloud files.
-    - Replace individual download buttons with a **3-dot menu** containing Download, Rename, and Delete.
-    - Add a **Bulk Action Bar** (top) that appears when items are selected.
-    - Add a "Upload Local Songs" button in the Cloud Browser to select and upload any number of local tracks.
-- **Renaming Support**:
-    - Add a `RenameDialog` that works for both local and cloud songs.
+#### [MODIFY] [MusicRepository.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/data/MusicRepository.kt)
+- **Aggressive Filtering**: Update the `scanLocalStorage` query to explicitly exclude directories like "CallRecordings", "Recorder", and files containing "call" in their path.
+- **Robust Duplicates**:
+    - Use `localPath` as the primary key for local files during scanning.
+    - Before adding a cloud track, check if a track with the same title and artist already exists to prevent duplicate entries for the same song across local/cloud.
+- **Sync Logging**: Add more detailed logging to `syncCloudTracks` to identify where it fails (auth, network, or data parsing).
 
-### Player UI Refinement
+### UI Refinement
 
-#### [MODIFY] [PlayerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/PlayerScreen.kt)
-- **Big Central Sleep Timer**:
-    - In landscape, position the sleep timer **exactly equidistant** between the playback control row and the song icon row.
-    - Increase font size to `headlineLarge` for high visibility.
-- **Duplicate Handling**:
-    - Refine `SyncWorker` to use the fixed folder ID and strictly check for filename duplicates before starting an upload.
+#### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
+- Ensure image loading in `StellarTrackItem` and `StellarGridItem` has proper error handling and placeholder display.
 
 ## Verification Plan
 
 ### Automated Tests
 - Verify successful build.
-- Check logs for "Duplicate detected" messages during sync.
+- Log check: Ensure "Skipping duplicate" and "Filtering out recording" logs appear correctly.
 
 ### Manual Verification
-- **Cloud Browser**:
-    - Drag down to refresh.
-    - Long-press or use checkboxes to select multiple songs.
-    - Bulk download/delete.
-    - Rename a cloud song and verify on Drive.
-- **Player UI**:
-    - Set a sleep timer and verify its big, bold, centered position in landscape.
-- **Upload**:
-    - Upload multiple selected songs from the local library.
+- **Images**: Browse the library and verify that more songs now show their album art.
+- **Filtering**: Check "All Songs" to ensure no call recordings are present.
+- **Duplicates**: Run a scan and cloud sync; verify no duplicate songs appear for those already in the library.
+- **Sync**: Check the Cloud Sync status message for success or specific error details.

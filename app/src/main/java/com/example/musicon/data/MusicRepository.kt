@@ -7,6 +7,7 @@ import com.example.musicon.data.local.*
 import com.example.musicon.logic.MediaMetadataUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 class MusicRepository(
@@ -35,9 +36,33 @@ class MusicRepository(
         
         context.contentResolver.query(collection, projection, selection, selectionArgs, null)?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
             
+            val existingTracks = trackDao.getAllTracks().first()
+            val existingNames = existingTracks.map { it.title.lowercase() }.toSet()
+            val existingDisplayNames = existingTracks.map { it.displayName.lowercase() }.toSet()
+
+            // Cleanup: Check if local files in DB still exist on device
+            existingTracks.forEach { existingTrack ->
+                if (existingTrack.localPath != null) {
+                    val file = java.io.File(existingTrack.localPath)
+                    if (!file.exists()) {
+                        android.util.Log.d("MusicRepository", "Removing missing track: ${existingTrack.displayName}")
+                        trackDao.deleteTrack(existingTrack)
+                    }
+                }
+            }
+
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
+                val name = cursor.getString(nameColumn)
+                
+                // Duplicate Protection: Check if a track with this name already exists
+                if (existingNames.contains(name.lowercase()) || existingDisplayNames.contains(name.lowercase())) {
+                    android.util.Log.d("MusicRepository", "Skipping duplicate: $name")
+                    continue
+                }
+
                 val contentUri = android.content.ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
                 val track = MediaMetadataUtils.extractMetadata(context, contentUri, id.toString())
                 if (track != null) {
@@ -47,7 +72,7 @@ class MusicRepository(
         }
     }
 
-    suspend fun syncCloudTracks(folderId: String? = null) {
+    suspend fun syncCloudTracks(folderId: String? = "14W_7EbfeM4oTwyXxS1FL7jt5Sf_6siCg") {
         val cloudFiles = cloudStorageManager.listAudioFiles(folderId)
         cloudFiles.forEach { file ->
             val existing = trackDao.getTrackById(file.id)

@@ -595,24 +595,25 @@ fun PlayerLayoutLandscape(
             }
         }
 
-        // Bottom Queue in Landscape
+        // Equidistant Sleep Timer and Bottom Queue in Landscape
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier.fillMaxWidth().weight(0.4f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             if (sleepTimerRemaining != null) {
                 Text(
                     text = formatSleepTime(sleepTimerRemaining),
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold, fontSize = 64.sp),
                     color = Color.White,
-                    modifier = Modifier.padding(vertical = 16.dp)
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
             
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp, start = 16.dp, end = 16.dp)
+                    .padding(horizontal = 16.dp)
                     .height(72.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically

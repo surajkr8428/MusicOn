@@ -47,14 +47,14 @@ class SyncWorker(
                 try {
                     CloudSyncManager.updateStatus(SyncStatus.Loading("Checking cloud for $fileName...", 0.05f))
                     
-                    // Handle Duplicates: Check if file already exists in cloud
+                    // Duplicate Protection: Check by name in the specific folder
                     val existingFile = cloudManager.findFileByName(fileName)
                     val gDriveId = if (existingFile != null) {
                         android.util.Log.d("SyncWorker", "Duplicate found: $fileName, using existing ID: ${existingFile.id}")
                         existingFile.id
                     } else {
                         CloudSyncManager.updateStatus(SyncStatus.Loading("Uploading $fileName...", 0.1f))
-                        cloudManager.uploadFile(filePath, fileName, null)
+                        cloudManager.uploadFile(filePath, fileName, "14W_7EbfeM4oTwyXxS1FL7jt5Sf_6siCg")
                     }
 
                     if (gDriveId != null) {
