@@ -30,21 +30,23 @@ class MusicRepository(
             MediaStore.Audio.Media.DATA
         )
         
-        // Filter for MP3 only and exclude recordings
-        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.MIME_TYPE} = ? AND ${MediaStore.Audio.Media.DATA} NOT LIKE ? AND ${MediaStore.Audio.Media.DATA} NOT LIKE ?"
-        val selectionArgs = arrayOf("audio/mpeg", "%Recordings%", "%voice%")
+        // Filter for MP3 only and exclude recordings aggressively
+        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND ${MediaStore.Audio.Media.MIME_TYPE} = ? AND ${MediaStore.Audio.Media.DATA} NOT LIKE ? AND ${MediaStore.Audio.Media.DATA} NOT LIKE ? AND ${MediaStore.Audio.Media.DATA} NOT LIKE ? AND ${MediaStore.Audio.Media.DATA} NOT LIKE ?"
+        val selectionArgs = arrayOf("audio/mpeg", "%Recordings%", "%voice%", "%CallRecordings%", "%Recorder%")
         
         context.contentResolver.query(collection, projection, selection, selectionArgs, null)?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
+            val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
             
             val existingTracks = trackDao.getAllTracks().first()
             val existingNames = existingTracks.map { it.title.lowercase() }.toSet()
             val existingDisplayNames = existingTracks.map { it.displayName.lowercase() }.toSet()
+            val existingPaths = existingTracks.mapNotNull { it.localPath?.lowercase() }.toSet()
 
             // Cleanup: Check if local files in DB still exist on device
             existingTracks.forEach { existingTrack ->
-                if (existingTrack.localPath != null) {
+                if (existingTrack.localPath != null && !existingTrack.localPath.startsWith("content://")) {
                     val file = java.io.File(existingTrack.localPath)
                     if (!file.exists()) {
                         android.util.Log.d("MusicRepository", "Removing missing track: ${existingTrack.displayName}")
@@ -56,10 +58,19 @@ class MusicRepository(
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val name = cursor.getString(nameColumn)
+                val path = cursor.getString(dataColumn)
                 
-                // Duplicate Protection: Check if a track with this name already exists
-                if (existingNames.contains(name.lowercase()) || existingDisplayNames.contains(name.lowercase())) {
+                // Duplicate Protection: Check if a track with this name or path already exists
+                if (existingNames.contains(name.lowercase()) || 
+                    existingDisplayNames.contains(name.lowercase()) ||
+                    existingPaths.contains(path.lowercase())) {
                     android.util.Log.d("MusicRepository", "Skipping duplicate: $name")
+                    continue
+                }
+
+                // Explicit check for 'call' in path to exclude more recordings
+                if (path.lowercase().contains("call")) {
+                    android.util.Log.d("MusicRepository", "Filtering out potential recording: $path")
                     continue
                 }
 
@@ -73,22 +84,44 @@ class MusicRepository(
     }
 
     suspend fun syncCloudTracks(folderId: String? = "14W_7EbfeM4oTwyXxS1FL7jt5Sf_6siCg") {
-        val cloudFiles = cloudStorageManager.listAudioFiles(folderId)
-        cloudFiles.forEach { file ->
-            val existing = trackDao.getTrackById(file.id)
-            if (existing == null) {
-                trackDao.insertTrack(
-                    TrackEntity(
-                        id = file.id,
-                        title = file.name,
-                        artist = "Cloud Artist",
-                        album = "Cloud Album",
-                        duration = 0,
-                        gDriveId = file.id,
-                        isDownloaded = false
+        try {
+            val cloudFiles = cloudStorageManager.listAudioFiles(folderId)
+            val allLocalTracks = trackDao.getAllTracks().first()
+            
+            cloudFiles.forEach { file ->
+                // Duplicate Protection: Check if a track with same title already exists locally
+                val alreadyExists = allLocalTracks.any { 
+                    it.title.equals(file.name, ignoreCase = true) || 
+                    it.displayName.equals(file.name, ignoreCase = true) ||
+                    it.gDriveId == file.id
+                }
+                
+                if (!alreadyExists) {
+                    trackDao.insertTrack(
+                        TrackEntity(
+                            id = file.id,
+                            title = file.name,
+                            artist = "Cloud Artist",
+                            album = "Cloud Album",
+                            duration = 0,
+                            gDriveId = file.id,
+                            isDownloaded = false
+                        )
                     )
-                )
+                } else {
+                    android.util.Log.d("MusicRepository", "Cloud sync: skipping duplicate or already synced file: ${file.name}")
+                    // Optionally update the GDriveId if it was missing
+                    val local = allLocalTracks.find { 
+                        it.title.equals(file.name, ignoreCase = true) || it.displayName.equals(file.name, ignoreCase = true)
+                    }
+                    if (local != null && local.gDriveId == null) {
+                        trackDao.updateTrack(local.copy(gDriveId = file.id))
+                    }
+                }
             }
+        } catch (e: Exception) {
+            android.util.Log.e("MusicRepository", "Cloud sync failed", e)
+            throw e
         }
     }
 

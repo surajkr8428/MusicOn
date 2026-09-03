@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
@@ -30,6 +31,7 @@ fun MiniPlayer(
     if (player == null) return
 
     val currentPlayingTrack by viewModel.currentPlayingTrack.collectAsState()
+    val sleepTimerRemaining by viewModel.sleepTimerRemaining.collectAsState()
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var currentMediaItem by remember { mutableStateOf(player.currentMediaItem) }
     var position by remember { mutableLongStateOf(player.currentPosition) }
@@ -85,16 +87,39 @@ fun MiniPlayer(
             ) {
                 Text(
                     text = currentMediaItem?.mediaMetadata?.title?.toString() ?: "No Song",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                     color = Color.White,
                     maxLines = 1
                 )
-                Text(
-                    text = currentMediaItem?.mediaMetadata?.artist?.toString() ?: "Unknown Artist",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.LightGray,
-                    maxLines = 1
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = currentMediaItem?.mediaMetadata?.artist?.toString() ?: "Unknown Artist",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.LightGray,
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "${formatTime(position)} / ${formatTime(player.duration)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                    sleepTimerRemaining?.let { remaining ->
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = com.example.musicon.ui.screens.formatSleepTime(remaining),
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
             }
             IconButton(onClick = { currentPlayingTrack?.let { viewModel.toggleFavorite(it) } }) {
                 Icon(
@@ -124,4 +149,11 @@ fun MiniPlayer(
             trackColor = Color.Transparent
         )
     }
+}
+
+private fun formatTime(millis: Long): String {
+    val totalSeconds = millis / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format("%d:%02d", minutes, seconds)
 }

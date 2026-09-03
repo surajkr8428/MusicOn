@@ -1,17 +1,21 @@
-# Walkthrough - Real-time Sync & File Location Features
+# Walkthrough - Advanced Metadata Search, Robust Sync, and UI Upgrades
 
-I have implemented real-time storage monitoring and added the "Open file location" feature to enhance your music management experience.
+I have completed a major round of improvements focusing on visual consistency, data integrity, and enhanced user controls.
 
 ## Changes Made
 
-### 1. Real-time Storage Synchronization
-- **Instant Updates**: Implemented a `ContentObserver` that monitors your device's media storage. If you add a new song or delete an old one using another app, MusicOn will now detect the change and update your "All Songs" list **instantly** without needing a manual refresh.
-- **Auto-Cleanup**: The scanning logic now detects entries in your library whose actual files have been deleted from the phone and removes them automatically to prevent "File not found" errors.
-- **Cloud Freshness**: Added lifecycle awareness so the app automatically checks for cloud updates whenever you return to it.
+### 1. Superior Album Art Extraction
+- **Enhanced Search**: Updated `MediaMetadataUtils.kt` to search for local image files (`cover.jpg`, `album.jpg`, etc.) in the song's directory if no embedded artwork is found. This ensures almost all your songs will now show their correct images.
 
-### 2. "Open File Location" Feature
-- **Direct Access**: Added a new action to the song options menu (3-dot menu or bottom sheet).
-- **File Manager Integration**: Selecting "Open file location" will launch your device's default file manager directly in the folder where the song is stored. This makes it easy to manually move, copy, or organize your files.
+### 2. Robust Duplicate Protection & Filtering
+- **Aggressive Filtering**: Overhauled the local storage scanner to explicitly ignore "CallRecordings", "Recorder", and any files containing "call" in their path.
+- **Duplicate Prevention**: Implemented high-speed checks during scanning. The app now compares normalized names and file paths to ensure your "All Songs" tab remains clutter-free.
+- **Smart Cloud Sync**: Cloud synchronization now checks your local library first. If a song already exists locally, it links to the cloud version instead of creating a duplicate entry.
+
+### 3. Professional UI Enhancements
+- **Select All Feature**: Added a "Select All" button to the library's multi-selection bar. You can now backup or delete your entire collection with a single tap.
+- **Big Sync Progress**: Redesigned the cloud progress display. It now features a **large 8dp-thick progress bar**, bold text, and a distinct background, making it highly visible at the top of the app.
+- **MiniPlayer Details**: The bottom player band now displays the **current song duration** (e.g., 01:23 / 04:56) and shows the **active sleep timer** in a clear badge.
 
 ## Verification Results
 
@@ -19,7 +23,7 @@ I have implemented real-time storage monitoring and added the "Open file locatio
 - Ran `gradle app:assembleDebug` - **Passed**.
 
 ### Manual Verification
-- **Real-time Add**: Copied a test MP3 to the music folder; it appeared in the app within seconds - **Verified**.
-- **Real-time Delete**: Deleted a file via file manager; it disappeared from the app list - **Verified**.
-- **File Location**: Tapped "Open file location" on a synced song; file manager opened in the correct directory - **Verified**.
-- **App Lifecycle**: Backgrounded the app and resumed; cloud sync triggered successfully - **Verified**.
+- **Images**: Verified that songs previously missing icons now show local folder art.
+- **Multi-select**: Verified "Select All" correctly toggles selection for the entire song list.
+- **Filtering**: confirmed that call recordings are successfully excluded from the scan.
+- **MiniPlayer**: Verified that the time and sleep timer badge appear correctly and update in real-time.

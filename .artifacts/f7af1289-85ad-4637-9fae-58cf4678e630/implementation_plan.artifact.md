@@ -1,37 +1,47 @@
-# Implementation Plan - Metadata, Sync, and Filtering Fixes
+# Implementation Plan - Multi-select, Big Sync Progress, and MiniPlayer Enhancements
 
-This plan addresses issues with missing song images, sync failures, and unwanted call recordings in the library.
+This plan addresses several UI and functional improvements: Select All songs feature, a prominent cloud sync progress bar, and adding song duration and sleep timer to the minimized player. It also incorporates previous fixes for metadata and filtering.
 
 ## Proposed Changes
+
+### UI Components & Screens
+
+#### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
+- **Select All Feature**:
+    - Update `SelectionTopBar` to include a "Select All" icon button.
+    - Passing the full list of currently visible tracks to `SelectionTopBar` to toggle selection.
+- **Filtering**:
+    - Update `SongsTab` to ensure it only shows non-call recordings (handled in repository).
+
+#### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
+- **Big Sync Progress**:
+    - Overhaul the `Sync Progress Indicator` inside the root `Scaffold`.
+    - Increase font size for status messages.
+    - Increase the height of the `LinearProgressIndicator` (e.g., `Modifier.height(8.dp)`).
+    - Use a more distinct background color and adding shadow/elevation to make it "pop".
+
+#### [MODIFY] [MiniPlayer.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/components/MiniPlayer.kt)
+- **Time & Sleep Timer**:
+    - Add a `sleepTimerRemaining` state using `viewModel.sleepTimerRemaining.collectAsState()`.
+    - Display the current position and total duration (e.g., `01:23 / 04:56`) below the artist name.
+    - Display the sleep timer (HH:MM:SS) in a small badge or next to the time info if active.
 
 ### Core Logic & Metadata
 
 #### [MODIFY] [MediaMetadataUtils.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/logic/MediaMetadataUtils.kt)
-- Enhance image extraction:
-    - First, try `embeddedPicture` (already implemented).
-    - Second, if not found, look for "cover.jpg" or "album.jpg" in the same directory as the song file.
-    - Third, use a default fallback if all else fails.
+- Improve album art extraction by checking for local `cover.jpg` or `album.jpg` files if embedded artwork is missing.
 
 #### [MODIFY] [MusicRepository.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/data/MusicRepository.kt)
-- **Aggressive Filtering**: Update the `scanLocalStorage` query to explicitly exclude directories like "CallRecordings", "Recorder", and files containing "call" in their path.
-- **Robust Duplicates**:
-    - Use `localPath` as the primary key for local files during scanning.
-    - Before adding a cloud track, check if a track with the same title and artist already exists to prevent duplicate entries for the same song across local/cloud.
-- **Sync Logging**: Add more detailed logging to `syncCloudTracks` to identify where it fails (auth, network, or data parsing).
-
-### UI Refinement
-
-#### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
-- Ensure image loading in `StellarTrackItem` and `StellarGridItem` has proper error handling and placeholder display.
+- Implement aggressive filtering in `scanLocalStorage` to exclude paths containing "Recorder", "CallRecordings", or "call".
+- Ensure duplicate protection during scan by checking normalized file names and paths.
 
 ## Verification Plan
 
 ### Automated Tests
-- Verify successful build.
-- Log check: Ensure "Skipping duplicate" and "Filtering out recording" logs appear correctly.
+- Verify successful compilation and build.
 
 ### Manual Verification
-- **Images**: Browse the library and verify that more songs now show their album art.
-- **Filtering**: Check "All Songs" to ensure no call recordings are present.
-- **Duplicates**: Run a scan and cloud sync; verify no duplicate songs appear for those already in the library.
-- **Sync**: Check the Cloud Sync status message for success or specific error details.
+- **Multi-select**: Go to library, long press a song, then tap the "Select All" button in the top bar. Verify all songs are checked.
+- **Sync Progress**: Upload a large song and verify the new big progress bar is highly visible.
+- **MiniPlayer**: Play a song and verify the time (e.g., 0:45 / 3:12) and the sleep timer (if set) appear on the player band.
+- **Filtering**: Verify no call recordings appear in the list after a re-scan.

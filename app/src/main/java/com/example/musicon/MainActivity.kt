@@ -20,6 +20,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -28,6 +29,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -634,24 +636,36 @@ fun MusicOnApp(
                         // Sync Progress Indicator
                         AnimatedVisibility(visible = syncStatus !is SyncStatus.Idle) {
                             Surface(
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
-                                modifier = Modifier.fillMaxWidth()
+                                color = Color(0xFF13112B),
+                                shadowElevation = 8.dp,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp).clip(RoundedCornerShape(8.dp))
                             ) {
-                                Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                Column(Modifier.padding(12.dp)) {
                                     val message = when (val s = syncStatus) {
                                         is SyncStatus.Loading -> s.message
                                         is SyncStatus.Success -> s.message
                                         is SyncStatus.Error -> s.message
                                         else -> ""
                                     }
-                                    Text(message, style = MaterialTheme.typography.labelSmall, color = Color.White)
+                                    Text(
+                                        message, 
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), 
+                                        color = Color.White
+                                    )
                                     if (syncStatus is SyncStatus.Loading) {
-                                        Spacer(Modifier.height(4.dp))
+                                        Spacer(Modifier.height(8.dp))
                                         val progress = (syncStatus as SyncStatus.Loading).progress
                                         if (progress >= 0) {
-                                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                                            LinearProgressIndicator(
+                                                progress = { progress }, 
+                                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
                                         } else {
-                                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                            LinearProgressIndicator(
+                                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
                                         }
                                     }
                                     if (syncStatus is SyncStatus.Success || syncStatus is SyncStatus.Error) {

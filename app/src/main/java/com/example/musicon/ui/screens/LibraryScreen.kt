@@ -122,7 +122,14 @@ fun LibraryScreen(
                 containerColor = Color.Transparent,
                 topBar = {
                     if (isSelectionMode) {
-                        SelectionTopBar(count = selectedIds.size, onClose = { selectedIds = emptySet() })
+                        SelectionTopBar(
+                            count = selectedIds.size, 
+                            onClose = { selectedIds = emptySet() },
+                            onSelectAll = { 
+                                val allVisibleIds = tracks.map { it.id }.toSet()
+                                selectedIds = if (selectedIds.size == allVisibleIds.size) emptySet() else allVisibleIds
+                            }
+                        )
                     } else {
                         LibraryTopBar(
                             searchQuery = searchQuery,
@@ -465,8 +472,17 @@ fun SortMiniButton(label: String, value: String, current: String, onSelect: (Str
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SelectionTopBar(count: Int, onClose: () -> Unit) {
-    TopAppBar(title = { Text("$count selected", color = Color.White) }, navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = Color.White) } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(alpha = 0.1f)))
+fun SelectionTopBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Unit) {
+    TopAppBar(
+        title = { Text("$count selected", color = Color.White) }, 
+        navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = Color.White) } },
+        actions = {
+            IconButton(onClick = onSelectAll) {
+                Icon(Icons.Default.SelectAll, "Select All", tint = Color.White)
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(alpha = 0.1f))
+    )
 }
 
 @Composable

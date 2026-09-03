@@ -39,9 +39,28 @@ object MediaMetadataUtils {
                     val file = File(coversDir, fileName)
                     FileOutputStream(file).use { it.write(artBytes) }
                     artPath = file.absolutePath
-                    android.util.Log.d(TAG, "Saved cover to: $artPath")
+                    android.util.Log.d(TAG, "Saved cover from embedded metadata to: $artPath")
                 } catch (e: Exception) {
                     android.util.Log.e(TAG, "Failed to save cover art", e)
+                }
+            } else {
+                // Try to find local cover art in the same directory
+                try {
+                    val songFile = File(uri.path ?: "")
+                    if (songFile.exists()) {
+                        val parent = songFile.parentFile
+                        val localCover = parent?.listFiles()?.find { 
+                            it.name.equals("cover.jpg", true) || 
+                            it.name.equals("album.jpg", true) ||
+                            it.name.equals("folder.jpg", true)
+                        }
+                        if (localCover != null) {
+                            artPath = localCover.absolutePath
+                            android.util.Log.d(TAG, "Found local cover art: $artPath")
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e(TAG, "Local cover search failed", e)
                 }
             }
 

@@ -1,9 +1,7 @@
-- `[x]` Update `MusicRepository.kt`: Remove missing tracks during scan
-- `[x]` Update `MainViewModel.kt`:
-    - `[x]` Implement `openFileLocation`
-    - `[x]` Implement `ContentObserver` for real-time local sync
-- `[x]` Update `TrackOptionsBottomSheet.kt`: Add "Open file location" button
-- `[x]` Update `LibraryScreen.kt`: Link context menu to ViewModel
-- `[x]` Update `MainActivity.kt`: Initialize/cleanup real-time sync
-- `[x]` Verify UI and auto-update functionality
+- `[x]` Enhance `MediaMetadataUtils.kt`: Local cover art search
+- `[x]` Refine `MusicRepository.kt`: Aggressive filtering (Recordings) & duplicate protection
+- `[x]` Update `LibraryScreen.kt`: "Select All" functionality in top bar
+- `[x]` Update `MainActivity.kt`: Redesign Sync Progress UI (Bigger bar & bold text)
+- `[x]` Update `MiniPlayer.kt`: Display song duration and sleep timer
+- `[x]` Verify UI and functionality
 - `[x]` Create final walkthrough
