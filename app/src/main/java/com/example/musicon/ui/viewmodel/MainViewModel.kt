@@ -37,6 +37,14 @@ class MainViewModel(
     private val _isUserSignedIn = mutableStateOf(false)
     val isUserSignedIn: State<Boolean> = _isUserSignedIn
 
+    private val _isOnline = MutableStateFlow(true)
+    val isOnline = _isOnline.asStateFlow()
+
+    fun updateOnlineStatus(online: Boolean) {
+        _isOnline.value = online
+        if (online && isUserSignedIn.value) syncCloudTracks()
+    }
+
     val themeMode: StateFlow<ThemeMode> = settingsRepository.themeModeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ThemeMode.SPOTIFY_DARK)
 
@@ -194,7 +202,9 @@ class MainViewModel(
                 delay(1000)
                 _sleepTimerRemaining.value = (_sleepTimerRemaining.value ?: 0) - 1000
             }
-            _playbackCommand.emit(PlaybackCommand.PAUSE)
+            _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK)
+            delay(500) // Give time for player to stop
+            _playbackCommand.emit(PlaybackCommand.CLOSE_APP)
             _sleepTimerRemaining.value = null
         }
     }
@@ -202,7 +212,7 @@ class MainViewModel(
     private val _playbackCommand = MutableSharedFlow<PlaybackCommand>()
     val playbackCommand = _playbackCommand.asSharedFlow()
 
-    enum class PlaybackCommand { PAUSE }
+    enum class PlaybackCommand { PAUSE, CLOSE_APP, STOP_PLAYBACK }
 
     val songSortOrder: StateFlow<String> = settingsRepository.songSortOrderFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "NAME")
@@ -213,14 +223,48 @@ class MainViewModel(
     private val _searchQuery = mutableStateOf("")
     val searchQuery: State<String> = _searchQuery
 
-    val filteredTracks = combine(allTracks, _searchQuery.asFlow(), songSortOrder) { tracks, query, sort ->
-        val list = if (query.isEmpty()) tracks else {
+    val filteredTracks = combine(
+        allTracks, 
+        _searchQuery.asFlow(), 
+        songSortOrder, 
+        isUserSignedIn.asFlow()
+    ) { tracks, query, sort, signedIn ->
+        val localFiltered = if (query.isEmpty()) tracks else {
             tracks.filter { 
                 it.displayName.contains(query, ignoreCase = true) ||
                 it.displayArtist.contains(query, ignoreCase = true) ||
                 it.displayAlbum.contains(query, ignoreCase = true)
             }
         }
+        
+        // Search from Cloud too if online, searching, AND signed in
+        var list = localFiltered
+        if (query.isNotEmpty() && isOnline.value && signedIn) {
+            try {
+                val cloudFiles = musicRepository.cloudStorageManager.listAudioFiles(null)
+                val cloudTracks = cloudFiles.filter { 
+                    it.name.contains(query, ignoreCase = true) 
+                }.map { file ->
+                    TrackEntity(
+                        id = file.id, title = file.name, artist = "Cloud", album = "Google Drive",
+                        duration = 0, gDriveId = file.id, isDownloaded = false
+                    )
+                }
+                // Merge and remove duplicates (prefer local)
+                val cloudOnly = cloudTracks.filter { ct -> 
+                    list.none { it.title.equals(ct.title, true) || it.gDriveId == ct.gDriveId } 
+                }
+                list = list + cloudOnly
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Cloud search failed", e)
+            }
+        }
+
+        // Final filtering to hide any unsynced cloud tracks if signed out
+        if (!signedIn) {
+            list = list.filter { it.localPath != null || it.isDownloaded }
+        }
+
         when(sort) {
             "NAME_ASC" -> list.sortedBy { it.displayName }
             "NAME_DESC" -> list.sortedByDescending { it.displayName }

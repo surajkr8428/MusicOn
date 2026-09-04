@@ -74,6 +74,7 @@ fun LibraryScreen(
     val sortOrder by viewModel.songSortOrder.collectAsState()
     val viewMode by viewModel.libraryViewMode.collectAsState()
     val sleepTimerRemaining by viewModel.sleepTimerRemaining.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
     
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -85,6 +86,9 @@ fun LibraryScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     var selectedTrackOptions by remember { mutableStateOf<TrackEntity?>(null) }
     var trackToEdit by remember { mutableStateOf<TrackEntity?>(null) }
+    var trackToDeleteConfirm by remember { mutableStateOf<TrackEntity?>(null) }
+    var tracksToBulkDeleteConfirm by remember { mutableStateOf<List<TrackEntity>?>(null) }
+    
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
     var currentPlaylistDetail by remember { mutableStateOf<com.example.musicon.data.local.Playlist?>(null) }
 
@@ -145,7 +149,9 @@ fun LibraryScreen(
                             },
                             viewMode = viewMode,
                             timerRemaining = sleepTimerRemaining,
-                            isLandscape = isLandscape
+                            isLandscape = isLandscape,
+                            viewModel = viewModel,
+                            isOnline = isOnline
                         )
                     }
                 },
@@ -155,7 +161,7 @@ fun LibraryScreen(
                             onPlay = { viewModel.playSelected(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
                             onNext = { viewModel.addToQueueNext(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
                             onPlaylist = { showBulkPlaylistDialog = true },
-                            onDelete = { viewModel.bulkDelete(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
+                            onDelete = { tracksToBulkDeleteConfirm = allTracks.filter { it.id in selectedIds } },
                             onUpload = { viewModel.bulkUpload(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
                             onRemove = { viewModel.removeFromLibrary(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() }
                         )
@@ -281,10 +287,38 @@ fun LibraryScreen(
                     "cut" -> onOpenCutter(selectedTrackOptions!!)
                     "edit" -> trackToEdit = selectedTrackOptions
                     "location" -> viewModel.openFileLocation(selectedTrackOptions!!)
-                    "remove" -> viewModel.removeFromLibrary(listOf(selectedTrackOptions!!))
+                    "remove" -> trackToDeleteConfirm = selectedTrackOptions
                 }
                 selectedTrackOptions = null
             }
+        )
+    }
+
+    if (trackToDeleteConfirm != null) {
+        AlertDialog(
+            onDismissRequest = { trackToDeleteConfirm = null },
+            title = { Text("Remove Song?") },
+            text = { Text("Are you sure you want to remove '${trackToDeleteConfirm!!.displayName}' from your library?") },
+            confirmButton = {
+                Button(onClick = { viewModel.removeFromLibrary(listOf(trackToDeleteConfirm!!)); trackToDeleteConfirm = null }) { Text("Remove") }
+            },
+            dismissButton = { TextButton(onClick = { trackToDeleteConfirm = null }) { Text("Cancel") } }
+        )
+    }
+
+    if (tracksToBulkDeleteConfirm != null) {
+        AlertDialog(
+            onDismissRequest = { tracksToBulkDeleteConfirm = null },
+            title = { Text("Delete Songs?", color = Color.White) },
+            text = { Text("Are you sure you want to delete ${tracksToBulkDeleteConfirm!!.size} songs from your device? This cannot be undone.", color = Color.Gray) },
+            confirmButton = {
+                Button(onClick = { 
+                    viewModel.bulkDelete(tracksToBulkDeleteConfirm!!)
+                    tracksToBulkDeleteConfirm = null
+                    selectedIds = emptySet()
+                }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { tracksToBulkDeleteConfirm = null }) { Text("Cancel") } }
         )
     }
 
@@ -363,10 +397,15 @@ fun LibraryTopBar(
     onViewModeToggle: () -> Unit,
     viewMode: LibraryViewMode,
     timerRemaining: Long?,
-    isLandscape: Boolean
+    isLandscape: Boolean,
+    viewModel: MainViewModel,
+    isOnline: Boolean
 ) {
+    val syncStatus by com.example.musicon.data.remote.CloudSyncManager.status.collectAsState()
+
     TopAppBar(
         modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
+        windowInsets = WindowInsets(0),
         title = {
             if (isSearchActive) {
                 TextField(
@@ -379,9 +418,14 @@ fun LibraryTopBar(
             } else {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 4.dp)
+                    modifier = Modifier.fillMaxWidth().padding(bottom = if (isLandscape) 0.dp else 4.dp)
                 ) {
                     Text("MusicOn", color = Color.White, fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp)
+
+                    // Unified Status Pill (Online/Offline + Sync Progress)
+                    Spacer(Modifier.width(12.dp))
+                    HeaderStatusPill(isOnline = isOnline, syncStatus = syncStatus)
+
                     if (timerRemaining != null) {
                         Spacer(Modifier.width(12.dp))
                         Surface(color = MaterialTheme.colorScheme.primary.copy(0.2f), shape = RoundedCornerShape(8.dp)) {
@@ -476,6 +520,7 @@ fun SelectionTopBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Unit) {
     TopAppBar(
         title = { Text("$count selected", color = Color.White) }, 
         navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = Color.White) } },
+        windowInsets = WindowInsets(0),
         actions = {
             IconButton(onClick = onSelectAll) {
                 Icon(Icons.Default.SelectAll, "Select All", tint = Color.White)
@@ -648,6 +693,16 @@ fun StellarTrackItem(track: TrackEntity, isSelected: Boolean, onPlay: () -> Unit
         Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(text = track.displayName, style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Cursive, color = LavenderTitle, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                
+                // Cloud Icon for Cloud Tracks
+                if (track.gDriveId != null && !track.isDownloaded) {
+                    Icon(
+                        Icons.Default.CloudQueue, null, 
+                        tint = Color.Gray, 
+                        modifier = Modifier.padding(start = 4.dp).size(14.dp)
+                    )
+                }
+
                 // Red heart icon next to name
                 IconButton(onClick = onToggleFavorite, modifier = Modifier.size(24.dp)) { 
                     Icon(if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, modifier = Modifier.size(16.dp), tint = if (track.isFavorite) Color.Red else Color.Gray) 
@@ -739,6 +794,43 @@ fun StellarActionButton(label: String, icon: ImageVector, modifier: Modifier = M
         Icon(icon, null, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(6.dp))
         Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun HeaderStatusPill(isOnline: Boolean, syncStatus: com.example.musicon.data.remote.SyncStatus) {
+    Surface(
+        color = if (isOnline) Color(0xFF2E7D32).copy(alpha = 0.2f) else Color(0xFFC62828).copy(alpha = 0.2f),
+        shape = RoundedCornerShape(22.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isOnline) Color(0xFF2E7D32) else Color(0xFFC62828)),
+        modifier = Modifier.height(30.dp).padding(horizontal = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val statusText = if (isOnline) "ONLINE" else "OFFLINE"
+            val statusColor = if (isOnline) Color(0xFF81C784) else Color(0xFFE57373)
+            
+            Text(
+                text = statusText,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
+                color = statusColor
+            )
+
+            if (syncStatus is com.example.musicon.data.remote.SyncStatus.Loading) {
+                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.CloudSync, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                
+                val progress = syncStatus.progress
+                if (progress >= 0) {
+                    Spacer(Modifier.width(8.dp))
+                    Box(Modifier.width(40.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.1f))) {
+                        Box(Modifier.fillMaxWidth(progress).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
+                    }
+                }
+            }
+        }
     }
 }
 

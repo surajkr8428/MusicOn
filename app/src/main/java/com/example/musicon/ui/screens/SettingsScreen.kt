@@ -120,6 +120,29 @@ fun SettingsScreen(
 
                 item {
                     SettingsHeader("Theming")
+                    val themeMode by viewModel.themeMode.collectAsState()
+                    
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Theme Mode", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            com.example.musicon.ui.theme.ThemeMode.entries.forEach { mode ->
+                                val isSelected = themeMode == mode
+                                Button(
+                                    onClick = { viewModel.updateThemeMode(mode) },
+                                    modifier = Modifier.weight(1f).height(40.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isSelected) primaryColor else Color.White.copy(alpha = 0.05f),
+                                        contentColor = if (isSelected) Color.Black else Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(mode.name, fontSize = 10.sp)
+                                }
+                            }
+                        }
+                    }
+
                     StellarSettingsToggle(Icons.Default.ColorLens, "Auto Theme Color", "Extract theme color from song image", autoTheme) { 
                         viewModel.updateAutoTheme(it) 
                     }

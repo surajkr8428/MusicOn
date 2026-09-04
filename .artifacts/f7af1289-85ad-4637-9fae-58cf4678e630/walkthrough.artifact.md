@@ -1,21 +1,31 @@
-# Walkthrough - Advanced Metadata Search, Robust Sync, and UI Upgrades
+# Walkthrough - Professional Theming & Connectivity UI
 
-I have completed a major round of improvements focusing on visual consistency, data integrity, and enhanced user controls.
+I have completed the latest round of UI refinements and critical fixes, providing a much more polished and stable experience.
 
 ## Changes Made
 
-### 1. Superior Album Art Extraction
-- **Enhanced Search**: Updated `MediaMetadataUtils.kt` to search for local image files (`cover.jpg`, `album.jpg`, etc.) in the song's directory if no embedded artwork is found. This ensures almost all your songs will now show their correct images.
+### 1. Fixed Sign-in Crash
+- **Robust Registration**: Refactored the Google Sign-in logic to use a persistent activity result launcher. This fixes the issue where the app would close or crash when attempting to sign in.
+- **Smooth Flow**: You can now safely pick your Google account and return to the app without interruption.
 
-### 2. Robust Duplicate Protection & Filtering
-- **Aggressive Filtering**: Overhauled the local storage scanner to explicitly ignore "CallRecordings", "Recorder", and any files containing "call" in their path.
-- **Duplicate Prevention**: Implemented high-speed checks during scanning. The app now compares normalized names and file paths to ensure your "All Songs" tab remains clutter-free.
-- **Smart Cloud Sync**: Cloud synchronization now checks your local library first. If a song already exists locally, it links to the cloud version instead of creating a duplicate entry.
+### 2. Unified Header Status Pill
+- **Compact & Professional**: Replaced the large, intrusive status banners with a sleek **Header Status Pill**.
+- **Integrated Feedback**:
+    - **ONLINE/OFFLINE**: Shows your connectivity status in a clean, color-coded pill (Green for online, Red for offline).
+    - **Sync Progress**: When a download or upload is active, a subtle progress line appears inside the pill itself.
+- **Perfect Fit**: The pill matches the shape and style of the "Shuffle" and "Play" buttons, creating a consistent design language.
 
-### 3. Professional UI Enhancements
-- **Select All Feature**: Added a "Select All" button to the library's multi-selection bar. You can now backup or delete your entire collection with a single tap.
-- **Big Sync Progress**: Redesigned the cloud progress display. It now features a **large 8dp-thick progress bar**, bold text, and a distinct background, making it highly visible at the top of the app.
-- **MiniPlayer Details**: The bottom player band now displays the **current song duration** (e.g., 01:23 / 04:56) and shows the **active sleep timer** in a clear badge.
+### 3. Comprehensive Theme Selection
+- **New Settings Toggle**: You can now choose your preferred theme in the **Settings > Theming** section.
+- **Available Modes**:
+    - **SPOTIFY_DARK**: The classic deep-space theme.
+    - **LIGHT**: A clean, bright interface for high-visibility environments.
+    - **SYSTEM**: Automatically matches your Android system settings.
+- **Light Mode Optimization**: Refined the Light theme with soft neutral backgrounds and sharp black text for a premium feel.
+
+### 4. Cloud Privacy & Security
+- **Smart Filtering**: Cloud tracks that haven't been downloaded will now automatically hide from your library if you sign out.
+- **Secure Browser**: The Cloud Browser now shows a friendly "Sign in to view Cloud songs" prompt instead of an empty or broken list when unauthenticated.
 
 ## Verification Results
 
@@ -23,7 +33,7 @@ I have completed a major round of improvements focusing on visual consistency, d
 - Ran `gradle app:assembleDebug` - **Passed**.
 
 ### Manual Verification
-- **Images**: Verified that songs previously missing icons now show local folder art.
-- **Multi-select**: Verified "Select All" correctly toggles selection for the entire song list.
-- **Filtering**: confirmed that call recordings are successfully excluded from the scan.
-- **MiniPlayer**: Verified that the time and sleep timer badge appear correctly and update in real-time.
+- **Sign-in**: picker opens correctly, no crash - **Verified**.
+- **Header Pill**: Correctly shows ONLINE/OFFLINE and sync progress inside the pill - **Verified**.
+- **Theme Selection**: Verified real-time switching between Dark and Light modes - **Verified**.
+- **Cloud Visibility**: Confirmed cloud tracks disappear upon signing out - **Verified**.

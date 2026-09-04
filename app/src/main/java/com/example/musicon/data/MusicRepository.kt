@@ -14,7 +14,7 @@ class MusicRepository(
     private val context: Context,
     private val trackDao: TrackDao,
     private val playlistDao: PlaylistDao,
-    private val cloudStorageManager: com.example.musicon.data.remote.CloudStorageManager
+    val cloudStorageManager: com.example.musicon.data.remote.CloudStorageManager
 ) {
 
     val allTracks: Flow<List<TrackEntity>> = trackDao.getAllTracks()
@@ -40,8 +40,9 @@ class MusicRepository(
             val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
             
             val existingTracks = trackDao.getAllTracks().first()
-            val existingNames = existingTracks.map { it.title.lowercase() }.toSet()
-            val existingDisplayNames = existingTracks.map { it.displayName.lowercase() }.toSet()
+            val existingFingerprints = existingTracks.map { 
+                "${it.displayName.lowercase().trim()}_${it.displayArtist.lowercase().trim()}" 
+            }.toSet()
             val existingPaths = existingTracks.mapNotNull { it.localPath?.lowercase() }.toSet()
 
             // Cleanup: Check if local files in DB still exist on device
@@ -60,23 +61,25 @@ class MusicRepository(
                 val name = cursor.getString(nameColumn)
                 val path = cursor.getString(dataColumn)
                 
-                // Duplicate Protection: Check if a track with this name or path already exists
-                if (existingNames.contains(name.lowercase()) || 
-                    existingDisplayNames.contains(name.lowercase()) ||
-                    existingPaths.contains(path.lowercase())) {
-                    android.util.Log.d("MusicRepository", "Skipping duplicate: $name")
-                    continue
-                }
+                // Duplicate Protection: Check by Path first (fastest)
+                if (existingPaths.contains(path.lowercase())) continue
 
-                // Explicit check for 'call' in path to exclude more recordings
-                if (path.lowercase().contains("call")) {
-                    android.util.Log.d("MusicRepository", "Filtering out potential recording: $path")
+                // Check for potential recordings or duplicates by metadata
+                if (path.lowercase().contains("call") || 
+                    path.lowercase().contains("recordings") || 
+                    path.lowercase().contains("recorder")) {
                     continue
                 }
 
                 val contentUri = android.content.ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
                 val track = MediaMetadataUtils.extractMetadata(context, contentUri, id.toString())
+                
                 if (track != null) {
+                    val fingerprint = "${track.displayName.lowercase().trim()}_${track.displayArtist.lowercase().trim()}"
+                    if (existingFingerprints.contains(fingerprint)) {
+                        android.util.Log.d("MusicRepository", "Skipping duplicate by metadata: ${track.displayName}")
+                        continue
+                    }
                     trackDao.insertTrack(track)
                 }
             }

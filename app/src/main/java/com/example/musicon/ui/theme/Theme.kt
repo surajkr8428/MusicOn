@@ -50,7 +50,15 @@ fun MusicOnTheme(
         else -> lightColorScheme(
             primary = accentColor,
             onPrimary = Color.White,
-            secondary = accentColor.copy(alpha = 0.8f)
+            secondary = accentColor.copy(alpha = 0.8f),
+            onSecondary = Color.White,
+            background = Color(0xFFF5F5F7), // Apple-style soft grey/white
+            surface = Color.White,
+            onSurface = Color.Black,
+            onBackground = Color.Black,
+            primaryContainer = accentColor.copy(alpha = 0.1f),
+            onPrimaryContainer = accentColor,
+            outline = Color.LightGray
         )
     }
 

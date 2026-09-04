@@ -150,7 +150,7 @@ fun PlayerScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets(0)),
+                    .windowInsetsPadding(WindowInsets.statusBars),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Header (Restored original alignment, sitting just below status bar)
@@ -183,14 +183,32 @@ fun PlayerScreen(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-
-
                         sleepTimerRemaining?.let { remaining ->
                             Text(
                                 text = formatSleepTime(remaining),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = Color.White,
                                 modifier = Modifier.padding(end = 12.dp)
+                            )
+                        }
+
+                        // Player UI View Toggle
+                        IconButton(onClick = {
+                            val nextMode = when (imageMode) {
+                                PlayerImageMode.SQUARE -> PlayerImageMode.FULL_SCREEN
+                                PlayerImageMode.FULL_SCREEN -> PlayerImageMode.ROTATION
+                                PlayerImageMode.ROTATION -> PlayerImageMode.SQUARE
+                            }
+                            viewModel.updatePlayerImageMode(nextMode)
+                        }) {
+                            Icon(
+                                when(imageMode) {
+                                    PlayerImageMode.SQUARE -> Icons.Default.CropSquare
+                                    PlayerImageMode.FULL_SCREEN -> Icons.Default.Fullscreen
+                                    PlayerImageMode.ROTATION -> Icons.Default.Sync
+                                },
+                                contentDescription = "Change View Mode",
+                                tint = Color.White
                             )
                         }
 
@@ -599,16 +617,20 @@ fun PlayerLayoutLandscape(
 
         // Equidistant Sleep Timer and Bottom Queue in Landscape
         Column(
-            modifier = Modifier.fillMaxWidth().weight(0.4f),
+            modifier = Modifier.fillMaxWidth().weight(0.6f),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             if (sleepTimerRemaining != null) {
                 Text(
                     text = formatSleepTime(sleepTimerRemaining),
-                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold, fontSize = 64.sp),
-                    color = Color.White,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontWeight = FontWeight.Bold, 
+                        fontSize = 90.sp,
+                        letterSpacing = 2.sp
+                    ),
+                    color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
             }
             

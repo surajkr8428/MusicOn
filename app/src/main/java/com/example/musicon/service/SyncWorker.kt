@@ -65,11 +65,12 @@ class SyncWorker(
                         CloudSyncManager.updateStatus(SyncStatus.Success("Synced: $fileName"))
                         Result.success()
                     } else {
-                        CloudSyncManager.updateStatus(SyncStatus.Error("Cloud sync failed for $fileName"))
+                        CloudSyncManager.updateStatus(SyncStatus.Error("Cloud upload failed: Check network or storage permissions"))
                         Result.failure()
                     }
                 } catch (e: Exception) {
-                    CloudSyncManager.updateStatus(SyncStatus.Error("Sync failed: ${e.message}"))
+                    android.util.Log.e("SyncWorker", "Upload error", e)
+                    CloudSyncManager.updateStatus(SyncStatus.Error("Sync failed: ${e.localizedMessage ?: "Unknown error"}"))
                     Result.failure()
                 }
             }

@@ -1,47 +1,43 @@
-# Implementation Plan - Multi-select, Big Sync Progress, and MiniPlayer Enhancements
+# Implementation Plan - Theming, Connectivity Status, and Fixes
 
-This plan addresses several UI and functional improvements: Select All songs feature, a prominent cloud sync progress bar, and adding song duration and sleep timer to the minimized player. It also incorporates previous fixes for metadata and filtering.
+This plan addresses the unified header status, Dark/Light mode support, fixing the sign-in crash, and securing cloud access.
 
 ## Proposed Changes
 
-### UI Components & Screens
-
-#### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
-- **Select All Feature**:
-    - Update `SelectionTopBar` to include a "Select All" icon button.
-    - Passing the full list of currently visible tracks to `SelectionTopBar` to toggle selection.
-- **Filtering**:
-    - Update `SongsTab` to ensure it only shows non-call recordings (handled in repository).
+### Core Fixes
 
 #### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
-- **Big Sync Progress**:
-    - Overhaul the `Sync Progress Indicator` inside the root `Scaffold`.
-    - Increase font size for status messages.
-    - Increase the height of the `LinearProgressIndicator` (e.g., `Modifier.height(8.dp)`).
-    - Use a more distinct background color and adding shadow/elevation to make it "pop".
+- **Fix Sign-in Crash**: Move `signInLauncher` registration to the class property level to avoid registration-during-method-call errors.
+- **Header Structure**: Ensure the status pill is correctly positioned between the title and search icon by providing sufficient space in the `LibraryTopBar`.
 
-#### [MODIFY] [MiniPlayer.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/components/MiniPlayer.kt)
-- **Time & Sleep Timer**:
-    - Add a `sleepTimerRemaining` state using `viewModel.sleepTimerRemaining.collectAsState()`.
-    - Display the current position and total duration (e.g., `01:23 / 04:56`) below the artist name.
-    - Display the sleep timer (HH:MM:SS) in a small badge or next to the time info if active.
+#### [MODIFY] [MainViewModel.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/viewmodel/MainViewModel.kt)
+- **Cloud Security**: Exclude cloud tracks from search results if `isUserSignedIn` is false.
 
-### Core Logic & Metadata
+### UI Components
 
-#### [MODIFY] [MediaMetadataUtils.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/logic/MediaMetadataUtils.kt)
-- Improve album art extraction by checking for local `cover.jpg` or `album.jpg` files if embedded artwork is missing.
+#### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
+- **Status Pill (Header)**:
+    - Implement a `HeaderStatusPill` component with `RoundedCornerShape(22.dp)` (matches Shuffle button).
+    - Combine **Online/Offline** status and **Cloud Sync progress** into this pill.
+    - Position it between the "MusicOn" title and the search icon.
+- **Cleanup**: Remove the separate large online/offline banners.
 
-#### [MODIFY] [MusicRepository.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/data/MusicRepository.kt)
-- Implement aggressive filtering in `scanLocalStorage` to exclude paths containing "Recorder", "CallRecordings", or "call".
-- Ensure duplicate protection during scan by checking normalized file names and paths.
+#### [MODIFY] [SettingsScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/SettingsScreen.kt)
+- **Theme Selection**: Add a settings item to toggle between **Light**, **Dark (Spotify)**, and **System** themes.
+
+#### [MODIFY] [Theme.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/theme/Theme.kt)
+- **Optimize Light Mode**: Refine `lightColorScheme` with soft neutral backgrounds and black text for a professional look.
+
+#### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
+- **Cloud Privacy**: Update `CloudBrowserScreen` to show a "Sign in to view Cloud songs" empty state if the user is not authenticated.
 
 ## Verification Plan
 
 ### Automated Tests
-- Verify successful compilation and build.
+- Build success check: `gradle app:assembleDebug`.
 
 ### Manual Verification
-- **Multi-select**: Go to library, long press a song, then tap the "Select All" button in the top bar. Verify all songs are checked.
-- **Sync Progress**: Upload a large song and verify the new big progress bar is highly visible.
-- **MiniPlayer**: Play a song and verify the time (e.g., 0:45 / 3:12) and the sleep timer (if set) appear on the player band.
-- **Filtering**: Verify no call recordings appear in the list after a re-scan.
+- **Sign-in**: Verify that clicking sign-in no longer closes the app and opens the Google account picker.
+- **Theme**: Verify switching to Light Mode updates the entire app's aesthetic.
+- **Status Pill**: Verify the compact ONLINE/OFFLINE indicator in the header.
+- **Cloud Privacy**: Sign out and confirm cloud songs disappear from Library and Cloud Browser.

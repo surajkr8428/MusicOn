@@ -1,7 +1,10 @@
-- `[x]` Enhance `MediaMetadataUtils.kt`: Local cover art search
-- `[x]` Refine `MusicRepository.kt`: Aggressive filtering (Recordings) & duplicate protection
-- `[x]` Update `LibraryScreen.kt`: "Select All" functionality in top bar
-- `[x]` Update `MainActivity.kt`: Redesign Sync Progress UI (Bigger bar & bold text)
-- `[x]` Update `MiniPlayer.kt`: Display song duration and sleep timer
-- `[x]` Verify UI and functionality
+- `[x]` Final UI/UX Polish and Cloud Enhancements
+    - `[x]` Fix Sign-in Crash in `MainActivity.kt`
+    - `[x]` Exclude Cloud Tracks when Signed Out in `MainViewModel.kt`
+    - `[x]` Implement `HeaderStatusPill` in `LibraryScreen.kt`
+    - `[x]` Clean up Library Headers
+    - `[x]` Add Theme Selection in `SettingsScreen.kt`
+    - `[x]` Optimize Light Theme in `Theme.kt`
+    - `[x]` Verify Cloud Browser Security
+- `[x]` Verify all fixes and functional test
 - `[x]` Create final walkthrough
