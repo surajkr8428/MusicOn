@@ -23,6 +23,10 @@ fun Mp3CutterScreen(
     viewModel: com.example.musicon.ui.viewmodel.MainViewModel,
     onBack: () -> Unit
 ) {
+    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+    val contentColor = if (isBright) Color.Black else Color.White
+    val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
+
     val isOnline by viewModel.isOnline.collectAsState()
     val isWifi by viewModel.isWifi.collectAsState()
     val syncStatus by com.example.musicon.data.remote.CloudSyncManager.status.collectAsState()
@@ -47,7 +51,7 @@ fun Mp3CutterScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 "MP3 Cutter", 
-                                color = Color.White, 
+                                color = contentColor, 
                                 fontWeight = FontWeight.Bold, 
                                 fontSize = if (isLandscape) 18.sp else 22.sp,
                                 modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 4.dp)
@@ -59,7 +63,7 @@ fun Mp3CutterScreen(
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack, modifier = if (isLandscape) Modifier.size(36.dp).padding(start = 4.dp) else Modifier) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = contentColor, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -80,10 +84,10 @@ fun Mp3CutterScreen(
                 
                 // Placeholder for Waveform
                 Box(
-                    Modifier.fillMaxWidth().height(120.dp).background(Color.White.copy(alpha = 0.05f)),
+                    Modifier.fillMaxWidth().height(120.dp).background(contentColor.copy(alpha = 0.05f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Waveform Visualization", color = Color.Gray)
+                    Text("Waveform Visualization", color = secondaryColor)
                 }
                 
                 Spacer(Modifier.height(32.dp))
@@ -96,12 +100,12 @@ fun Mp3CutterScreen(
                     },
                     valueRange = 0f..track.duration.toFloat(),
                     modifier = Modifier.fillMaxWidth(),
-                    colors = SliderDefaults.colors(thumbColor = Color.Red, activeTrackColor = Color.Red)
+                    colors = SliderDefaults.colors(thumbColor = Color.Red, activeTrackColor = Color.Red, inactiveTrackColor = contentColor.copy(alpha = 0.2f))
                 )
                 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(formatCutterTime(startRange.toLong()), color = Color.White)
-                    Text(formatCutterTime(endRange.toLong()), color = Color.White)
+                    Text(formatCutterTime(startRange.toLong()), color = contentColor)
+                    Text(formatCutterTime(endRange.toLong()), color = contentColor)
                 }
                 
                 Spacer(Modifier.weight(1f))

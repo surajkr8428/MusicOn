@@ -31,6 +31,13 @@ fun EqualizerScreen(
     val eqBandsStr by viewModel.eqBands.collectAsState()
     val bassBoost by viewModel.bassBoost.collectAsState()
     val virtualizer by viewModel.virtualizer.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
+    val isWifi by viewModel.isWifi.collectAsState()
+    val syncStatus by com.example.musicon.data.remote.CloudSyncManager.status.collectAsState()
+    
+    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+    val contentColor = if (isBright) Color.Black else Color.White
+    val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
 
     val bands = remember(eqBandsStr) { eqBandsStr.split(",").map { it.toInt() } }
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -47,17 +54,22 @@ fun EqualizerScreen(
                     modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
                     windowInsets = WindowInsets.statusBars,
                     title = { 
-                        Text(
-                            "Equalizer", 
-                            color = Color.White, 
-                            fontWeight = FontWeight.Bold, 
-                            fontSize = if (isLandscape) 18.sp else 22.sp,
-                            modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 4.dp)
-                        ) 
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Equalizer", 
+                                color = contentColor, 
+                                fontWeight = FontWeight.Bold, 
+                                fontSize = if (isLandscape) 18.sp else 22.sp,
+                                modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 4.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            HeaderStatusPill(isOnline = isOnline, isWifi = isWifi)
+                            SyncProgressBar(syncStatus = syncStatus, modifier = Modifier.weight(1f))
+                        }
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack, modifier = if (isLandscape) Modifier.size(36.dp).padding(start = 4.dp) else Modifier) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = contentColor, modifier = if (isLandscape) Modifier.size(20.dp) else Modifier)
                         }
                     },
                     actions = {
@@ -85,7 +97,7 @@ fun EqualizerScreen(
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 item {
-                    Text("Presets", color = Color.Gray, fontSize = 14.sp)
+                    Text("Presets", color = secondaryColor, fontSize = 14.sp)
                     Spacer(Modifier.height(12.dp))
                     val presets = listOf("Flat", "Rock", "Pop", "Jazz", "Classical", "Bass Boost")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -96,8 +108,8 @@ fun EqualizerScreen(
                                 label = { Text(preset) },
                                 enabled = eqEnabled,
                                 colors = FilterChipDefaults.filterChipColors(
-                                    labelColor = Color.White,
-                                    disabledLabelColor = Color.Gray
+                                    labelColor = contentColor,
+                                    disabledLabelColor = secondaryColor
                                 )
                             )
                         }
@@ -105,7 +117,7 @@ fun EqualizerScreen(
                 }
 
                 item {
-                    Text("Bands", color = Color.Gray, fontSize = 14.sp)
+                    Text("Bands", color = secondaryColor, fontSize = 14.sp)
                     Spacer(Modifier.height(16.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth().height(200.dp),
@@ -129,23 +141,23 @@ fun EqualizerScreen(
                                         inactiveTrackColor = primaryColor.copy(alpha = 0.2f)
                                     )
                                 )
-                                Text("${index + 1}", color = Color.White, fontSize = 12.sp)
+                                Text("${index + 1}", color = contentColor, fontSize = 12.sp)
                             }
                         }
                     }
                 }
 
                 item {
-                    Text("Audio Effects", color = Color.Gray, fontSize = 14.sp)
+                    Text("Audio Effects", color = secondaryColor, fontSize = 14.sp)
                     Spacer(Modifier.height(16.dp))
                     
-                    EffectSlider("Bass Boost", bassBoost.toFloat(), 0f..1000f, eqEnabled, primaryColor) {
+                    EffectSlider("Bass Boost", bassBoost.toFloat(), 0f..1000f, eqEnabled, primaryColor, contentColor, secondaryColor) {
                         viewModel.updateBassBoost(it.toInt())
                     }
                     
                     Spacer(Modifier.height(16.dp))
                     
-                    EffectSlider("Virtualizer", virtualizer.toFloat(), 0f..1000f, eqEnabled, primaryColor) {
+                    EffectSlider("Virtualizer", virtualizer.toFloat(), 0f..1000f, eqEnabled, primaryColor, contentColor, secondaryColor) {
                         viewModel.updateVirtualizer(it.toInt())
                     }
                 }
@@ -161,12 +173,14 @@ fun EffectSlider(
     range: ClosedFloatingPointRange<Float>,
     enabled: Boolean,
     accentColor: Color,
+    contentColor: Color,
+    secondaryColor: Color,
     onValueChange: (Float) -> Unit
 ) {
     Column {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, color = Color.White, fontSize = 16.sp)
-            Text("${(value / 10).toInt()}%", color = Color.Gray, fontSize = 14.sp)
+            Text(label, color = contentColor, fontSize = 16.sp)
+            Text("${(value / 10).toInt()}%", color = secondaryColor, fontSize = 14.sp)
         }
         Slider(
             value = value,

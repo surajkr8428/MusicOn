@@ -1,40 +1,48 @@
-# Implementation Plan - Final Stability, Persistence & Advanced UI
+# Implementation Plan - Stability, Navigation & Timer Controls
 
-This plan addresses the song playback issue, sign-in persistence, crashes, and advanced UI polish including elongated progress bars and enhanced cloud browser visuals.
+This plan addresses the playback issue, refactors Settings to a sidebar-only model, enhances the sleep timer controls, and fixes cloud synchronization and visuals.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Sign-in Persistence**: I will add a check in `MainActivity.onCreate` to automatically verify and restore the Google Sign-in state from the last session.
-> **Text Visibility**: To fix visibility on bright backgrounds (like Day phase), I will implement a `AdaptiveContentColor` logic that switches between high-contrast light/dark text based on the current background phase.
+> **Playback Reliability**: I will refine the `PlaybackService` to ensure it handles auth tokens more gracefully and uses a more reliable `MediaSource` for cloud tracks.
+> **Timer Placement**: As requested, the sleep timer will be removed from the Player header and relocated into the main controls area with new **Pause** and **Reset** buttons.
+> **Settings Access**: "Settings" will be removed from the left navigation drawer. It will only be accessible via the gear icon in the library header, opening in a sliding side panel.
 
 ## Proposed Changes
 
-### Stability & Persistence
+### Core Stability & Playback
 
 #### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
-- **Auto Sign-in**: Check `GoogleSignIn.getLastSignedInAccount` in `onCreate` and update `viewModel.updateSignInStatus(true)` immediately.
-- **Fix Playback**: Refine `toMediaItem()` to handle both `content://` and `file://` paths correctly using `Uri.fromFile` for local paths.
-- **Crash Prevention**: Add basic try-catch around `mediaController` interactions and ensure `lifecycleOwner` is handled safely.
+- **Fix Playback Flow**: Ensure `mediaController` is fully prepared and has a valid session before attempting to play.
+- **Side Panel Settings**:
+    - Remove the "Settings" item from the `NavigationDrawerItem` list.
+    - Ensure the drawer correctly handles the `isSettingsInDrawer` state.
+- **Beautiful Email**: Apply `FontFamily.Cursive` to the email display in the navigation drawer.
 
-### UI Refinement
+#### [MODIFY] [PlaybackService.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/service/PlaybackService.kt)
+- **Auth Token Refresh**: Refactor token injection to handle expired tokens by attempting a refresh during data source creation.
+
+### Cloud Integration
+
+#### [MODIFY] [CloudStorageManager.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/data/remote/CloudStorageManager.kt)
+- **Thumbnails**: Add `thumbnailLink` and `hasThumbnail` to the fields requested in `listAudioFiles`.
+- **Sync Reliability**: Add a method to ensure the "MusicOn" app folder exists before attempting to list or upload files.
+
+#### [MODIFY] [SettingsScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/SettingsScreen.kt)
+- **Cleanup**: Remove the "Sync Gdrive" manual sync button.
+
+### User Interface
+
+#### [MODIFY] [PlayerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/PlayerScreen.kt)
+- **Remove Header Timer**: Delete the timer and controls from the `Row` in the player header.
+- **Add Integrated Timer Controls**:
+    - Add a new row below the Seek Bar in `PlayerControls` containing the Sleep Timer countdown, a Pause/Resume icon, and a Reset icon.
+    - Ensure colors match the dynamic `primary` theme color.
+- **Visibility**: Apply `LocalIsBackgroundBright` checks to ensure text remains readable against animated backgrounds.
 
 #### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
-- **Stretched Progress Bar**: Update `SyncProgressBar` to use a `Box` with `weight(1f)` and a bolder thickness (10dp). Move the Search icon to the right of the progress bar if needed, or keep it elongated in between.
-- **Visibility**: Update all `Text` colors in `LibraryTopBar` and `HeaderStatusPill` to use a context-aware color (Black on bright, White on dark).
-
-#### [MODIFY] [StellarBackground.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/components/StellarBackground.kt)
-- **New Animation Modes**: Ensure "SPACE", "NEBULA", and "AURORA" are fully implemented with distinct Canvas drawing logic.
-- **Light Theme Support**: Provide a `CompositionLocal` or shared state for "IsBackgroundBright" to help child components adjust their text color.
-
-#### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt) - `CloudBrowserScreen`
-- **Thumbnails**: Use `file.thumbnailLink` in the `CloudBrowserScreen` items (Grid and List) to show actual song artwork where available.
-- **Beautiful Email**: Apply `FontFamily.Cursive` and `FontWeight.Bold` to the email display in the navigation drawer.
-
-### Playback Logic
-
-#### [MODIFY] [MainViewModel.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/viewmodel/MainViewModel.kt)
-- **Session Protection**: Ensure `isUserSignedIn` is persisted in `DataStore` or simply rely on `GoogleSignIn.getLastSignedInAccount`.
+- **Bolder Progress Bar**: Stretch the progress bar even further and increase its thickness to be "big" and bold as requested.
 
 ## Verification Plan
 
@@ -42,8 +50,8 @@ This plan addresses the song playback issue, sign-in persistence, crashes, and a
 - Build verification: `gradle app:assembleDebug`.
 
 ### Manual Verification
-- **Sign-in Persistence**: Sign in, close app from recents, reopen, and verify you are still signed in.
-- **Playback**: Click a song and verify audio starts.
-- **Progress Bar**: Verify it is long, thick, and positioned between title and search.
-- **Cloud Thumbnails**: Open Cloud Browser and verify artwork images load.
-- **Theme/Visibility**: Check text readability in both Light and Spotify Dark modes.
+- **Settings**: confirmed it only opens from the gear icon and is gone from the drawer.
+- **Playback**: verify cloud and local songs play without error.
+- **Timer**: pause and reset the timer from the Player screen controls.
+- **Cloud Visuals**: verify song thumbnails appear in the Cloud Browser.
+- **Visibility**: confirm text is clear in all animation modes and Day/Night phases.

@@ -224,7 +224,23 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryTopBar(searchQuery: String, isSearchActive: Boolean, onSearchToggle: () -> Unit, onSearchQueryChange: (String) -> Unit, onOpenDrawer: () -> Unit, onOpenSettings: () -> Unit, onSortClick: () -> Unit, onViewModeToggle: () -> Unit, viewMode: LibraryViewMode, timerRemaining: Long?, isLandscape: Boolean, viewModel: MainViewModel, isOnline: Boolean, isWifi: Boolean, syncStatus: com.example.musicon.data.remote.SyncStatus) {
+fun LibraryTopBar(
+    searchQuery: String, 
+    isSearchActive: Boolean,
+    onSearchToggle: () -> Unit,
+    onSearchQueryChange: (String) -> Unit, 
+    onOpenDrawer: () -> Unit, 
+    onOpenSettings: () -> Unit,
+    onSortClick: () -> Unit,
+    onViewModeToggle: () -> Unit,
+    viewMode: LibraryViewMode,
+    timerRemaining: Long?,
+    isLandscape: Boolean,
+    viewModel: MainViewModel,
+    isOnline: Boolean,
+    isWifi: Boolean,
+    syncStatus: com.example.musicon.data.remote.SyncStatus
+) {
     TopAppBar(
         modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier, windowInsets = WindowInsets(0),
         title = {
@@ -234,8 +250,35 @@ fun LibraryTopBar(searchQuery: String, isSearchActive: Boolean, onSearchToggle: 
                 val headerTextColor = if (isBright) Color.Black else Color.White
 
                 Text("MusicOn", color = headerTextColor, fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp)
-                Spacer(Modifier.width(12.dp)); HeaderStatusPill(isOnline, isWifi); SyncProgressBar(syncStatus, Modifier.weight(1f))
-                if (timerRemaining != null) Surface(color = MaterialTheme.colorScheme.primary.copy(0.2f), shape = RoundedCornerShape(8.dp)) { Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Timer, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp)); Spacer(Modifier.width(4.dp)); Text(formatSleepTime(timerRemaining), color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold) } }
+                
+                Spacer(Modifier.width(12.dp))
+                HeaderStatusPill(isOnline, isWifi)
+                
+                // Bolder, Elongated Progress Bar
+                Box(Modifier.weight(1f).padding(horizontal = 8.dp)) {
+                    SyncProgressBar(syncStatus, Modifier.fillMaxWidth())
+                }
+                
+                if (timerRemaining != null) {
+                    val isPaused by viewModel.isSleepTimerPaused.collectAsState()
+                    Surface(color = MaterialTheme.colorScheme.primary.copy(0.2f), shape = RoundedCornerShape(22.dp)) { 
+                        Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) { 
+                            Icon(Icons.Default.Timer, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text(formatSleepTime(timerRemaining), color = MaterialTheme.colorScheme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            
+                            // Pause/Resume Button
+                            IconButton(onClick = { viewModel.toggleSleepTimerPause() }, modifier = Modifier.size(24.dp)) {
+                                Icon(if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                            }
+                            
+                            // Reset Button
+                            IconButton(onClick = { viewModel.resetSleepTimer() }, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
+                            }
+                        } 
+                    }
+                }
             }
         },
         navigationIcon = { 
@@ -261,8 +304,15 @@ fun LibraryTopBar(searchQuery: String, isSearchActive: Boolean, onSearchToggle: 
 
 @Composable
 fun HeaderStatusPill(isOnline: Boolean, isWifi: Boolean) {
-    Surface(color = if (isOnline) Color(0xFF2E7D32) else Color(0xFFC62828), shape = RoundedCornerShape(22.dp), modifier = Modifier.height(30.dp)) {
-        Row(modifier = Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Surface(
+        color = if (isOnline) Color(0xFF2E7D32) else Color(0xFFC62828),
+        shape = RoundedCornerShape(22.dp),
+        modifier = Modifier.height(30.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             if (isOnline && isWifi) Icon(Icons.Default.Wifi, null, tint = Color.White, modifier = Modifier.size(14.dp).padding(end = 6.dp))
             Text(text = if (isOnline) "ONLINE" else "OFFLINE", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp), color = Color.White)
         }
@@ -297,7 +347,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
 
 @Composable fun PlaylistsTab(playlists: List<com.example.musicon.data.local.Playlist>, viewMode: LibraryViewMode, listState: androidx.compose.foundation.lazy.LazyListState, gridState: androidx.compose.foundation.lazy.grid.LazyGridState, onPlaylistClick: (com.example.musicon.data.local.Playlist) -> Unit, onCreatePlaylist: () -> Unit) {
     if (viewMode == LibraryViewMode.GRID) LazyVerticalGrid(state = gridState, columns = GridCells.Adaptive(minSize = 100.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) { items(playlists) { PlaylistGridItem(it, onPlaylistClick) }; item { Column(modifier = Modifier.padding(6.dp).clickable { onCreatePlaylist() }, horizontalAlignment = Alignment.CenterHorizontally) { Box(Modifier.size(70.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(0.1f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, null, tint = Color.Gray, modifier = Modifier.size(32.dp)) }; Spacer(Modifier.height(6.dp)); Text("Add Playlist", color = Color.White, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center) } } }
-    else LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { items(playlists) { ListItem(headlineContent = { Text(it.name, color = Color.White) }, leadingContent = { val icon = if (it.name == "Favorite") Icons.Default.Favorite else Icons.AutoMirrored.Filled.PlaylistAdd; Icon(icon, null, tint = if (it.name == "Favorite") Color.Red else Color.White) }, modifier = Modifier.clickable { onPlaylistClick(it) }, colors = ListItemDefaults.colors(containerColor = Color.Transparent)) }; item { ListItem(headlineContent = { Text("Add Playlist", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }, leadingContent = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary) }, modifier = Modifier.clickable { onCreatePlaylist() }, colors = ListItemDefaults.colors(containerColor = Color.Transparent)) } }
+    else LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { items(playlists) { ListItem(headlineContent = { Text(it.name, color = Color.White) }, leadingContent = { val icon = if (it.name == "Favorite") Icons.Default.Favorite else Icons.AutoMirrored.Filled.PlaylistAdd; Icon(icon, null, tint = if (it.name == "Favorite") Color.Red else Color.White) }, modifier = Modifier.clickable { onPlaylistClick(it) }, colors = ListItemDefaults.colors(containerColor = Color.Transparent)) }; item { ListItem(headlineContent = { Text("Add Playlist", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }, leadingContent = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary) }, modifier = Modifier.clickable { onCreatePlaylist() }, colors = ListItemDefaults.colors(containerColor = Color.Transparent) ) } }
 }
 
 @Composable fun GroupedTab(tracks: List<TrackEntity>, groupType: String, viewMode: LibraryViewMode, listState: androidx.compose.foundation.lazy.LazyListState, gridState: androidx.compose.foundation.lazy.grid.LazyGridState, onPlayGroup: (List<TrackEntity>) -> Unit) {
@@ -320,4 +370,37 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
     Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).combinedClickable(onClick = { onPlay(track) }, onLongClick = { onLongClick(track) }, onDoubleClick = onToggleFavorite).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) { Box { val imageModel = remember(track.customCoverPath, track.localPath) { val file = track.customCoverPath?.let { File(it) }; if (file != null && file.exists()) file else track.localPath ?: R.drawable.ic_launcher_foreground }; AsyncImage(model = imageModel, contentDescription = null, modifier = Modifier.aspectRatio(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop); if (isSelected) Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) }; if (track.isFavorite) Icon(Icons.Default.Favorite, null, tint = Color.Red, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(16.dp)) }; Spacer(Modifier.height(6.dp)); Text(text = track.displayName, color = primaryTextColor, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center); Text(text = track.displayArtist, color = secondaryTextColor, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) } }
 @Composable fun PlaylistGridItem(playlist: com.example.musicon.data.local.Playlist, onClick: (com.example.musicon.data.local.Playlist) -> Unit) { Column(modifier = Modifier.padding(6.dp).clickable { onClick(playlist) }, horizontalAlignment = Alignment.CenterHorizontally) { Box(Modifier.size(70.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(0.05f)), contentAlignment = Alignment.Center) { Icon(if (playlist.name == "Favorite") Icons.Default.Favorite else Icons.AutoMirrored.Filled.PlaylistAdd, null, tint = if (playlist.name == "Favorite") Color.Red else Color.Gray, modifier = Modifier.size(32.dp)) }; Spacer(Modifier.height(6.dp)); Text(playlist.name, color = Color.White, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center) } }
 @Composable fun GroupGridItem(name: String, tracks: List<TrackEntity>, onClick: (List<TrackEntity>) -> Unit) { Column(modifier = Modifier.padding(6.dp).clickable { onClick(tracks) }, horizontalAlignment = Alignment.CenterHorizontally) { Box(Modifier.size(70.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(0.05f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Album, null, tint = Color.Gray, modifier = Modifier.size(32.dp)) }; Spacer(Modifier.height(8.dp)); Text(name, color = Color.White, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center); Text("${tracks.size} songs", color = Color.Gray, fontSize = 9.sp, textAlign = TextAlign.Center) } }
-@Composable fun StellarActionButton(label: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) { Button(onClick = onClick, modifier = modifier.height(38.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), contentColor = Color.Black), shape = RoundedCornerShape(22.dp)) { Icon(icon, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold) } }
+@Composable
+fun StellarActionButton(label: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) { Button(onClick = onClick, modifier = modifier.height(38.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), contentColor = Color.Black), shape = RoundedCornerShape(22.dp)) { Icon(icon, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold) } }
+
+@Composable
+fun SleepTimerDialog(onDismiss: () -> Unit, onSet: (Int) -> Unit) {
+    var customMinutes by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Sleep Timer", color = Color.White, fontWeight = FontWeight.Bold) },
+        containerColor = Color(0xFF1E1B36),
+        text = {
+            Column {
+                val times = listOf(0 to "Off", 15 to "15 minutes", 30 to "30 minutes", 60 to "60 minutes")
+                times.forEach { (mins, label) ->
+                    TextButton(onClick = { onSet(mins) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(label, color = Color.White)
+                    }
+                }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.1f))
+                OutlinedTextField(
+                    value = customMinutes,
+                    onValueChange = { if (it.all { char -> char.isDigit() }) customMinutes = it },
+                    label = { Text("Custom Minutes", color = Color.Gray) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.Gray),
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                )
+            }
+        },
+        confirmButton = { Button(onClick = { val mins = customMinutes.toIntOrNull() ?: 0; if (mins > 0) onSet(mins) }, enabled = customMinutes.isNotEmpty()) { Text("Set Custom") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) } }
+    )
+}

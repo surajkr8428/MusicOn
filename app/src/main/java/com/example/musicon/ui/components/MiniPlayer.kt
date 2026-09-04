@@ -58,13 +58,17 @@ fun MiniPlayer(
         }
     }
 
+    val isBright = LocalIsBackgroundBright.current
+    val contentColor = if (isBright) Color.Black else Color.White
+    val secondaryColor = if (isBright) Color.DarkGray else Color.LightGray
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 4.dp)
             .height(64.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF1E1B36).copy(alpha = 0.95f))
+            .background(if (isBright) Color.White.copy(0.9f) else Color(0xFF1E1B36).copy(alpha = 0.95f))
             .clickable { onNavigateToPlayer() }
             .padding(8.dp)
     ) {
@@ -89,14 +93,14 @@ fun MiniPlayer(
                 Text(
                     text = currentMediaItem?.mediaMetadata?.title?.toString() ?: "No Song",
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                    color = Color.White,
+                    color = contentColor,
                     maxLines = 1
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = currentMediaItem?.mediaMetadata?.artist?.toString() ?: "Unknown Artist",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.LightGray,
+                        color = secondaryColor,
                         maxLines = 1,
                         modifier = Modifier.weight(1f, fill = false)
                     )
@@ -104,7 +108,7 @@ fun MiniPlayer(
                     Text(
                         text = "${formatTime(position)} / ${formatTime(player.duration)}",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.White.copy(alpha = 0.6f)
+                        color = contentColor.copy(alpha = 0.6f)
                     )
                     sleepTimerRemaining?.let { remaining ->
                         Spacer(Modifier.width(8.dp))
@@ -126,14 +130,14 @@ fun MiniPlayer(
                 Icon(
                     if (currentPlayingTrack?.isFavorite == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = null,
-                    tint = if (currentPlayingTrack?.isFavorite == true) Color.Red else Color(0xFFC3B1E1)
+                    tint = if (currentPlayingTrack?.isFavorite == true) Color.Red else (if (isBright) Color.DarkGray else Color(0xFFC3B1E1))
                 )
             }
             IconButton(onClick = { if (isPlaying) player.pause() else player.play() }) {
                 Icon(
                     if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, 
                     contentDescription = null,
-                    tint = Color.White
+                    tint = contentColor
                 )
             }
         }

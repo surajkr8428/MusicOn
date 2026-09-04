@@ -50,10 +50,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.musicon.ui.viewmodel.PlaybackEvent
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
-import coil.compose.AsyncImage
 import androidx.palette.graphics.Palette
 import com.example.musicon.data.LibraryViewMode
 import com.example.musicon.data.SettingsRepository
@@ -91,9 +91,9 @@ class MainActivity : ComponentActivity() {
         val cloudManager = com.example.musicon.data.remote.CloudStorageManager(applicationContext)
         val musicRepository = com.example.musicon.data.MusicRepository(applicationContext, database.trackDao(), database.playlistDao(), cloudManager)
         
-        // Auto Sign-in check
+        // Persistence: Check last account on Startup
         val account = GoogleSignIn.getLastSignedInAccount(this)
-        
+
         setContent {
             val viewModel: MainViewModel = viewModel(
                 factory = object : androidx.lifecycle.ViewModelProvider.Factory {
@@ -104,10 +104,11 @@ class MainActivity : ComponentActivity() {
                 }
             )
 
-            // Sync initial sign-in state
+            // Auto Sign-in persistence
             LaunchedEffect(Unit) {
                 if (account != null) viewModel.updateSignInStatus(true)
             }
+
             val themeMode by viewModel.themeMode.collectAsState()
             val accentColorInt by viewModel.accentColor.collectAsState()
             val autoTheme by viewModel.autoTheme.collectAsState()
@@ -140,7 +141,6 @@ class MainActivity : ComponentActivity() {
                 viewModel.playbackCommand.collect { command ->
                     when (command) {
                         MainViewModel.PlaybackCommand.CLOSE_APP -> {
-                            mediaController?.pause()
                             mediaController?.stop()
                             finishAffinity()
                         }
@@ -153,23 +153,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Handle Playback Events (Fix for song not playing)
+            // Handle Playback Events (Robust fix for song not playing)
             LaunchedEffect(mediaController) {
+                val controller = mediaController ?: return@LaunchedEffect
                 viewModel.playbackEvents.collect { event ->
                     try {
                         when (event) {
                             is PlaybackEvent.PlayTrackList -> {
                                 val mediaItems = event.tracks.map { it.toMediaItem() }
-                                mediaController?.apply {
-                                    setMediaItems(mediaItems)
-                                    seekTo(event.startIndex, 0L)
-                                    prepare()
-                                    play()
-                                }
+                                controller.setMediaItems(mediaItems)
+                                controller.seekTo(event.startIndex, 0L)
+                                controller.prepare()
+                                controller.play()
                             }
                         }
                     } catch (e: Exception) {
-                        android.util.Log.e("MusicOn", "Playback event error", e)
+                        android.util.Log.e("MusicOn", "Playback failed", e)
                     }
                 }
             }
@@ -228,11 +227,12 @@ class MainActivity : ComponentActivity() {
 
             val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
             DisposableEffect(lifecycleOwner) {
+                val lifecycle = lifecycleOwner.lifecycle
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) viewModel.syncCloudTracks()
                 }
-                lifecycleOwner.lifecycle.addObserver(observer)
-                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                lifecycle.addObserver(observer)
+                onDispose { lifecycle.removeObserver(observer) }
             }
 
             CompositionLocalProvider(com.example.musicon.ui.components.LocalCustomBackground provides customBgUri) {
@@ -307,10 +307,12 @@ private fun TrackEntity.toMediaItem(): androidx.media3.common.MediaItem {
         .setArtworkUri(customCoverPath?.let { android.net.Uri.parse(it) } ?: localPath?.let { android.net.Uri.parse(it) })
         .build()
 
-    val uri = localPath?.let { path ->
-        if (path.startsWith("content://")) android.net.Uri.parse(path)
-        else android.net.Uri.fromFile(java.io.File(path))
-    }
+    val uri = if (localPath != null) {
+        if (localPath.startsWith("content://")) android.net.Uri.parse(localPath)
+        else android.net.Uri.fromFile(java.io.File(localPath))
+    } else if (gDriveId != null) {
+        android.net.Uri.parse("https://www.googleapis.com/drive/v3/files/$gDriveId?alt=media")
+    } else null
 
     return androidx.media3.common.MediaItem.Builder()
         .setMediaId(id)
@@ -327,146 +329,113 @@ fun MusicOnApp(
     onSignInClick: () -> Unit,
     onSignOutClick: () -> Unit
 ) {
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
-    val isUserSignedIn by viewModel.isUserSignedIn
-    val context = LocalContext.current
-    
-    var isPlayerVisible by rememberSaveable { mutableStateOf(false) }
-    var isSettingsVisible by rememberSaveable { mutableStateOf(false) }
-    var isEqualizerVisible by rememberSaveable { mutableStateOf(false) }
-    var isCloudBrowserVisible by rememberSaveable { mutableStateOf(false) }
-    var cutterTrack by remember { mutableStateOf<TrackEntity?>(null) }
-    
-    var showSignInPrompt by remember { mutableStateOf(false) }
+    val themeMode by viewModel.themeMode.collectAsState()
+    val backgroundMode by viewModel.backgroundMode.collectAsState()
 
-    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-        viewModel.importLocalTracks(uris)
-    }
+    com.example.musicon.ui.components.StellarBackground(themeMode = themeMode, backgroundMode = backgroundMode) {
+        val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+        val scope = rememberCoroutineScope()
+        val isUserSignedIn by viewModel.isUserSignedIn
+        val context = LocalContext.current
+        
+        var isPlayerVisible by rememberSaveable { mutableStateOf(false) }
+        var isSettingsInDrawer by rememberSaveable { mutableStateOf(false) }
+        var isEqualizerVisible by rememberSaveable { mutableStateOf(false) }
+        var isCloudBrowserVisible by rememberSaveable { mutableStateOf(false) }
+        var cutterTrack by remember { mutableStateOf<TrackEntity?>(null) }
+        
+        var showSignInPrompt by remember { mutableStateOf(false) }
 
-    if (isPlayerVisible) {
-        PlayerScreen(viewModel = viewModel, player = mediaController, onBack = { isPlayerVisible = false })
-    } else if (isSettingsVisible) {
-        SettingsScreen(viewModel = viewModel, onSignInClick = onSignInClick, onScanClick = { viewModel.scanLocalStorage() }, onBack = { isSettingsVisible = false })
-    } else if (isEqualizerVisible) {
-        EqualizerScreen(viewModel = viewModel, onBack = { isEqualizerVisible = false })
-    } else if (isCloudBrowserVisible) {
-        CloudBrowserScreen(viewModel = viewModel, onBack = { isCloudBrowserVisible = false })
-    } else if (cutterTrack != null) {
-        Mp3CutterScreen(
-            track = cutterTrack!!,
-            viewModel = viewModel,
-            onBack = { cutterTrack = null }
-        )
-    } else {
-        ModalNavigationDrawer(
-            drawerState = drawerState,
-            drawerContent = {
-                ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background, modifier = Modifier.width(300.dp)) {
-                    Column(Modifier.fillMaxHeight()) {
-                        Spacer(Modifier.height(48.dp))
-                        if (!isUserSignedIn) {
-                            Button(onClick = onSignInClick, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                                Icon(Icons.Default.CloudSync, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("Sign in with Google", fontWeight = FontWeight.Bold)
+        val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+            viewModel.importLocalTracks(uris)
+        }
+
+        if (isPlayerVisible) {
+            PlayerScreen(viewModel = viewModel, player = mediaController, onBack = { isPlayerVisible = false })
+        } else if (isEqualizerVisible) {
+            EqualizerScreen(viewModel = viewModel, onBack = { isEqualizerVisible = false })
+        } else if (isCloudBrowserVisible) {
+            CloudBrowserScreen(viewModel = viewModel, onBack = { isCloudBrowserVisible = false })
+        } else if (cutterTrack != null) {
+            Mp3CutterScreen(track = cutterTrack!!, viewModel = viewModel, onBack = { cutterTrack = null })
+        } else {
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                drawerContent = {
+                    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), modifier = Modifier.width(320.dp)) {
+                        if (isSettingsInDrawer) {
+                            Column(Modifier.fillMaxSize()) {
+                                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(onClick = { isSettingsInDrawer = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }
+                                    Text("Settings", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                                }
+                                Box(modifier = Modifier.weight(1f)) { SettingsScreen(viewModel = viewModel, onSignInClick = onSignInClick, onScanClick = { viewModel.scanLocalStorage() }, onBack = { isSettingsInDrawer = false }) }
                             }
                         } else {
-                            val account = GoogleSignIn.getLastSignedInAccount(context)
-                            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
-                                val emailColor = if (isBright) Color.Black else Color.White
-
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        account?.email ?: "Signed in",
-                                        color = emailColor,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
-                                            fontFamily = FontFamily.Cursive,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 18.sp
-                                        ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text("Cloud Sync Enabled", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                            Column(Modifier.fillMaxHeight()) {
+                                Spacer(Modifier.height(48.dp))
+                                if (!isUserSignedIn) {
+                                    Button(onClick = onSignInClick, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                                        Icon(Icons.Default.CloudSync, null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Sign in with Google", fontWeight = FontWeight.Bold)
+                                    }
+                                } else {
+                                    val account = GoogleSignIn.getLastSignedInAccount(context)
+                                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                        val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+                                        val emailColor = if (isBright) Color.Black else Color.White
+                                        Column(Modifier.weight(1f)) {
+                                            Text(account?.email ?: "Signed in", color = emailColor, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Text("Cloud Sync Enabled", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                                        }
+                                        IconButton(onClick = onSignOutClick) { Icon(Icons.AutoMirrored.Filled.Logout, "Sign Out", tint = Color.Red) }
+                                    }
                                 }
-                                IconButton(onClick = onSignOutClick) { Icon(Icons.AutoMirrored.Filled.Logout, "Sign Out", tint = Color.Red) }
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                                val primaryColor = MaterialTheme.colorScheme.primary
+                                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("MusicOn", style = MaterialTheme.typography.headlineMedium.copy(color = primaryColor, fontWeight = FontWeight.Bold))
+                                    IconButton(onClick = { if (!isUserSignedIn) { showSignInPrompt = true } else { scope.launch { drawerState.close(); viewModel.syncAllLocalToCloud() } } }) { Icon(Icons.Default.CloudSync, "Sync All to Cloud", tint = primaryColor) }
+                                }
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                                NavigationDrawerItem(label = { Text("Import Hub (Local)") }, selected = false, onClick = { scope.launch { drawerState.close() }; filePicker.launch("audio/*") }, icon = { Icon(Icons.Default.FileDownload, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                                NavigationDrawerItem(label = { Text("Cloud Browser") }, selected = false, onClick = { if (!isUserSignedIn) { showSignInPrompt = true } else { scope.launch { drawerState.close() }; isCloudBrowserVisible = true } }, icon = { Icon(Icons.Default.CloudQueue, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                                NavigationDrawerItem(label = { Text("Equalizer") }, selected = false, onClick = { scope.launch { drawerState.close() }; isEqualizerVisible = true }, icon = { Icon(Icons.Default.Tune, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                                NavigationDrawerItem(label = { Text("Settings") }, selected = false, onClick = { isSettingsInDrawer = true }, icon = { Icon(Icons.Default.Settings, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                                NavigationDrawerItem(label = { Text("Share App (APK)") }, selected = false, onClick = { scope.launch { drawerState.close() }; /* Share Logic */ }, icon = { Icon(Icons.Default.Share, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                                Spacer(Modifier.weight(1f))
                             }
                         }
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                        val primaryColor = MaterialTheme.colorScheme.primary
-                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("MusicOn", style = MaterialTheme.typography.headlineMedium.copy(color = primaryColor, fontWeight = FontWeight.Bold))
-                            IconButton(onClick = { 
-                                if (!isUserSignedIn) { showSignInPrompt = true }
-                                else {
-                                    scope.launch { drawerState.close(); viewModel.syncAllLocalToCloud() } 
-                                }
-                            }) {
-                                Icon(Icons.Default.CloudSync, "Sync All to Cloud", tint = primaryColor)
-                            }
-                        }
-                        HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                        NavigationDrawerItem(label = { Text("Import Hub (Local)") }, selected = false, onClick = { scope.launch { drawerState.close() }; filePicker.launch("audio/*") }, icon = { Icon(Icons.Default.FileDownload, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                        NavigationDrawerItem(label = { Text("Cloud Browser") }, selected = false, onClick = { 
-                            if (!isUserSignedIn) { showSignInPrompt = true }
-                            else { scope.launch { drawerState.close() }; isCloudBrowserVisible = true }
-                        }, icon = { Icon(Icons.Default.CloudQueue, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                        NavigationDrawerItem(label = { Text("Equalizer") }, selected = false, onClick = { scope.launch { drawerState.close() }; isEqualizerVisible = true }, icon = { Icon(Icons.Default.Tune, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                        NavigationDrawerItem(label = { Text("Settings") }, selected = false, onClick = { scope.launch { drawerState.close() }; isSettingsVisible = true }, icon = { Icon(Icons.Default.Settings, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                        NavigationDrawerItem(label = { Text("Share App (APK)") }, selected = false, onClick = { scope.launch { drawerState.close() }; /* Share Logic */ }, icon = { Icon(Icons.Default.Share, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            ) {
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    containerColor = Color.Transparent,
+                    contentWindowInsets = WindowInsets.statusBars,
+                    bottomBar = { MiniPlayer(onNavigateToPlayer = { isPlayerVisible = true }, player = mediaController, viewModel = viewModel) }
+                ) { innerPadding ->
+                    Box(modifier = Modifier.padding(innerPadding)) {
+                        LibraryScreen(
+                            viewModel = viewModel,
+                            onOpenSettings = { isSettingsInDrawer = true; scope.launch { drawerState.open() } },
+                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                            onOpenCutter = { cutterTrack = it },
+                            onOpenPlayer = { isPlayerVisible = true }
+                        )
                     }
                 }
             }
-        ) {
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                contentWindowInsets = WindowInsets.statusBars,
-                bottomBar = { MiniPlayer(onNavigateToPlayer = { isPlayerVisible = true }, player = mediaController, viewModel = viewModel) }
-            ) { innerPadding ->
-                Box(modifier = Modifier.padding(innerPadding)) {
-                    LibraryScreen(
-                        viewModel = viewModel,
-                        onOpenSettings = { isSettingsVisible = true },
-                        onOpenDrawer = { scope.launch { drawerState.open() } },
-                        onOpenCutter = { cutterTrack = it },
-                        onOpenPlayer = { isPlayerVisible = true }
-                    )
-                }
-            }
         }
-    }
-
-    if (showSignInPrompt) {
-        AlertDialog(
-            onDismissRequest = { showSignInPrompt = false },
-            title = { Text("Sign in Required") },
-            text = { Text("Please sign in with Google to use cloud features.") },
-            confirmButton = {
-                Button(onClick = { showSignInPrompt = false; onSignInClick() }) { Text("Sign In") }
-            },
-            dismissButton = { TextButton(onClick = { showSignInPrompt = false }) { Text("Cancel") } }
-        )
+        if (showSignInPrompt) AlertDialog(onDismissRequest = { showSignInPrompt = false }, title = { Text("Sign in Required") }, text = { Text("Please sign in with Google to use cloud features.") }, confirmButton = { Button(onClick = { showSignInPrompt = false; onSignInClick() }) { Text("Sign In") } }, dismissButton = { TextButton(onClick = { showSignInPrompt = false }) { Text("Cancel") } })
     }
 }
 
 @Composable
 fun RenameDialog(initialName: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var name by remember { mutableStateOf(initialName) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Rename", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
-        text = {
-            OutlinedTextField(
-                value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface, focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.Gray)
-            )
-        },
-        confirmButton = { Button(onClick = { onConfirm(name) }) { Text("Rename") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) } }
-    )
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("Rename", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) }, text = { OutlinedTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface, focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.Gray)) }, confirmButton = { Button(onClick = { onConfirm(name) }) { Text("Rename") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) } })
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -490,159 +459,30 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
     var trackToDownloadConfirm by remember { mutableStateOf<com.google.api.services.drive.model.File?>(null) }
     var tracksToDeleteConfirm by remember { mutableStateOf<List<com.google.api.services.drive.model.File>?>(null) }
     val scope = rememberCoroutineScope()
-
-    fun refresh() {
-        scope.launch {
-            isRefreshing = true
-            cloudFiles = cloudManager.listAudioFiles()
-            isRefreshing = false
-            isLoading = false
-        }
-    }
-
+    fun refresh() { scope.launch { isRefreshing = true; cloudFiles = cloudManager.listAudioFiles(); isRefreshing = false; isLoading = false } }
     LaunchedEffect(Unit) { refresh() }
     BackHandler(onBack = onBack)
-
-    val sortedFiles = remember(cloudFiles, sortOrder) {
-        when (sortOrder) {
-            "NAME_ASC" -> cloudFiles.sortedBy { it.getName()?.lowercase() }
-            "NAME_DESC" -> cloudFiles.sortedByDescending { it.getName()?.lowercase() }
-            "SIZE_ASC" -> cloudFiles.sortedBy { it.getSize() ?: 0L }
-            "SIZE_DESC" -> cloudFiles.sortedByDescending { it.getSize() ?: 0L }
-            else -> cloudFiles
-        }
-    }
+    val sortedFiles = remember(cloudFiles, sortOrder) { when (sortOrder) { "NAME_ASC" -> cloudFiles.sortedBy { it.getName()?.lowercase() }; "NAME_DESC" -> cloudFiles.sortedByDescending { it.getName()?.lowercase() }; "SIZE_ASC" -> cloudFiles.sortedBy { it.getSize() ?: 0L }; "SIZE_DESC" -> cloudFiles.sortedByDescending { it.getSize() ?: 0L }; else -> cloudFiles } }
 
     com.example.musicon.ui.components.StellarBackground(themeMode = themeMode, backgroundMode = backgroundMode) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                if (selectedIds.isNotEmpty()) {
-                    TopAppBar(
-                        title = { Text("${selectedIds.size} selected", color = Color.White) },
-                        navigationIcon = { IconButton(onClick = { selectedIds = emptySet() }) { Icon(Icons.Default.Close, null, tint = Color.White) } },
-                        actions = {
-                            IconButton(onClick = { 
-                                val allIds = cloudFiles.map { it.id }.toSet()
-                                selectedIds = if (selectedIds.size == allIds.size) emptySet() else allIds
-                            }) { Icon(Icons.Default.SelectAll, null, tint = Color.White) }
-                            IconButton(onClick = { 
-                                val selectedFiles = cloudFiles.filter { it.id in selectedIds }
-                                // Simple download first of selected
-                                if (selectedFiles.isNotEmpty()) trackToDownloadConfirm = selectedFiles.first() 
-                            }) { Icon(Icons.Default.Download, null, tint = Color.White) }
-                            IconButton(onClick = { tracksToDeleteConfirm = cloudFiles.filter { it.id in selectedIds } }) { Icon(Icons.Default.Delete, null, tint = Color.Red) }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(0.1f))
-                    )
-                } else {
-                    TopAppBar(
-                        title = { 
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Cloud Browser", color = Color.White, fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.width(12.dp))
-                                HeaderStatusPill(isOnline = isOnline, isWifi = isWifi)
-                                SyncProgressBar(syncStatus = syncStatus, modifier = Modifier.weight(1f))
-                            }
-                        },
-                        navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } },
-                        actions = {
-                            IconButton(onClick = { viewMode = if (viewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) { Icon(if (viewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.White) }
-                            var showSort by remember { mutableStateOf(false) }
-                            IconButton(onClick = { showSort = true }) {
-                                Icon(Icons.AutoMirrored.Filled.Sort, null, tint = Color.White)
-                                DropdownMenu(expanded = showSort, onDismissRequest = { showSort = false }) {
-                                    DropdownMenuItem(text = { Text("Name A-Z") }, onClick = { sortOrder = "NAME_ASC"; showSort = false })
-                                    DropdownMenuItem(text = { Text("Name Z-A") }, onClick = { sortOrder = "NAME_DESC"; showSort = false })
-                                    DropdownMenuItem(text = { Text("Size Smallest") }, onClick = { sortOrder = "SIZE_ASC"; showSort = false })
-                                    DropdownMenuItem(text = { Text("Size Largest") }, onClick = { sortOrder = "SIZE_DESC"; showSort = false })
-                                }
-                            }
-                            IconButton(onClick = { viewModel.syncAllLocalToCloud() }) { Icon(Icons.Default.CloudUpload, null, tint = Color.White) }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-                    )
-                }
+                if (selectedIds.isNotEmpty()) { TopAppBar(title = { Text("${selectedIds.size} selected", color = Color.White) }, navigationIcon = { IconButton(onClick = { selectedIds = emptySet() }) { Icon(Icons.Default.Close, null, tint = Color.White) } }, actions = { IconButton(onClick = { val allIds = cloudFiles.map { it.id }.toSet(); selectedIds = if (selectedIds.size == allIds.size) emptySet() else allIds }) { Icon(Icons.Default.SelectAll, null, tint = Color.White) }; IconButton(onClick = { val sel = cloudFiles.filter { it.id in selectedIds }; if (sel.isNotEmpty()) trackToDownloadConfirm = sel.first() }) { Icon(Icons.Default.Download, null, tint = Color.White) }; IconButton(onClick = { tracksToDeleteConfirm = cloudFiles.filter { it.id in selectedIds } }) { Icon(Icons.Default.Delete, null, tint = Color.Red) } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(0.1f))) }
+                else { TopAppBar(title = { Row(verticalAlignment = Alignment.CenterVertically) { Text("Cloud Browser", color = Color.White, fontWeight = FontWeight.Bold); Spacer(Modifier.width(12.dp)); HeaderStatusPill(isOnline, isWifi); SyncProgressBar(syncStatus, Modifier.weight(1f)) } }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } }, actions = { IconButton(onClick = { viewMode = if (viewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) { Icon(if (viewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.White) }; var showSort by remember { mutableStateOf(false) }; IconButton(onClick = { showSort = true }) { Icon(Icons.AutoMirrored.Filled.Sort, null, tint = Color.White); DropdownMenu(expanded = showSort, onDismissRequest = { showSort = false }) { DropdownMenuItem(text = { Text("Name A-Z") }, onClick = { sortOrder = "NAME_ASC"; showSort = false }); DropdownMenuItem(text = { Text("Name Z-A") }, onClick = { sortOrder = "NAME_DESC"; showSort = false }); DropdownMenuItem(text = { Text("Size Smallest") }, onClick = { sortOrder = "SIZE_ASC"; showSort = false }); DropdownMenuItem(text = { Text("Size Largest") }, onClick = { sortOrder = "SIZE_DESC"; showSort = false }) } }; IconButton(onClick = { viewModel.syncAllLocalToCloud() }) { Icon(Icons.Default.CloudUpload, null, tint = Color.White) } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)) }
             }
         ) { padding ->
-            if (!isUserSignedIn) {
-                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.CloudOff, null, tint = Color.Gray, modifier = Modifier.size(64.dp))
-                        Spacer(Modifier.height(16.dp))
-                        Text("Sign in to view Cloud songs", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                }
-            } else {
+            if (!isUserSignedIn) { Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.CloudOff, null, tint = Color.Gray, modifier = Modifier.size(64.dp)); Spacer(Modifier.height(16.dp)); Text("Sign in to view Cloud songs", color = Color.White, fontWeight = FontWeight.Bold) } } }
+            else {
                 androidx.compose.material3.pulltorefresh.PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { refresh() }, modifier = Modifier.padding(padding).fillMaxSize()) {
-                    if (isLoading && !isRefreshing) {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) }
-                    } else if (viewMode == LibraryViewMode.GRID) {
-                        LazyVerticalGrid(columns = GridCells.Adaptive(110.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
-                            items(sortedFiles) { file ->
-                                val isSelected = file.id in selectedIds
-                                Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).background(if (isSelected) Color.White.copy(0.15f) else Color.Transparent).combinedClickable(onClick = { if (selectedIds.isNotEmpty()) selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id }, onLongClick = { selectedIds = setOf(file.id) }).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    AsyncImage(
-                                        model = file.thumbnailLink ?: R.drawable.ic_launcher_foreground,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
-                                        contentScale = ContentScale.Crop,
-                                        error = androidx.compose.ui.graphics.painter.ColorPainter(Color.White.copy(alpha = 0.1f))
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(file.getName() ?: "Unknown", color = Color.White, maxLines = 1, style = MaterialTheme.typography.labelSmall)
-                                }
-                            }
-                        }
-                    } else {
-                        LazyColumn(Modifier.fillMaxSize()) {
-                            items(sortedFiles) { file ->
-                                val isSelected = file.id in selectedIds
-                                ListItem(
-                                    headlineContent = { Text(file.getName() ?: "Unknown", color = Color.White) },
-                                    supportingContent = { Text("${(file.getSize() ?: 0L) / 1024} KB", color = Color.Gray) },
-                                    leadingContent = { 
-                                        if (selectedIds.isNotEmpty()) Checkbox(checked = isSelected, onCheckedChange = null) 
-                                        else {
-                                            AsyncImage(
-                                                model = file.thumbnailLink ?: R.drawable.ic_launcher_foreground,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        }
-                                    },
-                                    trailingContent = {
-                                        var showMenu by remember { mutableStateOf(false) }
-                                        Box {
-                                            IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
-                                            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                                                DropdownMenuItem(text = { Text("Download") }, leadingIcon = { Icon(Icons.Default.Download, null) }, onClick = { trackToDownloadConfirm = file; showMenu = false })
-                                                DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { trackToRename = file; showMenu = false })
-                                                DropdownMenuItem(text = { Text("Delete", color = Color.Red) }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, onClick = { tracksToDeleteConfirm = listOf(file); showMenu = false })
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.combinedClickable(onClick = { if (selectedIds.isNotEmpty()) selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id }, onLongClick = { selectedIds = setOf(file.id) }),
-                                    colors = ListItemDefaults.colors(containerColor = if (isSelected) Color.White.copy(0.1f) else Color.Transparent)
-                                )
-                            }
-                        }
-                    }
+                    if (isLoading && !isRefreshing) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) } }
+                    else if (viewMode == LibraryViewMode.GRID) { LazyVerticalGrid(columns = GridCells.Adaptive(110.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) { items(sortedFiles) { file -> val isSelected = file.id in selectedIds; Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).background(if (isSelected) Color.White.copy(0.15f) else Color.Transparent).combinedClickable(onClick = { if (selectedIds.isNotEmpty()) selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id }, onLongClick = { selectedIds = setOf(file.id) }).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) { AsyncImage(model = file.thumbnailLink ?: R.drawable.ic_launcher_foreground, contentDescription = null, modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop, error = androidx.compose.ui.graphics.painter.ColorPainter(Color.White.copy(alpha = 0.1f))); Spacer(Modifier.height(4.dp)); Text(file.getName() ?: "Unknown", color = Color.White, maxLines = 1, style = MaterialTheme.typography.labelSmall) } } } }
+                    else { LazyColumn(Modifier.fillMaxSize()) { items(sortedFiles) { file -> val isSelected = file.id in selectedIds; ListItem(headlineContent = { Text(file.getName() ?: "Unknown", color = Color.White) }, supportingContent = { Text("${(file.getSize() ?: 0L) / 1024} KB", color = Color.Gray) }, leadingContent = { if (selectedIds.isNotEmpty()) Checkbox(checked = isSelected, onCheckedChange = null) else AsyncImage(model = file.thumbnailLink ?: R.drawable.ic_launcher_foreground, contentDescription = null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop) }, trailingContent = { var showMenu by remember { mutableStateOf(false) }; Box { IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }; DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) { DropdownMenuItem(text = { Text("Download") }, leadingIcon = { Icon(Icons.Default.Download, null) }, onClick = { trackToDownloadConfirm = file; showMenu = false }); DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { trackToRename = file; showMenu = false }); DropdownMenuItem(text = { Text("Delete", color = Color.Red) }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, onClick = { tracksToDeleteConfirm = listOf(file); showMenu = false }) } } }, modifier = Modifier.combinedClickable(onClick = { if (selectedIds.isNotEmpty()) selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id }, onLongClick = { selectedIds = setOf(file.id) }), colors = ListItemDefaults.colors(containerColor = if (isSelected) Color.White.copy(0.1f) else Color.Transparent)) } } }
                 }
             }
         }
     }
-
-    if (trackToRename != null) {
-        RenameDialog(initialName = trackToRename!!.getName() ?: "", onDismiss = { trackToRename = null }, onConfirm = { newName ->
-            scope.launch { cloudManager.renameFile(trackToRename!!.id, newName); trackToRename = null; refresh() }
-        })
-    }
-    if (trackToDownloadConfirm != null) {
-        AlertDialog(onDismissRequest = { trackToDownloadConfirm = null }, title = { Text("Download?") }, text = { Text("Download '${trackToDownloadConfirm!!.getName()}' to internal storage?") }, confirmButton = { Button(onClick = { viewModel.downloadTrack(TrackEntity(id = trackToDownloadConfirm!!.id, title = trackToDownloadConfirm!!.getName() ?: "Unknown", artist = "Cloud", album = "Cloud", duration = 0, gDriveId = trackToDownloadConfirm!!.id)); trackToDownloadConfirm = null }) { Text("Download") } }, dismissButton = { TextButton(onClick = { trackToDownloadConfirm = null }) { Text("Cancel") } })
-    }
-    if (tracksToDeleteConfirm != null) {
-        AlertDialog(onDismissRequest = { tracksToDeleteConfirm = null }, title = { Text("Delete?") }, text = { Text("Delete ${tracksToDeleteConfirm!!.size} songs from Cloud?") }, confirmButton = { Button(onClick = { scope.launch { tracksToDeleteConfirm!!.forEach { cloudManager.deleteFile(it.id) }; tracksToDeleteConfirm = null; selectedIds = emptySet(); refresh() } }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Delete") } }, dismissButton = { TextButton(onClick = { tracksToDeleteConfirm = null }) { Text("Cancel") } })
-    }
+    if (trackToRename != null) RenameDialog(initialName = trackToRename!!.getName() ?: "", onDismiss = { trackToRename = null }, onConfirm = { newName -> scope.launch { cloudManager.renameFile(trackToRename!!.id, newName); trackToRename = null; refresh() } })
+    if (trackToDownloadConfirm != null) AlertDialog(onDismissRequest = { trackToDownloadConfirm = null }, title = { Text("Download?") }, text = { Text("Download '${trackToDownloadConfirm!!.getName()}' to internal storage?") }, confirmButton = { Button(onClick = { viewModel.downloadTrack(TrackEntity(id = trackToDownloadConfirm!!.id, title = trackToDownloadConfirm!!.getName() ?: "Unknown", artist = "Cloud", album = "Cloud", duration = 0, gDriveId = trackToDownloadConfirm!!.id)); trackToDownloadConfirm = null }) { Text("Download") } }, dismissButton = { TextButton(onClick = { trackToDownloadConfirm = null }) { Text("Cancel") } })
+    if (tracksToDeleteConfirm != null) AlertDialog(onDismissRequest = { tracksToDeleteConfirm = null }, title = { Text("Delete?") }, text = { Text("Delete ${tracksToDeleteConfirm!!.size} songs from Cloud?") }, confirmButton = { Button(onClick = { scope.launch { tracksToDeleteConfirm!!.forEach { cloudManager.deleteFile(it.id) }; tracksToDeleteConfirm = null; selectedIds = emptySet(); refresh() } }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Delete") } }, dismissButton = { TextButton(onClick = { tracksToDeleteConfirm = null }) { Text("Cancel") } })
 }

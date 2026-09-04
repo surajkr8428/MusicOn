@@ -161,6 +161,10 @@ fun PlayerScreen(
                     .windowInsetsPadding(WindowInsets.statusBars),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+                val contentColor = if (isBright) Color.Black else Color.White
+                val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
+
                 // Header (Restored original alignment, sitting just below status bar)
                 Row(
                     modifier = Modifier
@@ -171,7 +175,7 @@ fun PlayerScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBack) { 
-                        Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.White, modifier = Modifier.size(32.dp)) 
+                        Icon(Icons.Default.KeyboardArrowDown, null, tint = contentColor, modifier = Modifier.size(32.dp)) 
                     }
 
                     com.example.musicon.ui.screens.HeaderStatusPill(isOnline = isOnline, isWifi = isWifi)
@@ -189,19 +193,33 @@ fun PlayerScreen(
                         },
                         modifier = Modifier.width(160.dp)
                     ) {
-                        Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Player", color = if (selectedTab == 0) Color.White else Color.Gray, fontSize = 14.sp) } )
-                        Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) Color.White else Color.Gray, fontSize = 14.sp) } )
+                        Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Player", color = if (selectedTab == 0) contentColor else secondaryColor, fontSize = 14.sp) } )
+                        Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) contentColor else secondaryColor, fontSize = 14.sp) } )
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         sleepTimerRemaining?.let { remaining ->
-                            Text(
-                                text = formatSleepTime(remaining),
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = primaryColor,
-                                modifier = Modifier.padding(end = 12.dp)
-                            )
+                            val isPaused by viewModel.isSleepTimerPaused.collectAsState()
+                            Surface(color = primaryColor.copy(0.2f), shape = RoundedCornerShape(22.dp)) {
+                                Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Timer, null, tint = primaryColor, modifier = Modifier.size(12.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = formatSleepTime(remaining),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                        color = primaryColor
+                                    )
+                                    IconButton(onClick = { viewModel.toggleSleepTimerPause() }, modifier = Modifier.size(20.dp).padding(start = 4.dp)) {
+                                        Icon(if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause, null, tint = primaryColor, modifier = Modifier.size(12.dp))
+                                    }
+                                    IconButton(onClick = { viewModel.resetSleepTimer() }, modifier = Modifier.size(24.dp)) {
+                                        Icon(Icons.Default.Refresh, null, tint = primaryColor, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
                         }
+                        
+                        Spacer(Modifier.width(8.dp))
 
                         // Player UI View Toggle
                         IconButton(onClick = {
@@ -219,7 +237,7 @@ fun PlayerScreen(
                                     PlayerImageMode.ROTATION -> Icons.Default.Sync
                                 },
                                 contentDescription = "Change View Mode",
-                                tint = Color.White
+                                tint = contentColor
                             )
                         }
 
@@ -228,7 +246,7 @@ fun PlayerScreen(
                         val playlists by viewModel.allPlaylists.collectAsState()
 
                         IconButton(onClick = { showMoreMenu = true }) {
-                            Icon(Icons.Default.MoreVert, null, tint = Color.White)
+                            Icon(Icons.Default.MoreVert, null, tint = contentColor)
                             DropdownMenu(
                                 expanded = showMoreMenu,
                                 onDismissRequest = { showMoreMenu = false },
@@ -700,6 +718,10 @@ fun PlayerControls(
     isLandscape: Boolean = false,
     sleepTimerRemaining: Long? = null
 ) {
+    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+    val contentColor = if (isBright) Color.Black else Color.White
+    val secondaryColor = if (isBright) Color.DarkGray else Color.White.copy(alpha = 0.7f)
+
     Column(
         modifier = Modifier.fillMaxWidth().wrapContentHeight(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -710,7 +732,7 @@ fun PlayerControls(
             Text(
                 text = "${formatTime(if (isDragging) dragPosition else position)} / ${formatTime(duration)}",
                 style = MaterialTheme.typography.headlineMedium.copy(fontSize = if (isLandscape) 24.sp else 32.sp, fontWeight = FontWeight.Bold),
-                color = Color.White,
+                color = contentColor,
                 modifier = Modifier.align(Alignment.Center)
             )
         }
@@ -728,11 +750,11 @@ fun PlayerControls(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(currentTrack?.displayName ?: "Unknown", style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                Text(currentTrack?.displayArtist ?: "Unknown Artist", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(currentTrack?.displayName ?: "Unknown", style = MaterialTheme.typography.headlineSmall, color = contentColor, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(currentTrack?.displayArtist ?: "Unknown Artist", style = MaterialTheme.typography.titleMedium, color = secondaryColor, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
             IconButton(onClick = { currentTrack?.let { viewModel.toggleFavorite(it) } }) {
-                Icon(if (currentTrack?.isFavorite == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (currentTrack?.isFavorite == true) Color.Red else Color.White)
+                Icon(if (currentTrack?.isFavorite == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (currentTrack?.isFavorite == true) Color.Red else contentColor)
             }
         }
 
@@ -743,20 +765,20 @@ fun PlayerControls(
             onValueChange = { onDraggingChange(true); onDragPositionChange(it.toLong()) },
             onValueChangeFinished = { player.seekTo(dragPosition); onPositionUpdate(dragPosition); onDraggingChange(false) },
             valueRange = 0f..duration.toFloat(),
-            colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = primaryColor, inactiveTrackColor = Color.White.copy(alpha = 0.2f))
+            colors = SliderDefaults.colors(thumbColor = contentColor, activeTrackColor = primaryColor, inactiveTrackColor = contentColor.copy(alpha = 0.2f))
         )
 
         Spacer(modifier = Modifier.height(if (isLandscape) 4.dp else 12.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { player.shuffleModeEnabled = !player.shuffleModeEnabled }) { 
-                Icon(Icons.Default.Shuffle, null, tint = if (shuffleMode) primaryColor else Color.White.copy(alpha = 0.6f)) 
+                Icon(Icons.Default.Shuffle, null, tint = if (shuffleMode) primaryColor else contentColor.copy(alpha = 0.6f)) 
             }
-            IconButton(onClick = { player.seekToPrevious() }) { Icon(Icons.Default.SkipPrevious, null, tint = Color.White, modifier = Modifier.size(44.dp)) }
+            IconButton(onClick = { player.seekToPrevious() }) { Icon(Icons.Default.SkipPrevious, null, tint = contentColor, modifier = Modifier.size(44.dp)) }
             Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(primaryColor.copy(alpha = 0.9f)).clickable { if (isPlaying) player.pause() else player.play() }, contentAlignment = Alignment.Center) {
                 Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = Color.Black, modifier = Modifier.size(36.dp))
             }
-            IconButton(onClick = { player.seekToNext() }) { Icon(Icons.Default.SkipNext, null, tint = Color.White, modifier = Modifier.size(44.dp)) }
+            IconButton(onClick = { player.seekToNext() }) { Icon(Icons.Default.SkipNext, null, tint = contentColor, modifier = Modifier.size(44.dp)) }
             IconButton(onClick = { 
                 player.repeatMode = when(repeatMode) {
                     Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
@@ -765,7 +787,7 @@ fun PlayerControls(
                 }
             }) { 
                 val icon = if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat
-                Icon(icon, null, tint = if (repeatMode != Player.REPEAT_MODE_OFF) primaryColor else Color.White.copy(alpha = 0.6f)) 
+                Icon(icon, null, tint = if (repeatMode != Player.REPEAT_MODE_OFF) primaryColor else contentColor.copy(alpha = 0.6f)) 
             }
         }
 

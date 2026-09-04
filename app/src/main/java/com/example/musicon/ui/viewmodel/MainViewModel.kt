@@ -197,22 +197,48 @@ class MainViewModel(
     private val _sleepTimerRemaining = MutableStateFlow<Long?>(null)
     val sleepTimerRemaining: StateFlow<Long?> = _sleepTimerRemaining.asStateFlow()
 
+    private val _isSleepTimerPaused = MutableStateFlow(false)
+    val isSleepTimerPaused: StateFlow<Boolean> = _isSleepTimerPaused.asStateFlow()
+
     fun setSleepTimer(minutes: Int) {
         sleepTimerJob?.cancel()
+        _isSleepTimerPaused.value = false
         if (minutes == 0) {
             _sleepTimerRemaining.value = null
             return
         }
         _sleepTimerRemaining.value = minutes * 60 * 1000L
+        startSleepTimerJob()
+    }
+
+    fun toggleSleepTimerPause() {
+        if (_sleepTimerRemaining.value != null) {
+            _isSleepTimerPaused.value = !_isSleepTimerPaused.value
+        }
+    }
+
+    fun resetSleepTimer() {
+        sleepTimerJob?.cancel()
+        _sleepTimerRemaining.value = null
+        _isSleepTimerPaused.value = false
+    }
+
+    private fun startSleepTimerJob() {
         sleepTimerJob = viewModelScope.launch {
             while ((_sleepTimerRemaining.value ?: 0) > 0) {
-                delay(1000)
-                _sleepTimerRemaining.value = (_sleepTimerRemaining.value ?: 0) - 1000
+                if (!_isSleepTimerPaused.value) {
+                    delay(1000)
+                    _sleepTimerRemaining.value = (_sleepTimerRemaining.value ?: 0) - 1000
+                } else {
+                    delay(500)
+                }
             }
-            _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK)
-            delay(500) // Give time for player to stop
-            _playbackCommand.emit(PlaybackCommand.CLOSE_APP)
-            _sleepTimerRemaining.value = null
+            if (_sleepTimerRemaining.value != null) {
+                _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK)
+                delay(500)
+                _playbackCommand.emit(PlaybackCommand.CLOSE_APP)
+                _sleepTimerRemaining.value = null
+            }
         }
     }
 
