@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
+import com.example.musicon.logic.formatSleepTime
 
 @Composable
 fun MiniPlayer(
@@ -112,7 +113,7 @@ fun MiniPlayer(
                             shape = RoundedCornerShape(4.dp)
                         ) {
                             Text(
-                                text = com.example.musicon.ui.screens.formatSleepTime(remaining),
+                                text = formatSleepTime(remaining),
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)

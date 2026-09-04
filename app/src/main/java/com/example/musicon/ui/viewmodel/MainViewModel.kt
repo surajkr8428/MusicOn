@@ -40,8 +40,12 @@ class MainViewModel(
     private val _isOnline = MutableStateFlow(true)
     val isOnline = _isOnline.asStateFlow()
 
-    fun updateOnlineStatus(online: Boolean) {
+    private val _isWifi = MutableStateFlow(false)
+    val isWifi = _isWifi.asStateFlow()
+
+    fun updateOnlineStatus(online: Boolean, isWifi: Boolean = false) {
         _isOnline.value = online
+        _isWifi.value = isWifi
         if (online && isUserSignedIn.value) syncCloudTracks()
     }
 
@@ -78,6 +82,9 @@ class MainViewModel(
 
     val autoTheme: StateFlow<Boolean> = settingsRepository.autoThemeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    val backgroundMode: StateFlow<String> = settingsRepository.backgroundModeFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "DYNAMIC")
 
     private val _extractedAccentColor = MutableStateFlow<Int?>(null)
     val extractedAccentColor = _extractedAccentColor.asStateFlow()
@@ -545,6 +552,7 @@ class MainViewModel(
     fun updateCrossfade(enabled: Boolean) = viewModelScope.launch { settingsRepository.updateCrossfade(enabled) }
     fun updateAccentColor(color: Int) = viewModelScope.launch { settingsRepository.updateAccentColor(color) }
     fun updateAutoTheme(enabled: Boolean) = viewModelScope.launch { settingsRepository.updateAutoTheme(enabled) }
+    fun updateBackgroundMode(mode: String) = viewModelScope.launch { settingsRepository.updateBackgroundMode(mode) }
     fun updateShakeToSkip(enabled: Boolean) = viewModelScope.launch { settingsRepository.updateShakeToSkip(enabled) }
     fun updateCustomBackground(uri: String?) = viewModelScope.launch { settingsRepository.updateCustomBgUri(uri) }
 

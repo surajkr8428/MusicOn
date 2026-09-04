@@ -20,8 +20,13 @@ import com.example.musicon.ui.components.StellarBackground
 @Composable
 fun Mp3CutterScreen(
     track: TrackEntity,
+    viewModel: com.example.musicon.ui.viewmodel.MainViewModel,
     onBack: () -> Unit
 ) {
+    val isOnline by viewModel.isOnline.collectAsState()
+    val isWifi by viewModel.isWifi.collectAsState()
+    val syncStatus by com.example.musicon.data.remote.CloudSyncManager.status.collectAsState()
+
     var startRange by remember { mutableFloatStateOf(0f) }
     var endRange by remember { mutableFloatStateOf(track.duration.toFloat()) }
 
@@ -39,13 +44,18 @@ fun Mp3CutterScreen(
                     modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
                     windowInsets = WindowInsets.statusBars,
                     title = { 
-                        Text(
-                            "MP3 Cutter", 
-                            color = Color.White, 
-                            fontWeight = FontWeight.Bold, 
-                            fontSize = if (isLandscape) 18.sp else 22.sp,
-                            modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 4.dp)
-                        ) 
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "MP3 Cutter", 
+                                color = Color.White, 
+                                fontWeight = FontWeight.Bold, 
+                                fontSize = if (isLandscape) 18.sp else 22.sp,
+                                modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 4.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            HeaderStatusPill(isOnline = isOnline, isWifi = isWifi)
+                            SyncProgressBar(syncStatus = syncStatus, modifier = Modifier.weight(1f))
+                        }
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack, modifier = if (isLandscape) Modifier.size(36.dp).padding(start = 4.dp) else Modifier) {
@@ -90,8 +100,8 @@ fun Mp3CutterScreen(
                 )
                 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(formatTime(startRange.toLong()), color = Color.White)
-                    Text(formatTime(endRange.toLong()), color = Color.White)
+                    Text(formatCutterTime(startRange.toLong()), color = Color.White)
+                    Text(formatCutterTime(endRange.toLong()), color = Color.White)
                 }
                 
                 Spacer(Modifier.weight(1f))
@@ -108,7 +118,7 @@ fun Mp3CutterScreen(
     }
 }
 
-private fun formatTime(millis: Long): String {
+private fun formatCutterTime(millis: Long): String {
     val totalSeconds = millis / 1000
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60

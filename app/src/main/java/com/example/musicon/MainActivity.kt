@@ -48,6 +48,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.musicon.ui.viewmodel.PlaybackEvent
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.palette.graphics.Palette
@@ -71,9 +72,11 @@ import java.io.File
 class MainActivity : ComponentActivity() {
     private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
     private var mediaController: MediaController? by mutableStateOf(null)
+    
+    private var onSignInResult: ((Boolean) -> Unit)? = null
 
-    private val signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
-        // viewModel status updated via check in App
+    private val signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        onSignInResult?.invoke(result.resultCode == RESULT_OK)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -110,7 +113,11 @@ class MainActivity : ComponentActivity() {
             DisposableEffect(Unit) {
                 val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
                 val callback = object : ConnectivityManager.NetworkCallback() {
-                    override fun onAvailable(network: Network) { viewModel.updateOnlineStatus(true) }
+                    override fun onAvailable(network: Network) {
+                        val capabilities = cm.getNetworkCapabilities(network)
+                        val isWifi = capabilities?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
+                        viewModel.updateOnlineStatus(true, isWifi)
+                    }
                     override fun onLost(network: Network) { viewModel.updateOnlineStatus(false) }
                 }
                 cm.registerNetworkCallback(NetworkRequest.Builder().build(), callback)
@@ -131,6 +138,23 @@ class MainActivity : ComponentActivity() {
                             mediaController?.stop()
                         }
                         else -> {}
+                    }
+                }
+            }
+
+            // Handle Playback Events (Fix for song not playing)
+            LaunchedEffect(mediaController) {
+                viewModel.playbackEvents.collect { event ->
+                    when (event) {
+                        is PlaybackEvent.PlayTrackList -> {
+                            val mediaItems = event.tracks.map { it.toMediaItem() }
+                            mediaController?.apply {
+                                setMediaItems(mediaItems)
+                                seekTo(event.startIndex, 0L)
+                                prepare()
+                                play()
+                            }
+                        }
                     }
                 }
             }
@@ -214,8 +238,13 @@ class MainActivity : ComponentActivity() {
                                 viewModel = viewModel,
                                 mediaController = mediaController,
                                 isOnline = isOnline,
-                                onSignInClick = { triggerSignIn() },
-                                onSignOutClick = { triggerSignOut() }
+                                onSignInClick = { 
+                                    onSignInResult = { success -> 
+                                        if (success) viewModel.updateSignInStatus(true) 
+                                    }
+                                    triggerSignIn() 
+                                },
+                                onSignOutClick = { triggerSignOut(); viewModel.updateSignInStatus(false) }
                             )
                         }
                     } else {
@@ -255,6 +284,21 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private fun TrackEntity.toMediaItem(): androidx.media3.common.MediaItem {
+    val metadata = androidx.media3.common.MediaMetadata.Builder()
+        .setTitle(displayName)
+        .setArtist(displayArtist)
+        .setAlbumTitle(displayAlbum)
+        .setArtworkUri(customCoverPath?.let { android.net.Uri.fromFile(File(it)) } ?: localPath?.let { android.net.Uri.parse(it) })
+        .build()
+
+    return androidx.media3.common.MediaItem.Builder()
+        .setMediaId(id)
+        .setUri(localPath?.let { android.net.Uri.parse(it) })
+        .setMediaMetadata(metadata)
+        .build()
+}
+
 @Composable
 fun MusicOnApp(
     viewModel: MainViewModel,
@@ -273,6 +317,8 @@ fun MusicOnApp(
     var isEqualizerVisible by rememberSaveable { mutableStateOf(false) }
     var isCloudBrowserVisible by rememberSaveable { mutableStateOf(false) }
     var cutterTrack by remember { mutableStateOf<TrackEntity?>(null) }
+    
+    var showSignInPrompt by remember { mutableStateOf(false) }
 
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         viewModel.importLocalTracks(uris)
@@ -287,7 +333,11 @@ fun MusicOnApp(
     } else if (isCloudBrowserVisible) {
         CloudBrowserScreen(viewModel = viewModel, onBack = { isCloudBrowserVisible = false })
     } else if (cutterTrack != null) {
-        Mp3CutterScreen(track = cutterTrack!!, onBack = { cutterTrack = null })
+        Mp3CutterScreen(
+            track = cutterTrack!!,
+            viewModel = viewModel,
+            onBack = { cutterTrack = null }
+        )
     } else {
         ModalNavigationDrawer(
             drawerState = drawerState,
@@ -315,13 +365,21 @@ fun MusicOnApp(
                         val primaryColor = MaterialTheme.colorScheme.primary
                         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("MusicOn", style = MaterialTheme.typography.headlineMedium.copy(color = primaryColor, fontWeight = FontWeight.Bold))
-                            IconButton(onClick = { scope.launch { drawerState.close(); viewModel.syncAllLocalToCloud() } }) {
+                            IconButton(onClick = { 
+                                if (!isUserSignedIn) { showSignInPrompt = true }
+                                else {
+                                    scope.launch { drawerState.close(); viewModel.syncAllLocalToCloud() } 
+                                }
+                            }) {
                                 Icon(Icons.Default.CloudSync, "Sync All to Cloud", tint = primaryColor)
                             }
                         }
                         HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                         NavigationDrawerItem(label = { Text("Import Hub (Local)") }, selected = false, onClick = { scope.launch { drawerState.close() }; filePicker.launch("audio/*") }, icon = { Icon(Icons.Default.FileDownload, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                        NavigationDrawerItem(label = { Text("Cloud Browser") }, selected = false, onClick = { scope.launch { drawerState.close() }; isCloudBrowserVisible = true }, icon = { Icon(Icons.Default.CloudQueue, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                        NavigationDrawerItem(label = { Text("Cloud Browser") }, selected = false, onClick = { 
+                            if (!isUserSignedIn) { showSignInPrompt = true }
+                            else { scope.launch { drawerState.close() }; isCloudBrowserVisible = true }
+                        }, icon = { Icon(Icons.Default.CloudQueue, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
                         NavigationDrawerItem(label = { Text("Equalizer") }, selected = false, onClick = { scope.launch { drawerState.close() }; isEqualizerVisible = true }, icon = { Icon(Icons.Default.Tune, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
                         NavigationDrawerItem(label = { Text("Settings") }, selected = false, onClick = { scope.launch { drawerState.close() }; isSettingsVisible = true }, icon = { Icon(Icons.Default.Settings, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
                         NavigationDrawerItem(label = { Text("Share App (APK)") }, selected = false, onClick = { scope.launch { drawerState.close() }; /* Share Logic */ }, icon = { Icon(Icons.Default.Share, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
@@ -347,6 +405,18 @@ fun MusicOnApp(
             }
         }
     }
+
+    if (showSignInPrompt) {
+        AlertDialog(
+            onDismissRequest = { showSignInPrompt = false },
+            title = { Text("Sign in Required") },
+            text = { Text("Please sign in with Google to use cloud features.") },
+            confirmButton = {
+                Button(onClick = { showSignInPrompt = false; onSignInClick() }) { Text("Sign In") }
+            },
+            dismissButton = { TextButton(onClick = { showSignInPrompt = false }) { Text("Cancel") } }
+        )
+    }
 }
 
 @Composable
@@ -371,6 +441,11 @@ fun RenameDialog(initialName: String, onDismiss: () -> Unit, onConfirm: (String)
 fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val isUserSignedIn by viewModel.isUserSignedIn
+    val isOnline by viewModel.isOnline.collectAsState()
+    val isWifi by viewModel.isWifi.collectAsState()
+    val syncStatus by CloudSyncManager.status.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
+    val backgroundMode by viewModel.backgroundMode.collectAsState()
     val cloudManager = remember { com.example.musicon.data.remote.CloudStorageManager(context) }
     var cloudFiles by remember { mutableStateOf<List<com.google.api.services.drive.model.File>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -405,7 +480,7 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
         }
     }
 
-    com.example.musicon.ui.components.StellarBackground {
+    com.example.musicon.ui.components.StellarBackground(themeMode = themeMode, backgroundMode = backgroundMode) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
@@ -429,7 +504,14 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                     )
                 } else {
                     TopAppBar(
-                        title = { Text("Cloud Browser", color = Color.White, fontWeight = FontWeight.Bold) },
+                        title = { 
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Cloud Browser", color = Color.White, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(12.dp))
+                                HeaderStatusPill(isOnline = isOnline, isWifi = isWifi)
+                                SyncProgressBar(syncStatus = syncStatus, modifier = Modifier.weight(1f))
+                            }
+                        },
                         navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } },
                         actions = {
                             IconButton(onClick = { viewMode = if (viewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) { Icon(if (viewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.White) }

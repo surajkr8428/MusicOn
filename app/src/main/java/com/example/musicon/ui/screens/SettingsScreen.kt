@@ -53,6 +53,9 @@ fun SettingsScreen(
     val autoTheme by viewModel.autoTheme.collectAsState()
     val customBgUri by viewModel.customBgUri.collectAsState()
     val accentColorInt by viewModel.accentColor.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
+    val isWifi by viewModel.isWifi.collectAsState()
+    val syncStatus by com.example.musicon.data.remote.CloudSyncManager.status.collectAsState()
     
     val primaryColor = Color(accentColorInt)
     var hexInput by remember { mutableStateOf("") }
@@ -82,13 +85,18 @@ fun SettingsScreen(
                     modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier,
                     windowInsets = WindowInsets.statusBars,
                     title = { 
-                        Text(
-                            "Settings", 
-                            color = Color.White, 
-                            fontWeight = FontWeight.Bold, 
-                            fontSize = if (isLandscape) 18.sp else 22.sp,
-                            modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 4.dp)
-                        ) 
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Settings", 
+                                color = Color.White, 
+                                fontWeight = FontWeight.Bold, 
+                                fontSize = if (isLandscape) 18.sp else 22.sp,
+                                modifier = Modifier.padding(bottom = if (isLandscape) 0.dp else 4.dp)
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            HeaderStatusPill(isOnline = isOnline, isWifi = isWifi)
+                            SyncProgressBar(syncStatus = syncStatus, modifier = Modifier.weight(1f))
+                        }
                     },
                     navigationIcon = {
                         IconButton(onClick = onBack, modifier = if (isLandscape) Modifier.size(36.dp).padding(start = 4.dp) else Modifier) {
@@ -102,6 +110,29 @@ fun SettingsScreen(
             LazyColumn(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                 item {
                     SettingsHeader("General")
+                    val backgroundMode by viewModel.backgroundMode.collectAsState()
+                    
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Background Animation", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf("DYNAMIC", "SPACE", "NEBULA", "AURORA").forEach { mode ->
+                                val isSelected = backgroundMode == mode
+                                Button(
+                                    onClick = { viewModel.updateBackgroundMode(mode) },
+                                    modifier = Modifier.weight(1f).height(36.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isSelected) primaryColor else Color.White.copy(alpha = 0.05f),
+                                        contentColor = if (isSelected) Color.Black else Color.White
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(mode, fontSize = 9.sp)
+                                }
+                            }
+                        }
+                    }
+
                     StellarSettingsItem(Icons.Default.Scanner, "Scan local music", "Search for local files") {
                         onScanClick()
                     }
@@ -119,7 +150,6 @@ fun SettingsScreen(
                 }
 
                 item {
-                    SettingsHeader("Theming")
                     val themeMode by viewModel.themeMode.collectAsState()
                     
                     Column(modifier = Modifier.padding(16.dp)) {

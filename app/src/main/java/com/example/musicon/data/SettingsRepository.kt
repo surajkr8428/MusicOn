@@ -42,6 +42,7 @@ class SettingsRepository(val context: Context) {
         val SHAKE_TO_SKIP = booleanPreferencesKey("shake_to_skip")
         val CUSTOM_BG_URI = stringPreferencesKey("custom_bg_uri")
         val AUTO_THEME = booleanPreferencesKey("auto_theme")
+        val BACKGROUND_MODE = stringPreferencesKey("background_mode") // "DYNAMIC", "NEBULA", "AURORA", "SPACE"
         
         // Sorting
         val SONG_SORT_ORDER = stringPreferencesKey("song_sort_order")
@@ -81,6 +82,7 @@ class SettingsRepository(val context: Context) {
     val shakeToSkipFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.SHAKE_TO_SKIP] ?: false }
     val customBgUriFlow: Flow<String?> = context.dataStore.data.map { it[PreferencesKeys.CUSTOM_BG_URI] }
     val autoThemeFlow: Flow<Boolean> = context.dataStore.data.map { it[PreferencesKeys.AUTO_THEME] ?: true }
+    val backgroundModeFlow: Flow<String> = context.dataStore.data.map { it[PreferencesKeys.BACKGROUND_MODE] ?: "DYNAMIC" }
     
     val songSortOrderFlow: Flow<String> = context.dataStore.data.map { it[PreferencesKeys.SONG_SORT_ORDER] ?: "NAME" }
 
@@ -105,6 +107,7 @@ class SettingsRepository(val context: Context) {
     suspend fun updateShakeToSkip(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.SHAKE_TO_SKIP] = enabled } }
     suspend fun updateCustomBgUri(uri: String?) { context.dataStore.edit { if (uri == null) it.remove(PreferencesKeys.CUSTOM_BG_URI) else it[PreferencesKeys.CUSTOM_BG_URI] = uri } }
     suspend fun updateAutoTheme(enabled: Boolean) { context.dataStore.edit { it[PreferencesKeys.AUTO_THEME] = enabled } }
+    suspend fun updateBackgroundMode(mode: String) { context.dataStore.edit { it[PreferencesKeys.BACKGROUND_MODE] = mode } }
     suspend fun updateSongSortOrder(order: String) { context.dataStore.edit { it[PreferencesKeys.SONG_SORT_ORDER] = order } }
     
     suspend fun updateLastPlaybackState(trackId: String?, position: Long) {

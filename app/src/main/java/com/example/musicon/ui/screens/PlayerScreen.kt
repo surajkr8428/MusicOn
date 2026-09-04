@@ -58,6 +58,7 @@ import com.example.musicon.ui.theme.LavenderTitle
 import com.example.musicon.ui.viewmodel.MainViewModel
 import com.example.musicon.logic.LrcParser
 import com.example.musicon.logic.LyricLine
+import com.example.musicon.logic.formatSleepTime
 import java.io.File
 
 @Composable
@@ -75,6 +76,11 @@ fun PlayerScreen(
 
     val queue by viewModel.playbackQueue.collectAsState()
     val imageMode by viewModel.playerImageMode.collectAsState()
+    val themeMode by viewModel.themeMode.collectAsState()
+    val backgroundMode by viewModel.backgroundMode.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
+    val isWifi by viewModel.isWifi.collectAsState()
+    val syncStatus by com.example.musicon.data.remote.CloudSyncManager.status.collectAsState()
     val primaryColor = MaterialTheme.colorScheme.primary
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -144,7 +150,9 @@ fun PlayerScreen(
 
         // Mid Layer: Stellar Background
         com.example.musicon.ui.components.StellarBackground(
-            showInternalBackground = imageMode != PlayerImageMode.FULL_SCREEN
+            showInternalBackground = imageMode != PlayerImageMode.FULL_SCREEN,
+            themeMode = themeMode,
+            backgroundMode = backgroundMode
         ) {
             // Front Layer: Content
             Column(
@@ -165,6 +173,9 @@ fun PlayerScreen(
                     IconButton(onClick = onBack) { 
                         Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.White, modifier = Modifier.size(32.dp)) 
                     }
+
+                    com.example.musicon.ui.screens.HeaderStatusPill(isOnline = isOnline, isWifi = isWifi)
+                    com.example.musicon.ui.screens.SyncProgressBar(syncStatus = syncStatus, modifier = Modifier.width(60.dp))
                     
                     TabRow(
                         selectedTabIndex = selectedTab,
@@ -187,7 +198,7 @@ fun PlayerScreen(
                             Text(
                                 text = formatSleepTime(remaining),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White,
+                                color = primaryColor,
                                 modifier = Modifier.padding(end = 12.dp)
                             )
                         }
@@ -869,15 +880,7 @@ fun LyricsView(
     }
 }
 
-fun formatSleepTime(millis: Long): String {
-    val totalSeconds = millis / 1000
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return String.format("%02d:%02d:%02d", hours, minutes, seconds)
-}
-
-private fun formatTime(millis: Long): String {
+fun formatTime(millis: Long): String {
     val totalSeconds = millis / 1000
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
