@@ -38,7 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,6 +53,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.musicon.ui.viewmodel.PlaybackEvent
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import coil.compose.AsyncImage
 import androidx.palette.graphics.Palette
 import com.example.musicon.data.LibraryViewMode
 import com.example.musicon.data.SettingsRepository
@@ -88,6 +91,9 @@ class MainActivity : ComponentActivity() {
         val cloudManager = com.example.musicon.data.remote.CloudStorageManager(applicationContext)
         val musicRepository = com.example.musicon.data.MusicRepository(applicationContext, database.trackDao(), database.playlistDao(), cloudManager)
         
+        // Auto Sign-in check
+        val account = GoogleSignIn.getLastSignedInAccount(this)
+        
         setContent {
             val viewModel: MainViewModel = viewModel(
                 factory = object : androidx.lifecycle.ViewModelProvider.Factory {
@@ -97,6 +103,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             )
+
+            // Sync initial sign-in state
+            LaunchedEffect(Unit) {
+                if (account != null) viewModel.updateSignInStatus(true)
+            }
             val themeMode by viewModel.themeMode.collectAsState()
             val accentColorInt by viewModel.accentColor.collectAsState()
             val autoTheme by viewModel.autoTheme.collectAsState()
@@ -145,16 +156,20 @@ class MainActivity : ComponentActivity() {
             // Handle Playback Events (Fix for song not playing)
             LaunchedEffect(mediaController) {
                 viewModel.playbackEvents.collect { event ->
-                    when (event) {
-                        is PlaybackEvent.PlayTrackList -> {
-                            val mediaItems = event.tracks.map { it.toMediaItem() }
-                            mediaController?.apply {
-                                setMediaItems(mediaItems)
-                                seekTo(event.startIndex, 0L)
-                                prepare()
-                                play()
+                    try {
+                        when (event) {
+                            is PlaybackEvent.PlayTrackList -> {
+                                val mediaItems = event.tracks.map { it.toMediaItem() }
+                                mediaController?.apply {
+                                    setMediaItems(mediaItems)
+                                    seekTo(event.startIndex, 0L)
+                                    prepare()
+                                    play()
+                                }
                             }
                         }
+                    } catch (e: Exception) {
+                        android.util.Log.e("MusicOn", "Playback event error", e)
                     }
                 }
             }
@@ -289,12 +304,17 @@ private fun TrackEntity.toMediaItem(): androidx.media3.common.MediaItem {
         .setTitle(displayName)
         .setArtist(displayArtist)
         .setAlbumTitle(displayAlbum)
-        .setArtworkUri(customCoverPath?.let { android.net.Uri.fromFile(File(it)) } ?: localPath?.let { android.net.Uri.parse(it) })
+        .setArtworkUri(customCoverPath?.let { android.net.Uri.parse(it) } ?: localPath?.let { android.net.Uri.parse(it) })
         .build()
+
+    val uri = localPath?.let { path ->
+        if (path.startsWith("content://")) android.net.Uri.parse(path)
+        else android.net.Uri.fromFile(java.io.File(path))
+    }
 
     return androidx.media3.common.MediaItem.Builder()
         .setMediaId(id)
-        .setUri(localPath?.let { android.net.Uri.parse(it) })
+        .setUri(uri)
         .setMediaMetadata(metadata)
         .build()
 }
@@ -354,8 +374,21 @@ fun MusicOnApp(
                         } else {
                             val account = GoogleSignIn.getLastSignedInAccount(context)
                             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+                                val emailColor = if (isBright) Color.Black else Color.White
+
                                 Column(Modifier.weight(1f)) {
-                                    Text(account?.email ?: "Signed in", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(
+                                        account?.email ?: "Signed in",
+                                        color = emailColor,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontFamily = FontFamily.Cursive,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 18.sp
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                     Text("Cloud Sync Enabled", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
                                 }
                                 IconButton(onClick = onSignOutClick) { Icon(Icons.AutoMirrored.Filled.Logout, "Sign Out", tint = Color.Red) }
@@ -549,7 +582,14 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                             items(sortedFiles) { file ->
                                 val isSelected = file.id in selectedIds
                                 Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).background(if (isSelected) Color.White.copy(0.15f) else Color.Transparent).combinedClickable(onClick = { if (selectedIds.isNotEmpty()) selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id }, onLongClick = { selectedIds = setOf(file.id) }).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.MusicNote, null, tint = Color.White.copy(0.7f), modifier = Modifier.size(64.dp))
+                                    AsyncImage(
+                                        model = file.thumbnailLink ?: R.drawable.ic_launcher_foreground,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Crop,
+                                        error = androidx.compose.ui.graphics.painter.ColorPainter(Color.White.copy(alpha = 0.1f))
+                                    )
+                                    Spacer(Modifier.height(4.dp))
                                     Text(file.getName() ?: "Unknown", color = Color.White, maxLines = 1, style = MaterialTheme.typography.labelSmall)
                                 }
                             }
@@ -561,7 +601,17 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                                 ListItem(
                                     headlineContent = { Text(file.getName() ?: "Unknown", color = Color.White) },
                                     supportingContent = { Text("${(file.getSize() ?: 0L) / 1024} KB", color = Color.Gray) },
-                                    leadingContent = { if (selectedIds.isNotEmpty()) Checkbox(checked = isSelected, onCheckedChange = null) else Icon(Icons.Default.MusicNote, null, tint = Color.Gray) },
+                                    leadingContent = { 
+                                        if (selectedIds.isNotEmpty()) Checkbox(checked = isSelected, onCheckedChange = null) 
+                                        else {
+                                            AsyncImage(
+                                                model = file.thumbnailLink ?: R.drawable.ic_launcher_foreground,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        }
+                                    },
                                     trailingContent = {
                                         var showMenu by remember { mutableStateOf(false) }
                                         Box {

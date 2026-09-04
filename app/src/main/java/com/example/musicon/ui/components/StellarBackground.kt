@@ -18,6 +18,7 @@ import kotlin.random.Random
 import com.example.musicon.ui.theme.ThemeMode
 
 val LocalCustomBackground = staticCompositionLocalOf<String?> { null }
+val LocalIsBackgroundBright = compositionLocalOf { false }
 
 enum class DayPhase { SUNRISE, DAY, SUNSET, NIGHT }
 
@@ -69,55 +70,59 @@ fun StellarBackground(
         animationSpec = tween(2000), label = "bottomColor"
     )
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (showInternalBackground) {
-            if (customBgUri != null) {
-                AsyncImage(model = customBgUri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                val overlayAlpha = if (themeMode == ThemeMode.LIGHT) 0.3f else 0.65f
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = overlayAlpha)))
-            } else {
-                Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(topColor, bottomColor))))
+    val isBright = phase == DayPhase.DAY || phase == DayPhase.SUNRISE || themeMode == ThemeMode.LIGHT
 
-                val stars = remember { List(120) { Offset(Random.nextFloat(), Random.nextFloat()) to (Random.nextFloat() * 1.6f + 0.2f) } }
-                
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val canvasWidth = size.width
-                    val canvasHeight = size.height
+    CompositionLocalProvider(LocalIsBackgroundBright provides isBright) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (showInternalBackground) {
+                if (customBgUri != null) {
+                    AsyncImage(model = customBgUri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    val overlayAlpha = if (themeMode == ThemeMode.LIGHT) 0.3f else 0.65f
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = overlayAlpha)))
+                } else {
+                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(colors = listOf(topColor, bottomColor))))
+
+                    val stars = remember { List(120) { Offset(Random.nextFloat(), Random.nextFloat()) to (Random.nextFloat() * 1.6f + 0.2f) } }
                     
-                    if (phase != DayPhase.NIGHT || themeMode == ThemeMode.LIGHT) {
-                        val sunColor = if (themeMode == ThemeMode.LIGHT) Color(0xFFFFD54F) else Color(0xFFFFEE58)
-                        drawCircle(
-                            color = sunColor.copy(alpha = 0.3f),
-                            radius = canvasWidth * 0.12f,
-                            center = Offset(canvasWidth * 0.85f, canvasHeight * 0.15f)
-                        )
-                    }
-
-                    if ((backgroundMode == "SPACE" || phase == DayPhase.NIGHT) && themeMode != ThemeMode.LIGHT) {
-                        stars.forEach { (pos, radius) ->
-                            drawCircle(color = Color.White.copy(alpha = 0.4f), radius = radius, center = Offset(pos.x * canvasWidth, pos.y * canvasHeight))
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val canvasWidth = size.width
+                        val canvasHeight = size.height
+                        
+                        if (phase != DayPhase.NIGHT || themeMode == ThemeMode.LIGHT) {
+                            val sunColor = if (themeMode == ThemeMode.LIGHT) Color(0xFFFFD54F) else Color(0xFFFFEE58)
+                            drawCircle(
+                                color = sunColor.copy(alpha = 0.3f),
+                                radius = canvasWidth * 0.12f,
+                                center = Offset(canvasWidth * 0.85f, canvasHeight * 0.15f)
+                            )
                         }
-                    }
-                    
-                    if (backgroundMode == "NEBULA") {
-                        val nebulaColor = if (themeMode == ThemeMode.LIGHT) Color(0xFFB39DDB) else Color(0xFF7C4DFF)
-                        drawCircle(
-                            brush = Brush.radialGradient(colors = listOf(nebulaColor.copy(0.15f), Color.Transparent), center = Offset(canvasWidth * 0.3f, canvasHeight * 0.4f), radius = canvasWidth * 0.8f),
-                            radius = canvasWidth * 0.8f, center = Offset(canvasWidth * 0.3f, canvasHeight * 0.4f)
-                        )
-                    }
-                    
-                    if (backgroundMode == "AURORA") {
-                        val auroraColor = if (themeMode == ThemeMode.LIGHT) Color(0xFFB2DFDB) else Color(0xFF1DE9B6)
-                        drawCircle(
-                            brush = Brush.verticalGradient(colors = listOf(Color.Transparent, auroraColor.copy(alpha = 0.1f), Color.Transparent)),
-                            center = Offset(0f, canvasHeight * 0.7f),
-                            radius = canvasHeight * 0.2f
-                        )
+
+                        if ((backgroundMode == "SPACE" || phase == DayPhase.NIGHT) && themeMode != ThemeMode.LIGHT) {
+                            stars.forEach { (pos, radius) ->
+                                drawCircle(color = Color.White.copy(alpha = 0.4f), radius = radius, center = Offset(pos.x * canvasWidth, pos.y * canvasHeight))
+                            }
+                        }
+                        
+                        if (backgroundMode == "NEBULA") {
+                            val nebulaColor = if (themeMode == ThemeMode.LIGHT) Color(0xFFB39DDB) else Color(0xFF7C4DFF)
+                            drawCircle(
+                                brush = Brush.radialGradient(colors = listOf(nebulaColor.copy(0.15f), Color.Transparent), center = Offset(canvasWidth * 0.3f, canvasHeight * 0.4f), radius = canvasWidth * 0.8f),
+                                radius = canvasWidth * 0.8f, center = Offset(canvasWidth * 0.3f, canvasHeight * 0.4f)
+                            )
+                        }
+                        
+                        if (backgroundMode == "AURORA") {
+                            val auroraColor = if (themeMode == ThemeMode.LIGHT) Color(0xFFB2DFDB) else Color(0xFF1DE9B6)
+                            drawCircle(
+                                brush = Brush.verticalGradient(colors = listOf(Color.Transparent, auroraColor.copy(alpha = 0.1f), Color.Transparent)),
+                                center = Offset(0f, canvasHeight * 0.7f),
+                                radius = canvasHeight * 0.2f
+                            )
+                        }
                     }
                 }
             }
+            content()
         }
-        content()
     }
 }

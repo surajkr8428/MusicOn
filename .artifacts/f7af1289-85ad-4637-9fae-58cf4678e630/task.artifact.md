@@ -1,10 +1,8 @@
-- `[x]` Final UI/UX Polish and Cloud Enhancements
-    - `[x]` Fix Sign-in Crash in `MainActivity.kt`
-    - `[x]` Exclude Cloud Tracks when Signed Out in `MainViewModel.kt`
-    - `[x]` Implement `HeaderStatusPill` in `LibraryScreen.kt`
-    - `[x]` Clean up Library Headers
-    - `[x]` Add Theme Selection in `SettingsScreen.kt`
-    - `[x]` Optimize Light Theme in `Theme.kt`
-    - `[x]` Verify Cloud Browser Security
-- `[x]` Verify all fixes and functional test
-- `[x]` Create final walkthrough
+- `[/]` Final Stability and Advanced UI Polish
+    - `[ ]` Auto Sign-in check & Playback Fix in `MainActivity.kt`
+    - `[ ]` Implement Adaptive Colors & Animation Modes in `StellarBackground.kt`
+    - `[ ]` Stretch & Bold Progress Bar in `LibraryScreen.kt`
+    - `[ ]` Add Cloud Thumbnails & Styled Email in `MainActivity.kt`
+    - `[ ]` Final Stability check (try-catch & safe lifecycle)
+- `[ ]` Verify all fixes and functional test
+- `[ ]` Create final walkthrough
