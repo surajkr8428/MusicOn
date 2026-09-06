@@ -198,29 +198,6 @@ fun PlayerScreen(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        sleepTimerRemaining?.let { remaining ->
-                            val isPaused by viewModel.isSleepTimerPaused.collectAsState()
-                            Surface(color = primaryColor.copy(0.2f), shape = RoundedCornerShape(22.dp)) {
-                                Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Timer, null, tint = primaryColor, modifier = Modifier.size(12.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text(
-                                        text = formatSleepTime(remaining),
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                                        color = primaryColor
-                                    )
-                                    IconButton(onClick = { viewModel.toggleSleepTimerPause() }, modifier = Modifier.size(20.dp).padding(start = 4.dp)) {
-                                        Icon(if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause, null, tint = primaryColor, modifier = Modifier.size(12.dp))
-                                    }
-                                    IconButton(onClick = { viewModel.resetSleepTimer() }, modifier = Modifier.size(24.dp)) {
-                                        Icon(Icons.Default.Refresh, null, tint = primaryColor, modifier = Modifier.size(14.dp))
-                                    }
-                                }
-                            }
-                        }
-                        
-                        Spacer(Modifier.width(8.dp))
-
                         // Player UI View Toggle
                         IconButton(onClick = {
                             val nextMode = when (imageMode) {
@@ -402,9 +379,9 @@ fun PlayerScreen(
     }
 
     if (showSleepTimerDialog) {
-        com.example.musicon.ui.screens.SleepTimerDialog(
+        SleepTimerDialog(
             onDismiss = { showSleepTimerDialog = false },
-            onSet = { viewModel.setSleepTimer(it); showSleepTimerDialog = false }
+            onSet = { h, m, s -> viewModel.setSleepTimer(h, m, s); showSleepTimerDialog = false }
         )
     }
 }
@@ -469,8 +446,16 @@ fun PlayerLayoutPortrait(
                         onHorizontalDrag = { change, dragAmount ->
                             change.consume()
                             if (!hasSkippedInSession) {
-                                if (dragAmount > 50) { player.seekToPrevious(); hasSkippedInSession = true }
-                                else if (dragAmount < -50) { player.seekToNext(); hasSkippedInSession = true }
+                                if (dragAmount > 50) { 
+                                    player.seekToPrevious()
+                                    player.play() // Force play on skip
+                                    hasSkippedInSession = true 
+                                }
+                                else if (dragAmount < -50) { 
+                                    player.seekToNext()
+                                    player.play() // Force play on skip
+                                    hasSkippedInSession = true 
+                                }
                             }
                         }
                     )
@@ -479,10 +464,11 @@ fun PlayerLayoutPortrait(
         ) {
             if (imageMode != PlayerImageMode.FULL_SCREEN && currentTrack != null) {
                 val trackForImg = currentTrack
-                val artworkUri = remember(trackForImg.id) {
+                val artworkUri = remember(trackForImg.id, trackForImg.customCoverPath) {
                     val path = trackForImg.customCoverPath ?: trackForImg.localPath
                     if (path != null) {
-                        if (path.startsWith("content://")) Uri.parse(path) else File(path)
+                        if (path.startsWith("content://") || path.startsWith("http")) Uri.parse(path) 
+                        else File(path)
                     } else null
                 }
 
@@ -533,6 +519,7 @@ fun PlayerLayoutPortrait(
             queue = queue,
             sleepTimerRemaining = sleepTimerRemaining
         )
+        Spacer(Modifier.weight(0.15f)) // Weight-based spacer to push controls up significantly
     }
 }
 
@@ -652,7 +639,7 @@ fun PlayerLayoutLandscape(
         ) {
             if (sleepTimerRemaining != null) {
                 Text(
-                    text = formatSleepTime(sleepTimerRemaining),
+                    text = com.example.musicon.logic.formatSleepTime(sleepTimerRemaining),
                     style = MaterialTheme.typography.displayMedium.copy(
                         fontWeight = FontWeight.Bold, 
                         fontSize = 90.sp,
@@ -768,17 +755,57 @@ fun PlayerControls(
             colors = SliderDefaults.colors(thumbColor = contentColor, activeTrackColor = primaryColor, inactiveTrackColor = contentColor.copy(alpha = 0.2f))
         )
 
+        // Integrated Sleep Timer Controls
+        if (sleepTimerRemaining != null) {
+            val isPaused by viewModel.isSleepTimerPaused.collectAsState()
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(color = primaryColor.copy(0.2f), shape = RoundedCornerShape(22.dp)) {
+                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Timer, null, tint = primaryColor, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = com.example.musicon.logic.formatSleepTime(sleepTimerRemaining), 
+                            color = primaryColor, 
+                            fontWeight = FontWeight.Black, 
+                            fontSize = 16.sp
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        IconButton(onClick = { viewModel.toggleSleepTimerPause() }, modifier = Modifier.size(36.dp)) {
+                            Icon(if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause, null, tint = primaryColor, modifier = Modifier.size(20.dp))
+                        }
+                        IconButton(onClick = { viewModel.resetSleepTimer() }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Refresh, null, tint = primaryColor, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(if (isLandscape) 4.dp else 12.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { player.shuffleModeEnabled = !player.shuffleModeEnabled }) { 
-                Icon(Icons.Default.Shuffle, null, tint = if (shuffleMode) primaryColor else contentColor.copy(alpha = 0.6f)) 
+            IconButton(onClick = { player.shuffleModeEnabled = !player.shuffleModeEnabled }) {
+                Icon(Icons.Default.Shuffle, null, tint = if (shuffleMode) primaryColor else contentColor.copy(alpha = 0.6f))
             }
-            IconButton(onClick = { player.seekToPrevious() }) { Icon(Icons.Default.SkipPrevious, null, tint = contentColor, modifier = Modifier.size(44.dp)) }
+            IconButton(onClick = { 
+                player.seekToPrevious()
+                player.play() // Force play on skip
+            }) { 
+                Icon(Icons.Default.SkipPrevious, null, tint = contentColor, modifier = Modifier.size(44.dp)) 
+            }
             Box(modifier = Modifier.size(64.dp).clip(CircleShape).background(primaryColor.copy(alpha = 0.9f)).clickable { if (isPlaying) player.pause() else player.play() }, contentAlignment = Alignment.Center) {
                 Icon(if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, null, tint = Color.Black, modifier = Modifier.size(36.dp))
             }
-            IconButton(onClick = { player.seekToNext() }) { Icon(Icons.Default.SkipNext, null, tint = contentColor, modifier = Modifier.size(44.dp)) }
+            IconButton(onClick = { 
+                player.seekToNext()
+                player.play() // Force play on skip
+            }) { 
+                Icon(Icons.Default.SkipNext, null, tint = contentColor, modifier = Modifier.size(44.dp)) 
+            }
             IconButton(onClick = { 
                 player.repeatMode = when(repeatMode) {
                     Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL

@@ -1,8 +1,7 @@
-- `[x]` Final Stability, Persistence & Side-Bar Settings
-    - `[x]` Update `MainViewModel.kt`: Timer pause/reset, sign-in persistence state
-    - `[x]` Update `MainActivity.kt`: Auto sign-in on startup, Fix Playback listener
-    - `[x]` Refactor `LibraryScreen.kt`: Side-bar Settings, Timer Pause/Reset UI, Stretched Progress
-    - `[x]` Update `PlayerScreen.kt`: Timer controls, Animated Background integration
-    - `[x]` Final Visual Polish: Adaptive text, Cloud thumbnails, Styled email
+- `[/]` Character Logos, Grid Selection & Cloud UI
+    - `[ ]` Implement procedural character logos (Batman, Spiderman, etc.) in `StellarBackground.kt`
+    - `[ ]` Refactor background mode selection to a Grid in `SettingsScreen.kt`
+    - `[ ]` Update `LibraryScreen.kt` with solid cloud icon overlays
+    - `[ ]` Improve Aurora/Character visibility for white icons
 - `[ ]` Verify all fixes and functional test
 - `[ ]` Create final walkthrough

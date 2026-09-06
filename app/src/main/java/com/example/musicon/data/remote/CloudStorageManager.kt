@@ -17,7 +17,25 @@ import java.io.InputStream
 
 class CloudStorageManager(private val context: Context) {
 
-    private val FOLDER_ID = "14W_7EbfeM4oTwyXxS1FL7jt5Sf_6siCg"
+    suspend fun getOrCreateAppFolder(): String? = withContext(Dispatchers.IO) {
+        val service = getDriveService() ?: return@withContext null
+        try {
+            val query = "name = 'MusicOn' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+            val result = service.files().list().setQ(query).setFields("files(id)").execute()
+            val existing = result.files?.firstOrNull()?.id
+            if (existing != null) return@withContext existing
+            
+            val fileMetadata = com.google.api.services.drive.model.File().apply {
+                name = "MusicOn"
+                mimeType = "application/vnd.google-apps.folder"
+            }
+            val folder = service.files().create(fileMetadata).setFields("id").execute()
+            folder.id
+        } catch (e: Exception) {
+            android.util.Log.e("CloudStorageManager", "Folder creation failed", e)
+            null
+        }
+    }
 
     suspend fun getAccessTokenAsync(): String? = withContext(Dispatchers.IO) {
         val account = GoogleSignIn.getLastSignedInAccount(context) ?: return@withContext null
@@ -46,7 +64,7 @@ class CloudStorageManager(private val context: Context) {
         ).setApplicationName("MusicOn").build()
     }
 
-    suspend fun listAudioFiles(folderId: String? = FOLDER_ID): List<com.google.api.services.drive.model.File> = withContext(Dispatchers.IO) {
+    suspend fun listAudioFiles(folderId: String?): List<com.google.api.services.drive.model.File> = withContext(Dispatchers.IO) {
         val service = getDriveService() ?: return@withContext emptyList()
         val query = if (folderId != null) {
             "mimeType contains 'audio/' and '$folderId' in parents and trashed = false"
@@ -57,7 +75,7 @@ class CloudStorageManager(private val context: Context) {
         try {
             val result = service.files().list()
                 .setQ(query)
-                .setFields("files(id, name, mimeType, size)")
+                .setFields("files(id, name, mimeType, size, thumbnailLink, hasThumbnail)")
                 .execute()
             result.files ?: emptyList()
         } catch (e: Exception) {
@@ -75,7 +93,8 @@ class CloudStorageManager(private val context: Context) {
 
     suspend fun findFileByName(name: String): com.google.api.services.drive.model.File? = withContext(Dispatchers.IO) {
         val service = getDriveService() ?: return@withContext null
-        val query = "name = '$name' and '$FOLDER_ID' in parents and mimeType contains 'audio/' and trashed = false"
+        val folderId = getOrCreateAppFolder() ?: return@withContext null
+        val query = "name = '$name' and '$folderId' in parents and mimeType contains 'audio/' and trashed = false"
         try {
             val result = service.files().list()
                 .setQ(query)
@@ -108,7 +127,8 @@ class CloudStorageManager(private val context: Context) {
         }
     }
 
-    suspend fun uploadFile(filePath: String, name: String, folderId: String? = FOLDER_ID): String? = withContext(Dispatchers.IO) {
+    suspend fun uploadFile(filePath: String, name: String): String? = withContext(Dispatchers.IO) {
+        val folderId = getOrCreateAppFolder()
         android.util.Log.d("CloudStorageManager", "Starting upload: $name from $filePath to $folderId")
         val service = getDriveService() ?: run {
             android.util.Log.e("CloudStorageManager", "Failed to get Drive service")
@@ -124,26 +144,34 @@ class CloudStorageManager(private val context: Context) {
             
             val mediaContent = if (filePath.startsWith("content://")) {
                 val uri = android.net.Uri.parse(filePath)
-                val inputStream: InputStream? = context.contentResolver.openInputStream(uri)
-                if (inputStream == null) {
-                    android.util.Log.e("CloudStorageManager", "Could not open InputStream for URI: $filePath")
+                // Copy to temp file to avoid permission issues in background worker
+                val tempFile = File(context.cacheDir, "upload_temp_${System.currentTimeMillis()}.mp3")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    tempFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                if (!tempFile.exists() || tempFile.length() == 0L) {
+                    android.util.Log.e("CloudStorageManager", "Temp file creation failed")
                     return@withContext null
                 }
-                InputStreamContent("audio/mpeg", inputStream)
+                val content = FileContent("audio/mpeg", tempFile)
+                val result = service.files().create(fileMetadata, content).setFields("id").execute()
+                tempFile.delete() // Cleanup
+                result.id
             } else {
                 val localFile = File(filePath)
                 if (!localFile.exists()) {
                     android.util.Log.e("CloudStorageManager", "Local file does not exist: $filePath")
                     return@withContext null
                 }
-                FileContent("audio/mpeg", localFile)
+                val content = FileContent("audio/mpeg", localFile)
+                val result = service.files().create(fileMetadata, content).setFields("id").execute()
+                result.id
             }
             
-            val result = service.files().create(fileMetadata, mediaContent)
-                .setFields("id")
-                .execute()
-            android.util.Log.d("CloudStorageManager", "Upload successful, ID: ${result.id}")
-            result.id
+            android.util.Log.d("CloudStorageManager", "Upload successful, ID: $mediaContent")
+            mediaContent
         } catch (e: Exception) {
             android.util.Log.e("CloudStorageManager", "Upload failed", e)
             null

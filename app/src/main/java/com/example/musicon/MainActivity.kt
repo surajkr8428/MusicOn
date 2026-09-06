@@ -9,7 +9,6 @@ import android.net.Network
 import android.net.NetworkRequest
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -20,14 +19,17 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -38,11 +40,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,7 +52,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import coil.ImageLoader
+import coil.request.ImageRequest
+import com.example.musicon.data.remote.CloudStorageManager
 import com.example.musicon.ui.viewmodel.PlaybackEvent
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -58,8 +62,8 @@ import androidx.palette.graphics.Palette
 import com.example.musicon.data.LibraryViewMode
 import com.example.musicon.data.SettingsRepository
 import com.example.musicon.data.local.TrackEntity
+import com.example.musicon.ui.theme.ThemeMode
 import com.example.musicon.data.remote.CloudSyncManager
-import com.example.musicon.data.remote.SyncStatus
 import com.example.musicon.ui.components.MiniPlayer
 import com.example.musicon.ui.screens.*
 import com.example.musicon.ui.theme.MusicOnTheme
@@ -68,6 +72,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -79,7 +84,14 @@ class MainActivity : ComponentActivity() {
     private var onSignInResult: ((Boolean) -> Unit)? = null
 
     private val signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        onSignInResult?.invoke(result.resultCode == RESULT_OK)
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+            onSignInResult?.invoke(account != null)
+        } catch (e: Exception) {
+            android.util.Log.e("MusicOn", "Sign-in failed", e)
+            onSignInResult?.invoke(false)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,7 +103,6 @@ class MainActivity : ComponentActivity() {
         val cloudManager = com.example.musicon.data.remote.CloudStorageManager(applicationContext)
         val musicRepository = com.example.musicon.data.MusicRepository(applicationContext, database.trackDao(), database.playlistDao(), cloudManager)
         
-        // Persistence: Check last account on Startup
         val account = GoogleSignIn.getLastSignedInAccount(this)
 
         setContent {
@@ -104,9 +115,12 @@ class MainActivity : ComponentActivity() {
                 }
             )
 
-            // Auto Sign-in persistence
             LaunchedEffect(Unit) {
                 if (account != null) viewModel.updateSignInStatus(true)
+                // Startup refresh: Scan for new local music
+                viewModel.scanLocalStorage()
+                // Handle initial intent for "Open With"
+                intent?.let { handleIntent(it, viewModel) }
             }
 
             val themeMode by viewModel.themeMode.collectAsState()
@@ -121,7 +135,6 @@ class MainActivity : ComponentActivity() {
             val customBgUri by settingsRepository.customBgUriFlow.collectAsState(null)
             val isOnline by viewModel.isOnline.collectAsState()
 
-            // Connectivity Monitor
             DisposableEffect(Unit) {
                 val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
                 val callback = object : ConnectivityManager.NetworkCallback() {
@@ -136,7 +149,6 @@ class MainActivity : ComponentActivity() {
                 onDispose { cm.unregisterNetworkCallback(callback) }
             }
 
-            // Playback Commands
             LaunchedEffect(Unit) {
                 viewModel.playbackCommand.collect { command ->
                     when (command) {
@@ -153,14 +165,29 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Handle Playback Events (Robust fix for song not playing)
             LaunchedEffect(mediaController) {
                 val controller = mediaController ?: return@LaunchedEffect
+                
+                controller.addListener(object : Player.Listener {
+                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                        android.util.Log.e("MusicOn", "Player Error: ${error.errorCodeName}", error)
+                    }
+
+                    override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                        val id = mediaItem?.mediaId
+                        if (id != null) {
+                            android.util.Log.d("MusicOn", "Transitioned to track: $id")
+                            viewModel.updateCurrentTrackById(id)
+                        }
+                    }
+                })
+
                 viewModel.playbackEvents.collect { event ->
                     try {
                         when (event) {
                             is PlaybackEvent.PlayTrackList -> {
                                 val mediaItems = event.tracks.map { it.toMediaItem() }
+                                android.util.Log.d("MusicOn", "Playing track list, size: ${mediaItems.size}, start index: ${event.startIndex}")
                                 controller.setMediaItems(mediaItems)
                                 controller.seekTo(event.startIndex, 0L)
                                 controller.prepare()
@@ -173,7 +200,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Dynamic Theming
             val context = LocalContext.current
             LaunchedEffect(currentTrack, autoTheme) {
                 if (!autoTheme) {
@@ -189,6 +215,8 @@ class MainActivity : ComponentActivity() {
                                 context.contentResolver.openInputStream(android.net.Uri.parse(path))?.use {
                                     BitmapFactory.decodeStream(it)
                                 }
+                            } else if (path.startsWith("http")) {
+                                null // Don't palette extract from remote URLs for now
                             } else {
                                 BitmapFactory.decodeFile(path)
                             }
@@ -235,13 +263,23 @@ class MainActivity : ComponentActivity() {
                 onDispose { lifecycle.removeObserver(observer) }
             }
 
-            CompositionLocalProvider(com.example.musicon.ui.components.LocalCustomBackground provides customBgUri) {
+            val imageLoader = remember {
+                ImageLoader.Builder(applicationContext)
+                    .crossfade(true)
+                    .build()
+            }
+
+            CompositionLocalProvider(
+                com.example.musicon.ui.components.LocalCustomBackground provides customBgUri,
+                com.example.musicon.ui.components.LocalIsBackgroundBright provides (themeMode == ThemeMode.LIGHT),
+                coil.compose.LocalImageLoader provides imageLoader
+            ) {
                 MusicOnTheme(themeMode = themeMode, accentColor = accentColor) {
                     var isFirstLaunch by rememberSaveable { mutableStateOf(true) }
                     var showApp by remember { mutableStateOf(!isFirstLaunch) }
                     LaunchedEffect(Unit) {
                         if (isFirstLaunch) {
-                            kotlinx.coroutines.delay(200)
+                            delay(200)
                             showApp = true
                             isFirstLaunch = false
                         }
@@ -254,9 +292,7 @@ class MainActivity : ComponentActivity() {
                                 mediaController = mediaController,
                                 isOnline = isOnline,
                                 onSignInClick = { 
-                                    onSignInResult = { success -> 
-                                        if (success) viewModel.updateSignInStatus(true) 
-                                    }
+                                    onSignInResult = { success -> if (success) viewModel.updateSignInStatus(true) }
                                     triggerSignIn() 
                                 },
                                 onSignOutClick = { triggerSignOut(); viewModel.updateSignInStatus(false) }
@@ -270,10 +306,26 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
+    private fun handleIntent(intent: android.content.Intent, viewModel: MainViewModel) {
+        if (intent.action == android.content.Intent.ACTION_VIEW) {
+            intent.data?.let { uri ->
+                viewModel.playExternalFile(uri)
+            }
+        }
+    }
+
     private fun triggerSignIn() {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
-            .requestScopes(com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"), com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.readonly"))
+            .requestScopes(
+                com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"),
+                com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.readonly")
+            )
             .build()
         val client = GoogleSignIn.getClient(this, gso)
         signInLauncher.launch(client.signInIntent)
@@ -311,6 +363,7 @@ private fun TrackEntity.toMediaItem(): androidx.media3.common.MediaItem {
         if (localPath.startsWith("content://")) android.net.Uri.parse(localPath)
         else android.net.Uri.fromFile(java.io.File(localPath))
     } else if (gDriveId != null) {
+        // Correct direct link for GDrive media
         android.net.Uri.parse("https://www.googleapis.com/drive/v3/files/$gDriveId?alt=media")
     } else null
 
@@ -333,21 +386,51 @@ fun MusicOnApp(
     val backgroundMode by viewModel.backgroundMode.collectAsState()
 
     com.example.musicon.ui.components.StellarBackground(themeMode = themeMode, backgroundMode = backgroundMode) {
-        val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
         val scope = rememberCoroutineScope()
         val isUserSignedIn by viewModel.isUserSignedIn
         val context = LocalContext.current
         
         var isPlayerVisible by rememberSaveable { mutableStateOf(false) }
-        var isSettingsInDrawer by rememberSaveable { mutableStateOf(false) }
         var isEqualizerVisible by rememberSaveable { mutableStateOf(false) }
         var isCloudBrowserVisible by rememberSaveable { mutableStateOf(false) }
         var cutterTrack by remember { mutableStateOf<TrackEntity?>(null) }
-        
         var showSignInPrompt by remember { mutableStateOf(false) }
 
         val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
             viewModel.importLocalTracks(uris)
+        }
+
+        // APK Share Logic
+        fun shareAppApk() {
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val sourceFile = File(context.applicationInfo.sourceDir)
+                    val shareDir = File(context.externalCacheDir, "shared_apk")
+                    if (shareDir.exists()) shareDir.deleteRecursively()
+                    shareDir.mkdirs()
+                    
+                    val destFile = File(shareDir, "MusicOn.apk")
+                    sourceFile.copyTo(destFile, overwrite = true)
+                    destFile.setReadable(true, false)
+                    
+                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                        context, "${context.packageName}.fileprovider", destFile
+                    )
+                    
+                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type = "application/vnd.android.package-archive"
+                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        clipData = android.content.ClipData.newRawUri("MusicOn APK", uri)
+                    }
+                    val chooser = android.content.Intent.createChooser(intent, "Share MusicOn APK")
+                    chooser.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    chooser.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    context.startActivity(chooser)
+                } catch (e: Exception) {
+                    android.util.Log.e("MusicOn", "Failed to share APK", e)
+                }
+            }
         }
 
         if (isPlayerVisible) {
@@ -359,71 +442,92 @@ fun MusicOnApp(
         } else if (cutterTrack != null) {
             Mp3CutterScreen(track = cutterTrack!!, viewModel = viewModel, onBack = { cutterTrack = null })
         } else {
+            // Dual Drawer Implementation: Left for Menu, Right for Settings
+            val leftDrawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+            val rightDrawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+
             ModalNavigationDrawer(
-                drawerState = drawerState,
+                drawerState = leftDrawerState,
                 drawerContent = {
-                    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), modifier = Modifier.width(320.dp)) {
-                        if (isSettingsInDrawer) {
-                            Column(Modifier.fillMaxSize()) {
-                                Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(onClick = { isSettingsInDrawer = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }
-                                    Text("Settings", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+                    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), modifier = Modifier.width(300.dp)) {
+                        Column(Modifier.fillMaxHeight()) {
+                            Spacer(Modifier.height(48.dp))
+                            if (!isUserSignedIn) {
+                                Button(onClick = onSignInClick, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                                    Icon(Icons.Default.CloudSync, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Sign in with Google", fontWeight = FontWeight.Bold)
                                 }
-                                Box(modifier = Modifier.weight(1f)) { SettingsScreen(viewModel = viewModel, onSignInClick = onSignInClick, onScanClick = { viewModel.scanLocalStorage() }, onBack = { isSettingsInDrawer = false }) }
-                            }
-                        } else {
-                            Column(Modifier.fillMaxHeight()) {
-                                Spacer(Modifier.height(48.dp))
-                                if (!isUserSignedIn) {
-                                    Button(onClick = onSignInClick, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                                        Icon(Icons.Default.CloudSync, null)
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("Sign in with Google", fontWeight = FontWeight.Bold)
-                                    }
-                                } else {
-                                    val account = GoogleSignIn.getLastSignedInAccount(context)
-                                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                        val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
-                                        val emailColor = if (isBright) Color.Black else Color.White
-                                        Column(Modifier.weight(1f)) {
-                                            Text(account?.email ?: "Signed in", color = emailColor, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                            Text("Cloud Sync Enabled", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
-                                        }
-                                        IconButton(onClick = onSignOutClick) { Icon(Icons.AutoMirrored.Filled.Logout, "Sign Out", tint = Color.Red) }
-                                    }
-                                }
-                                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                                val primaryColor = MaterialTheme.colorScheme.primary
+                            } else {
+                                val account = GoogleSignIn.getLastSignedInAccount(context)
                                 Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("MusicOn", style = MaterialTheme.typography.headlineMedium.copy(color = primaryColor, fontWeight = FontWeight.Bold))
-                                    IconButton(onClick = { if (!isUserSignedIn) { showSignInPrompt = true } else { scope.launch { drawerState.close(); viewModel.syncAllLocalToCloud() } } }) { Icon(Icons.Default.CloudSync, "Sync All to Cloud", tint = primaryColor) }
+                                    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+                                    val emailColor = if (isBright) Color.Black else Color.White
+
+                                    Column(Modifier.weight(1f)) {
+                                        Text(account?.email ?: "Signed in", color = emailColor, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text("Cloud Sync Enabled", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                    IconButton(onClick = onSignOutClick) { Icon(Icons.AutoMirrored.Filled.Logout, "Sign Out", tint = Color.Red) }
                                 }
-                                HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
-                                NavigationDrawerItem(label = { Text("Import Hub (Local)") }, selected = false, onClick = { scope.launch { drawerState.close() }; filePicker.launch("audio/*") }, icon = { Icon(Icons.Default.FileDownload, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                                NavigationDrawerItem(label = { Text("Cloud Browser") }, selected = false, onClick = { if (!isUserSignedIn) { showSignInPrompt = true } else { scope.launch { drawerState.close() }; isCloudBrowserVisible = true } }, icon = { Icon(Icons.Default.CloudQueue, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                                NavigationDrawerItem(label = { Text("Equalizer") }, selected = false, onClick = { scope.launch { drawerState.close() }; isEqualizerVisible = true }, icon = { Icon(Icons.Default.Tune, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                                NavigationDrawerItem(label = { Text("Settings") }, selected = false, onClick = { isSettingsInDrawer = true }, icon = { Icon(Icons.Default.Settings, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                                NavigationDrawerItem(label = { Text("Share App (APK)") }, selected = false, onClick = { scope.launch { drawerState.close() }; /* Share Logic */ }, icon = { Icon(Icons.Default.Share, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                                Spacer(Modifier.weight(1f))
                             }
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                            val primaryColor = MaterialTheme.colorScheme.primary
+                            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("MusicOn", style = MaterialTheme.typography.headlineMedium.copy(color = primaryColor, fontWeight = FontWeight.Bold))
+                                IconButton(onClick = { if (!isUserSignedIn) showSignInPrompt = true else scope.launch { leftDrawerState.close(); viewModel.syncAllLocalToCloud() } }) { Icon(Icons.Default.CloudSync, "Sync All to Cloud", tint = primaryColor) }
+                            }
+                            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+                            NavigationDrawerItem(label = { Text("Import Hub (Local)") }, selected = false, onClick = { scope.launch { leftDrawerState.close() }; filePicker.launch("audio/*") }, icon = { Icon(Icons.Default.FileDownload, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                            NavigationDrawerItem(label = { Text("Cloud Browser") }, selected = false, onClick = { if (!isUserSignedIn) showSignInPrompt = true else { scope.launch { leftDrawerState.close() }; isCloudBrowserVisible = true } }, icon = { Icon(Icons.Default.CloudQueue, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                            NavigationDrawerItem(label = { Text("Equalizer") }, selected = false, onClick = { scope.launch { leftDrawerState.close() }; isEqualizerVisible = true }, icon = { Icon(Icons.Default.Tune, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                            NavigationDrawerItem(label = { Text("Share App (APK)") }, selected = false, onClick = { scope.launch { leftDrawerState.close() }; shareAppApk() }, icon = { Icon(Icons.Default.Share, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                            Spacer(Modifier.weight(1f))
                         }
                     }
                 }
             ) {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = Color.Transparent,
-                    contentWindowInsets = WindowInsets.statusBars,
-                    bottomBar = { MiniPlayer(onNavigateToPlayer = { isPlayerVisible = true }, player = mediaController, viewModel = viewModel) }
-                ) { innerPadding ->
-                    Box(modifier = Modifier.padding(innerPadding)) {
-                        LibraryScreen(
-                            viewModel = viewModel,
-                            onOpenSettings = { isSettingsInDrawer = true; scope.launch { drawerState.open() } },
-                            onOpenDrawer = { scope.launch { drawerState.open() } },
-                            onOpenCutter = { cutterTrack = it },
-                            onOpenPlayer = { isPlayerVisible = true }
-                        )
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                    ModalNavigationDrawer(
+                        drawerState = rightDrawerState,
+                        drawerContent = {
+                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                                ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), modifier = Modifier.width(320.dp).fillMaxHeight()) {
+                                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(onClick = { scope.launch { rightDrawerState.close() } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }
+                                        Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                    SettingsScreen(viewModel = viewModel, onSignInClick = onSignInClick, onScanClick = { viewModel.scanLocalStorage() }, onBack = { scope.launch { rightDrawerState.close() } })
+                                }
+                            }
+                        }
+                    ) {
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            Scaffold(
+                                modifier = Modifier.fillMaxSize(),
+                                containerColor = Color.Transparent,
+                                contentWindowInsets = WindowInsets.statusBars,
+                                bottomBar = { 
+                                    MiniPlayer(
+                                        onNavigateToPlayer = { isPlayerVisible = true }, 
+                                        player = mediaController, 
+                                        viewModel = viewModel,
+                                        isLeftMenuOpen = leftDrawerState.isOpen,
+                                        isRightSidebarOpen = rightDrawerState.isOpen
+                                    ) 
+                                }
+                            ) { innerPadding ->
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    LibraryScreen(
+                                        viewModel = viewModel,
+                                        onOpenSettings = { scope.launch { rightDrawerState.open() } },
+                                        onOpenDrawer = { scope.launch { leftDrawerState.open() } },
+                                        onOpenCutter = { cutterTrack = it },
+                                        onOpenPlayer = { isPlayerVisible = true }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -449,35 +553,133 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
     val themeMode by viewModel.themeMode.collectAsState()
     val backgroundMode by viewModel.backgroundMode.collectAsState()
     val cloudManager = remember { com.example.musicon.data.remote.CloudStorageManager(context) }
+    
     var cloudFiles by remember { mutableStateOf<List<com.google.api.services.drive.model.File>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var isRefreshing by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var viewMode by rememberSaveable { mutableStateOf(LibraryViewMode.LIST) }
     var sortOrder by rememberSaveable { mutableStateOf("NAME_ASC") }
+    
     var trackToRename by remember { mutableStateOf<com.google.api.services.drive.model.File?>(null) }
     var trackToDownloadConfirm by remember { mutableStateOf<com.google.api.services.drive.model.File?>(null) }
     var tracksToDeleteConfirm by remember { mutableStateOf<List<com.google.api.services.drive.model.File>?>(null) }
     val scope = rememberCoroutineScope()
-    fun refresh() { scope.launch { isRefreshing = true; cloudFiles = cloudManager.listAudioFiles(); isRefreshing = false; isLoading = false } }
+
+    fun refresh() {
+        scope.launch {
+            isRefreshing = true
+            val folderId = cloudManager.getOrCreateAppFolder()
+            cloudFiles = cloudManager.listAudioFiles(folderId)
+            isRefreshing = false
+            isLoading = false
+        }
+    }
+
     LaunchedEffect(Unit) { refresh() }
     BackHandler(onBack = onBack)
-    val sortedFiles = remember(cloudFiles, sortOrder) { when (sortOrder) { "NAME_ASC" -> cloudFiles.sortedBy { it.getName()?.lowercase() }; "NAME_DESC" -> cloudFiles.sortedByDescending { it.getName()?.lowercase() }; "SIZE_ASC" -> cloudFiles.sortedBy { it.getSize() ?: 0L }; "SIZE_DESC" -> cloudFiles.sortedByDescending { it.getSize() ?: 0L }; else -> cloudFiles } }
+
+    val sortedFiles = remember(cloudFiles, sortOrder) {
+        when (sortOrder) {
+            "NAME_ASC" -> cloudFiles.sortedBy { it.getName()?.lowercase() }
+            "NAME_DESC" -> cloudFiles.sortedByDescending { it.getName()?.lowercase() }
+            "SIZE_ASC" -> cloudFiles.sortedBy { it.getSize() ?: 0L }
+            "SIZE_DESC" -> cloudFiles.sortedByDescending { it.getSize() ?: 0L }
+            else -> cloudFiles
+        }
+    }
 
     com.example.musicon.ui.components.StellarBackground(themeMode = themeMode, backgroundMode = backgroundMode) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                if (selectedIds.isNotEmpty()) { TopAppBar(title = { Text("${selectedIds.size} selected", color = Color.White) }, navigationIcon = { IconButton(onClick = { selectedIds = emptySet() }) { Icon(Icons.Default.Close, null, tint = Color.White) } }, actions = { IconButton(onClick = { val allIds = cloudFiles.map { it.id }.toSet(); selectedIds = if (selectedIds.size == allIds.size) emptySet() else allIds }) { Icon(Icons.Default.SelectAll, null, tint = Color.White) }; IconButton(onClick = { val sel = cloudFiles.filter { it.id in selectedIds }; if (sel.isNotEmpty()) trackToDownloadConfirm = sel.first() }) { Icon(Icons.Default.Download, null, tint = Color.White) }; IconButton(onClick = { tracksToDeleteConfirm = cloudFiles.filter { it.id in selectedIds } }) { Icon(Icons.Default.Delete, null, tint = Color.Red) } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(0.1f))) }
-                else { TopAppBar(title = { Row(verticalAlignment = Alignment.CenterVertically) { Text("Cloud Browser", color = Color.White, fontWeight = FontWeight.Bold); Spacer(Modifier.width(12.dp)); HeaderStatusPill(isOnline, isWifi); SyncProgressBar(syncStatus, Modifier.weight(1f)) } }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } }, actions = { IconButton(onClick = { viewMode = if (viewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) { Icon(if (viewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.White) }; var showSort by remember { mutableStateOf(false) }; IconButton(onClick = { showSort = true }) { Icon(Icons.AutoMirrored.Filled.Sort, null, tint = Color.White); DropdownMenu(expanded = showSort, onDismissRequest = { showSort = false }) { DropdownMenuItem(text = { Text("Name A-Z") }, onClick = { sortOrder = "NAME_ASC"; showSort = false }); DropdownMenuItem(text = { Text("Name Z-A") }, onClick = { sortOrder = "NAME_DESC"; showSort = false }); DropdownMenuItem(text = { Text("Size Smallest") }, onClick = { sortOrder = "SIZE_ASC"; showSort = false }); DropdownMenuItem(text = { Text("Size Largest") }, onClick = { sortOrder = "SIZE_DESC"; showSort = false }) } }; IconButton(onClick = { viewModel.syncAllLocalToCloud() }) { Icon(Icons.Default.CloudUpload, null, tint = Color.White) } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)) }
+                if (selectedIds.isNotEmpty()) {
+                    TopAppBar(
+                        title = { Text("${selectedIds.size} selected", color = Color.White) },
+                        navigationIcon = { IconButton(onClick = { selectedIds = emptySet() }) { Icon(Icons.Default.Close, null, tint = Color.White) } },
+                        actions = {
+                            IconButton(onClick = { val allIds = cloudFiles.map { it.id }.toSet(); selectedIds = if (selectedIds.size == allIds.size) emptySet() else allIds }) { Icon(Icons.Default.SelectAll, null, tint = Color.White) }
+                            IconButton(onClick = { val sel = cloudFiles.filter { it.id in selectedIds }; if (sel.isNotEmpty()) trackToDownloadConfirm = sel.first() }) { Icon(Icons.Default.Download, null, tint = Color.White) }
+                            IconButton(onClick = { tracksToDeleteConfirm = cloudFiles.filter { it.id in selectedIds } }) { Icon(Icons.Default.Delete, null, tint = Color.Red) }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(0.1f))
+                    )
+                } else {
+                    TopAppBar(
+                        title = { Row(verticalAlignment = Alignment.CenterVertically) { Text("Cloud Browser", color = Color.White, fontWeight = FontWeight.Bold); Spacer(Modifier.width(12.dp)); HeaderStatusPill(isOnline, isWifi); SyncProgressBar(syncStatus, Modifier.weight(1f)) } },
+                        navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } },
+                        actions = {
+                            IconButton(onClick = { viewMode = if (viewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) { Icon(if (viewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.White) }
+                            var showSort by remember { mutableStateOf(false) }
+                            IconButton(onClick = { showSort = true }) {
+                                Icon(Icons.AutoMirrored.Filled.Sort, null, tint = Color.White)
+                                DropdownMenu(expanded = showSort, onDismissRequest = { showSort = false }) {
+                                    DropdownMenuItem(text = { Text("Name A-Z") }, onClick = { sortOrder = "NAME_ASC"; showSort = false })
+                                    DropdownMenuItem(text = { Text("Name Z-A") }, onClick = { sortOrder = "NAME_DESC"; showSort = false })
+                                    DropdownMenuItem(text = { Text("Size Smallest") }, onClick = { sortOrder = "SIZE_ASC"; showSort = false })
+                                    DropdownMenuItem(text = { Text("Size Largest") }, onClick = { sortOrder = "SIZE_DESC"; showSort = false })
+                                }
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                    )
+                }
             }
         ) { padding ->
-            if (!isUserSignedIn) { Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.CloudOff, null, tint = Color.Gray, modifier = Modifier.size(64.dp)); Spacer(Modifier.height(16.dp)); Text("Sign in to view Cloud songs", color = Color.White, fontWeight = FontWeight.Bold) } } }
-            else {
+            if (!isUserSignedIn) {
+                Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(Icons.Default.CloudOff, null, tint = Color.Gray, modifier = Modifier.size(64.dp)); Spacer(Modifier.height(16.dp)); Text("Sign in to view Cloud songs", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
                 androidx.compose.material3.pulltorefresh.PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { refresh() }, modifier = Modifier.padding(padding).fillMaxSize()) {
                     if (isLoading && !isRefreshing) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) } }
-                    else if (viewMode == LibraryViewMode.GRID) { LazyVerticalGrid(columns = GridCells.Adaptive(110.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) { items(sortedFiles) { file -> val isSelected = file.id in selectedIds; Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).background(if (isSelected) Color.White.copy(0.15f) else Color.Transparent).combinedClickable(onClick = { if (selectedIds.isNotEmpty()) selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id }, onLongClick = { selectedIds = setOf(file.id) }).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) { AsyncImage(model = file.thumbnailLink ?: R.drawable.ic_launcher_foreground, contentDescription = null, modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop, error = androidx.compose.ui.graphics.painter.ColorPainter(Color.White.copy(alpha = 0.1f))); Spacer(Modifier.height(4.dp)); Text(file.getName() ?: "Unknown", color = Color.White, maxLines = 1, style = MaterialTheme.typography.labelSmall) } } } }
-                    else { LazyColumn(Modifier.fillMaxSize()) { items(sortedFiles) { file -> val isSelected = file.id in selectedIds; ListItem(headlineContent = { Text(file.getName() ?: "Unknown", color = Color.White) }, supportingContent = { Text("${(file.getSize() ?: 0L) / 1024} KB", color = Color.Gray) }, leadingContent = { if (selectedIds.isNotEmpty()) Checkbox(checked = isSelected, onCheckedChange = null) else AsyncImage(model = file.thumbnailLink ?: R.drawable.ic_launcher_foreground, contentDescription = null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop) }, trailingContent = { var showMenu by remember { mutableStateOf(false) }; Box { IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }; DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) { DropdownMenuItem(text = { Text("Download") }, leadingIcon = { Icon(Icons.Default.Download, null) }, onClick = { trackToDownloadConfirm = file; showMenu = false }); DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { trackToRename = file; showMenu = false }); DropdownMenuItem(text = { Text("Delete", color = Color.Red) }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, onClick = { tracksToDeleteConfirm = listOf(file); showMenu = false }) } } }, modifier = Modifier.combinedClickable(onClick = { if (selectedIds.isNotEmpty()) selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id }, onLongClick = { selectedIds = setOf(file.id) }), colors = ListItemDefaults.colors(containerColor = if (isSelected) Color.White.copy(0.1f) else Color.Transparent)) } } }
+                    else if (viewMode == LibraryViewMode.GRID) {
+                        LazyVerticalGrid(columns = GridCells.Adaptive(110.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
+                            items(sortedFiles) { file ->
+                                val isSelected = file.id in selectedIds
+                                Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).background(if (isSelected) Color.White.copy(0.15f) else Color.Transparent).combinedClickable(onClick = { if (selectedIds.isNotEmpty()) selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id }, onLongClick = { selectedIds = setOf(file.id) }).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    AsyncImage(
+                                        model = file.thumbnailLink ?: R.drawable.ic_launcher_foreground,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Crop,
+                                        error = androidx.compose.ui.graphics.painter.ColorPainter(Color.White.copy(alpha = 0.1f))
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(file.name ?: "Unknown", color = Color.White, maxLines = 1, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    } else {
+                        LazyColumn(Modifier.fillMaxSize()) {
+                            items(sortedFiles) { file ->
+                                val isSelected = file.id in selectedIds
+                                ListItem(
+                                    headlineContent = { Text(file.name ?: "Unknown", color = Color.White) },
+                                    supportingContent = { Text("${(file.getSize() ?: 0L) / 1024} KB", color = Color.Gray) },
+                                    leadingContent = { 
+                                        if (selectedIds.isNotEmpty()) Checkbox(checked = isSelected, onCheckedChange = null) 
+                                        else AsyncImage(model = file.thumbnailLink ?: R.drawable.ic_launcher_foreground, contentDescription = null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(4.dp)), contentScale = ContentScale.Crop)
+                                    },
+                                    trailingContent = {
+                                        var showMenu by remember { mutableStateOf(false) }
+                                        Box {
+                                            IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
+                                            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                                DropdownMenuItem(text = { Text("Download") }, leadingIcon = { Icon(Icons.Default.Download, null) }, onClick = { trackToDownloadConfirm = file; showMenu = false })
+                                                DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Default.Edit, null) }, onClick = { trackToRename = file; showMenu = false })
+                                                DropdownMenuItem(text = { Text("Delete", color = Color.Red) }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, onClick = { tracksToDeleteConfirm = listOf(file); showMenu = false })
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.combinedClickable(onClick = { if (selectedIds.isNotEmpty()) selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id }, onLongClick = { selectedIds = setOf(file.id) }),
+                                    colors = ListItemDefaults.colors(containerColor = if (isSelected) Color.White.copy(0.1f) else Color.Transparent)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

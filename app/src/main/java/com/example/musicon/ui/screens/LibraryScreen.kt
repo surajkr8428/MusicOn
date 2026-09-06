@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
@@ -29,6 +30,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -111,6 +113,16 @@ fun LibraryScreen(
     val folderGridStates = remember { mutableStateMapOf<String, androidx.compose.foundation.lazy.grid.LazyGridState>() }
     
     var showSignInRequiredDialog by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(syncStatus) {
+        val currentStatus = syncStatus
+        if (currentStatus is com.example.musicon.data.remote.SyncStatus.Success) {
+            android.widget.Toast.makeText(context, currentStatus.message, android.widget.Toast.LENGTH_SHORT).show()
+        } else if (currentStatus is com.example.musicon.data.remote.SyncStatus.Error) {
+            android.widget.Toast.makeText(context, currentStatus.message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
 
     BackHandler(isSelectionMode || searchQuery.isNotEmpty() || currentPlaylistDetail != null || isSearchActive) {
         if (isSelectionMode) selectedIds = emptySet()
@@ -138,7 +150,18 @@ fun LibraryScreen(
                             onNext = { viewModel.addToQueueNext(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
                             onPlaylist = { showBulkPlaylistDialog = true },
                             onDelete = { tracksToBulkDeleteConfirm = allTracks.filter { it.id in selectedIds } },
-                            onUpload = { if (!viewModel.isUserSignedIn.value) showSignInRequiredDialog = true else { viewModel.bulkUpload(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() } },
+                            onUpload = { 
+                                if (!viewModel.isUserSignedIn.value) {
+                                    showSignInRequiredDialog = true 
+                                } else { 
+                                    val toUpload = allTracks.filter { it.id in selectedIds }
+                                    if (toUpload.isNotEmpty()) {
+                                        android.widget.Toast.makeText(context, "Starting GDrive sync for ${toUpload.size} songs", android.widget.Toast.LENGTH_SHORT).show()
+                                        viewModel.bulkUpload(toUpload)
+                                    }
+                                    selectedIds = emptySet() 
+                                } 
+                            },
                             onRemove = { viewModel.removeFromLibrary(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() }
                         )
                     }
@@ -321,11 +344,71 @@ fun HeaderStatusPill(isOnline: Boolean, isWifi: Boolean) {
 
 @Composable
 fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modifier: Modifier = Modifier) {
-    if (syncStatus is com.example.musicon.data.remote.SyncStatus.Loading) {
-        val progress = syncStatus.progress
-        Box(modifier = modifier.height(30.dp).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-            if (progress >= 0) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)), color = MaterialTheme.colorScheme.primary, trackColor = Color.White.copy(alpha = 0.2f))
-            else LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(10.dp).clip(RoundedCornerShape(5.dp)), color = MaterialTheme.colorScheme.primary, trackColor = Color.White.copy(alpha = 0.2f))
+    if (syncStatus is com.example.musicon.data.remote.SyncStatus.Idle) return
+
+    val barColor = when (syncStatus) {
+        is com.example.musicon.data.remote.SyncStatus.Loading -> Color.Yellow
+        is com.example.musicon.data.remote.SyncStatus.Success -> Color.Green
+        is com.example.musicon.data.remote.SyncStatus.Error -> Color.Red
+        else -> MaterialTheme.colorScheme.primary
+    }
+
+    val progress = when (syncStatus) {
+        is com.example.musicon.data.remote.SyncStatus.Loading -> syncStatus.progress
+        is com.example.musicon.data.remote.SyncStatus.Success -> 1f
+        else -> -1f
+    }
+
+    Box(modifier = modifier.height(36.dp).padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
+        val sweepProgress = if (progress >= 0f) progress else 0.5f
+        
+        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxWidth().height(15.dp).clip(RoundedCornerShape(8.dp))) {
+            val width = size.width
+            val height = size.height
+            
+            // Track
+            drawRoundRect(
+                color = Color.White.copy(alpha = 0.2f),
+                size = size,
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(height / 2)
+            )
+            
+            // Progress line
+            drawRoundRect(
+                color = barColor,
+                size = androidx.compose.ui.geometry.Size(width * sweepProgress, height),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(height / 2)
+            )
+            
+            // Tip Dot - Circular indicator at the tip
+            if (syncStatus is com.example.musicon.data.remote.SyncStatus.Loading) {
+                drawCircle(
+                    color = Color.White,
+                    radius = height * 0.7f, // Slightly larger than bar
+                    center = Offset(width * sweepProgress, height / 2)
+                )
+                drawCircle(
+                    color = barColor,
+                    radius = height * 0.4f,
+                    center = Offset(width * sweepProgress, height / 2)
+                )
+            }
+        }
+
+        if (syncStatus is com.example.musicon.data.remote.SyncStatus.Success) {
+            Text(
+                text = "Complete",
+                color = Color.Black,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold
+            )
+        } else if (progress >= 0f) {
+            Text(
+                text = "${(progress * 100).toInt()}%",
+                color = Color.Black,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
@@ -361,46 +444,154 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
     val primaryTextColor = if (isBright) Color.Black else LavenderTitle
     val secondaryTextColor = if (isBright) Color.DarkGray else Color.LightGray
 
-    Row(modifier = Modifier.fillMaxWidth().background(if (isSelected) (if (isBright) Color.Black.copy(0.05f) else Color.White.copy(0.1f)) else Color.Transparent).combinedClickable(onClick = onPlay, onLongClick = onLongClick, onDoubleClick = onToggleFavorite).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { Box { val imageModel = remember(track.customCoverPath, track.localPath) { val file = track.customCoverPath?.let { File(it) }; if (file != null && file.exists()) file else track.localPath ?: R.drawable.ic_launcher_foreground }; AsyncImage(model = imageModel, contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop); if (isSelected) Box(modifier = Modifier.size(48.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) } }; Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Text(text = track.displayName, style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Cursive, color = primaryTextColor, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false)); if (track.gDriveId != null && !track.isDownloaded) Icon(Icons.Default.CloudQueue, null, tint = secondaryTextColor, modifier = Modifier.padding(start = 4.dp).size(14.dp)); IconButton(onClick = onToggleFavorite, modifier = Modifier.size(24.dp)) { Icon(if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, modifier = Modifier.size(16.dp), tint = if (track.isFavorite) Color.Red else secondaryTextColor) } }; Text(text = "${track.displayArtist} | ${formatDuration(track.duration)}", style = MaterialTheme.typography.labelSmall, color = secondaryTextColor, maxLines = 1) }; IconButton(onClick = onOptions) { Icon(Icons.Default.MoreVert, null, tint = secondaryTextColor, modifier = Modifier.size(20.dp)) } } }
+    Row(modifier = Modifier.fillMaxWidth().background(if (isSelected) (if (isBright) Color.Black.copy(0.05f) else Color.White.copy(0.1f)) else Color.Transparent).combinedClickable(onClick = onPlay, onLongClick = onLongClick, onDoubleClick = onToggleFavorite).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { 
+        Box { 
+            val imageModel = remember(track.customCoverPath, track.localPath) {
+                if (track.customCoverPath?.startsWith("http") == true) track.customCoverPath
+                else track.customCoverPath?.let { File(it) }?.takeIf { it.exists() }
+                    ?: track.localPath?.let { if (it.startsWith("content://")) it else File(it) }
+                    ?: R.drawable.ic_launcher_foreground
+            }
+            AsyncImage(model = imageModel, contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
+            if (isSelected) Box(modifier = Modifier.size(48.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) } 
+            
+            // Cloud Icon Overlay - Solid indicator
+            if (track.gDriveId != null && !track.isDownloaded) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        color = Color.White,
+                        shape = CircleShape,
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Cloud, 
+                            null, 
+                            tint = Color(0xFF1976D2), // Standard cloud blue
+                            modifier = Modifier.padding(3.dp)
+                        )
+                    }
+                }
+            }
+        }
+        Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) { 
+            Row(verticalAlignment = Alignment.CenterVertically) { 
+                Text(text = track.displayName, style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Cursive, color = primaryTextColor, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                IconButton(onClick = onToggleFavorite, modifier = Modifier.size(24.dp)) { Icon(if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, modifier = Modifier.size(16.dp), tint = if (track.isFavorite) Color.Red else secondaryTextColor) } 
+            }
+            Text(text = "${track.displayArtist} | ${formatDuration(track.duration)}", style = MaterialTheme.typography.labelSmall, color = secondaryTextColor, maxLines = 1) 
+        }
+        IconButton(onClick = onOptions) { Icon(Icons.Default.MoreVert, null, tint = secondaryTextColor, modifier = Modifier.size(20.dp)) } 
+    }
+}
 @OptIn(ExperimentalFoundationApi::class) @Composable fun StellarGridItem(track: TrackEntity, isSelected: Boolean, onPlay: (TrackEntity) -> Unit, onLongClick: (TrackEntity) -> Unit, onToggleFavorite: () -> Unit) {
     val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
     val primaryTextColor = if (isBright) Color.Black else LavenderTitle
     val secondaryTextColor = if (isBright) Color.DarkGray else Color.Gray
 
-    Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).combinedClickable(onClick = { onPlay(track) }, onLongClick = { onLongClick(track) }, onDoubleClick = onToggleFavorite).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) { Box { val imageModel = remember(track.customCoverPath, track.localPath) { val file = track.customCoverPath?.let { File(it) }; if (file != null && file.exists()) file else track.localPath ?: R.drawable.ic_launcher_foreground }; AsyncImage(model = imageModel, contentDescription = null, modifier = Modifier.aspectRatio(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop); if (isSelected) Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) }; if (track.isFavorite) Icon(Icons.Default.Favorite, null, tint = Color.Red, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(16.dp)) }; Spacer(Modifier.height(6.dp)); Text(text = track.displayName, color = primaryTextColor, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center); Text(text = track.displayArtist, color = secondaryTextColor, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) } }
+    Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).combinedClickable(onClick = { onPlay(track) }, onLongClick = { onLongClick(track) }, onDoubleClick = onToggleFavorite).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) { 
+        Box { 
+            val imageModel = remember(track.customCoverPath, track.localPath) {
+                if (track.customCoverPath?.startsWith("http") == true) track.customCoverPath
+                else track.customCoverPath?.let { File(it) }?.takeIf { it.exists() }
+                    ?: track.localPath?.let { if (it.startsWith("content://")) it else File(it) }
+                    ?: R.drawable.ic_launcher_foreground
+            }
+            AsyncImage(model = imageModel, contentDescription = null, modifier = Modifier.aspectRatio(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
+            if (isSelected) Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) }
+            
+            // Cloud Icon Overlay - Solid indicator
+            if (track.gDriveId != null && !track.isDownloaded) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        color = Color.White,
+                        shape = CircleShape,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Cloud, 
+                            null, 
+                            tint = Color(0xFF1976D2),
+                            modifier = Modifier.padding(4.dp)
+                        )
+                    }
+                }
+            }
+            
+            if (track.isFavorite) Icon(Icons.Default.Favorite, null, tint = Color.Red, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(16.dp))
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(text = track.displayName, color = primaryTextColor, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(text = track.displayArtist, color = secondaryTextColor, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) 
+    }
+}
 @Composable fun PlaylistGridItem(playlist: com.example.musicon.data.local.Playlist, onClick: (com.example.musicon.data.local.Playlist) -> Unit) { Column(modifier = Modifier.padding(6.dp).clickable { onClick(playlist) }, horizontalAlignment = Alignment.CenterHorizontally) { Box(Modifier.size(70.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(0.05f)), contentAlignment = Alignment.Center) { Icon(if (playlist.name == "Favorite") Icons.Default.Favorite else Icons.AutoMirrored.Filled.PlaylistAdd, null, tint = if (playlist.name == "Favorite") Color.Red else Color.Gray, modifier = Modifier.size(32.dp)) }; Spacer(Modifier.height(6.dp)); Text(playlist.name, color = Color.White, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center) } }
 @Composable fun GroupGridItem(name: String, tracks: List<TrackEntity>, onClick: (List<TrackEntity>) -> Unit) { Column(modifier = Modifier.padding(6.dp).clickable { onClick(tracks) }, horizontalAlignment = Alignment.CenterHorizontally) { Box(Modifier.size(70.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(0.05f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Album, null, tint = Color.Gray, modifier = Modifier.size(32.dp)) }; Spacer(Modifier.height(8.dp)); Text(name, color = Color.White, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center); Text("${tracks.size} songs", color = Color.Gray, fontSize = 9.sp, textAlign = TextAlign.Center) } }
 @Composable
 fun StellarActionButton(label: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) { Button(onClick = onClick, modifier = modifier.height(38.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), contentColor = Color.Black), shape = RoundedCornerShape(22.dp)) { Icon(icon, null, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold) } }
 
 @Composable
-fun SleepTimerDialog(onDismiss: () -> Unit, onSet: (Int) -> Unit) {
-    var customMinutes by remember { mutableStateOf("") }
+fun SleepTimerDialog(onDismiss: () -> Unit, onSet: (Int, Int, Int) -> Unit) {
+    var h by remember { mutableStateOf("") }
+    var m by remember { mutableStateOf("") }
+    var s by remember { mutableStateOf("") }
+    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+    val contentColor = if (isBright) Color.Black else Color.White
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Sleep Timer", color = Color.White, fontWeight = FontWeight.Bold) },
-        containerColor = Color(0xFF1E1B36),
+        title = { Text("Sleep Timer", color = contentColor, fontWeight = FontWeight.Bold) },
+        containerColor = if (isBright) Color.White else Color(0xFF1E1B36),
         text = {
             Column {
-                val times = listOf(0 to "Off", 15 to "15 minutes", 30 to "30 minutes", 60 to "60 minutes")
-                times.forEach { (mins, label) ->
-                    TextButton(onClick = { onSet(mins) }, modifier = Modifier.fillMaxWidth()) {
-                        Text(label, color = Color.White)
+                val times = listOf(
+                    "Off" to Triple(0, 0, 0), 
+                    "15 min" to Triple(0, 15, 0), 
+                    "30 min" to Triple(0, 30, 0), 
+                    "1 hour" to Triple(1, 0, 0)
+                )
+                times.forEach { (label, hms) ->
+                    TextButton(onClick = { onSet(hms.first, hms.second, hms.third) }, modifier = Modifier.fillMaxWidth()) {
+                        Text(label, color = contentColor)
                     }
                 }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.White.copy(alpha = 0.1f))
-                OutlinedTextField(
-                    value = customMinutes,
-                    onValueChange = { if (it.all { char -> char.isDigit() }) customMinutes = it },
-                    label = { Text("Custom Minutes", color = Color.Gray) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.Gray),
-                    singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
-                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = contentColor.copy(alpha = 0.1f))
+                
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = h, onValueChange = { if (it.length <= 2) h = it },
+                        label = { Text("HH", fontSize = 10.sp) }, modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = contentColor, unfocusedTextColor = contentColor),
+                        singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    )
+                    OutlinedTextField(
+                        value = m, onValueChange = { if (it.length <= 2) m = it },
+                        label = { Text("MM", fontSize = 10.sp) }, modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = contentColor, unfocusedTextColor = contentColor),
+                        singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    )
+                    OutlinedTextField(
+                        value = s, onValueChange = { if (it.length <= 2) s = it },
+                        label = { Text("SS", fontSize = 10.sp) }, modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = contentColor, unfocusedTextColor = contentColor),
+                        singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    )
+                }
+                Text("Enter hours, minutes and seconds", color = Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
             }
         },
-        confirmButton = { Button(onClick = { val mins = customMinutes.toIntOrNull() ?: 0; if (mins > 0) onSet(mins) }, enabled = customMinutes.isNotEmpty()) { Text("Set Custom") } },
+        confirmButton = { 
+            Button(onClick = { onSet(h.toIntOrNull() ?: 0, m.toIntOrNull() ?: 0, s.toIntOrNull() ?: 0) }) { Text("Set") } 
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) } }
     )
 }

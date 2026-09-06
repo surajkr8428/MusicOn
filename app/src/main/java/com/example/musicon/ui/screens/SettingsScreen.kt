@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.musicon.ui.components.ColorWheel
@@ -59,22 +61,47 @@ fun SettingsScreen(
             SettingsHeader("General")
             val backgroundMode by viewModel.backgroundMode.collectAsState()
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Background Animation", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("DYNAMIC", "SPACE", "NEBULA", "AURORA").forEach { mode ->
-                        val isSelected = backgroundMode == mode
-                        Button(
-                            onClick = { viewModel.updateBackgroundMode(mode) },
-                            modifier = Modifier.weight(1f).height(36.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (isSelected) primaryColor else Color.White.copy(alpha = 0.05f), contentColor = if (isSelected) Color.Black else Color.White),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(0.dp)
-                        ) { Text(mode, fontSize = 9.sp) }
+                Text("Background Animation", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(8.dp))
+                val modes = listOf(
+                    "DYNAMIC", "SPACE", "NEBULA", "AURORA", "SHINOBI", 
+                    "SUPERMAN", "SPIDERMAN", "BATMAN", "IRONMAN", 
+                    "NARUTO_SASUKE", "TOM_JERRY", "THOR", "CAPTAIN_AMERICA", "BLACK_PANTHER"
+                )
+                
+                // Vertical Grid for Animation Modes
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    modes.chunked(3).forEach { rowModes ->
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            rowModes.forEach { mode ->
+                                val isSelected = backgroundMode == mode
+                                Button(
+                                    onClick = { viewModel.updateBackgroundMode(mode) },
+                                    modifier = Modifier.weight(1f).height(40.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isSelected) primaryColor else MaterialTheme.colorScheme.surfaceVariant, 
+                                        contentColor = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text(
+                                        text = mode.replace("_", " "), 
+                                        fontSize = 8.sp, 
+                                        maxLines = 1, 
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            // Fill empty slots in last row
+                            repeat(3 - rowModes.size) {
+                                Spacer(Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
             }
             StellarSettingsItem(Icons.Default.Scanner, "Scan local music", "Search for local files") { onScanClick() }
-            StellarSettingsItem(Icons.Default.CloudSync, "Sync GDrive", "Manual cloud synchronization") { viewModel.syncCloudTracks() }
             StellarSettingsItem(Icons.Default.Image, "App Background", if (customBgUri != null) "Custom photo set" else "Default nebula") {
                 bgPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
@@ -88,14 +115,14 @@ fun SettingsScreen(
         item {
             val themeMode by viewModel.themeMode.collectAsState()
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("Theme Mode", color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("Theme Mode", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     com.example.musicon.ui.theme.ThemeMode.entries.forEach { mode ->
                         val isSelected = themeMode == mode
                         Button(
                             onClick = { viewModel.updateThemeMode(mode) },
                             modifier = Modifier.weight(1f).height(40.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (isSelected) primaryColor else Color.White.copy(alpha = 0.05f), contentColor = if (isSelected) Color.Black else Color.White),
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isSelected) primaryColor else MaterialTheme.colorScheme.surfaceVariant, contentColor = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant),
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(0.dp)
                         ) { Text(mode.name, fontSize = 10.sp) }
@@ -105,7 +132,7 @@ fun SettingsScreen(
             StellarSettingsToggle(Icons.Default.ColorLens, "Auto Theme Color", "Extract theme color from song image", autoTheme) { viewModel.updateAutoTheme(it) }
             Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text("Manual Theme Color", color = Color.White, fontSize = 14.sp)
+                    Text("Manual Theme Color", color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp)
                     IconButton(onClick = { showColorWheel = !showColorWheel }) { Icon(if (showColorWheel) Icons.Default.Close else Icons.Default.Palette, null, tint = primaryColor) }
                 }
                 AnimatedVisibility(visible = showColorWheel, enter = expandVertically(), exit = shrinkVertically()) {
@@ -115,9 +142,24 @@ fun SettingsScreen(
                         Spacer(Modifier.height(24.dp))
                     }
                 }
-                Text("Custom Hex Color", color = Color.White, fontSize = 14.sp, modifier = Modifier.align(Alignment.Start))
+                Text("Custom Hex Color", color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, modifier = Modifier.align(Alignment.Start))
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp).fillMaxWidth()) {
-                    OutlinedTextField(value = hexInput, onValueChange = { if (it.length <= 7) hexInput = it }, placeholder = { Text("#FFFFFF", color = Color.Gray) }, modifier = Modifier.width(120.dp), colors = TextFieldDefaults.colors(focusedContainerColor = Color.White.copy(0.05f), unfocusedContainerColor = Color.Transparent, focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedIndicatorColor = primaryColor, unfocusedIndicatorColor = Color.Gray), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text))
+                    OutlinedTextField(
+                        value = hexInput, 
+                        onValueChange = { if (it.length <= 7) hexInput = it }, 
+                        placeholder = { Text("#FFFFFF", color = Color.Gray) }, 
+                        modifier = Modifier.width(120.dp), 
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface, 
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface, 
+                            focusedContainerColor = Color.Transparent, 
+                            unfocusedContainerColor = Color.Transparent, 
+                            focusedBorderColor = primaryColor, 
+                            unfocusedBorderColor = Color.Gray
+                        ), 
+                        singleLine = true, 
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text)
+                    )
                     Spacer(Modifier.width(12.dp))
                     Button(onClick = { try { val color = Color(android.graphics.Color.parseColor(if (hexInput.startsWith("#")) hexInput else "#$hexInput")); viewModel.updateAccentColor(color.toArgb()) } catch (e: Exception) {} }, colors = ButtonDefaults.buttonColors(containerColor = primaryColor, contentColor = Color.Black), shape = RoundedCornerShape(8.dp)) { Text("Apply", fontWeight = FontWeight.Bold) }
                 }
@@ -156,11 +198,14 @@ fun SettingsHeader(title: String) {
 
 @Composable
 fun StellarSettingsItem(icon: ImageVector, title: String, subtitle: String?, onClick: (() -> Unit)? = null) {
+    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+    val contentColor = if (isBright) Color.Black else Color.White
+    
     Surface(onClick = { onClick?.invoke() }, color = Color.Transparent, enabled = onClick != null) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(24.dp))
+            Icon(icon, null, tint = contentColor.copy(alpha = 0.8f), modifier = Modifier.size(24.dp))
             Column(modifier = Modifier.weight(1f).padding(start = 20.dp)) {
-                Text(text = title, color = Color.White, fontSize = 17.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive, fontWeight = FontWeight.SemiBold)
+                Text(text = title, color = contentColor, fontSize = 17.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive, fontWeight = FontWeight.SemiBold)
                 if (subtitle != null) Text(subtitle, color = Color.Gray, fontSize = 12.sp)
             }
         }
@@ -169,11 +214,14 @@ fun StellarSettingsItem(icon: ImageVector, title: String, subtitle: String?, onC
 
 @Composable
 fun StellarSettingsToggle(icon: ImageVector, title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+    val contentColor = if (isBright) Color.Black else Color.White
     val primaryColor = MaterialTheme.colorScheme.primary
+    
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(24.dp))
+        Icon(icon, null, tint = contentColor.copy(alpha = 0.8f), modifier = Modifier.size(24.dp))
         Column(modifier = Modifier.weight(1f).padding(start = 20.dp)) {
-            Text(text = title, color = Color.White, fontSize = 17.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive, fontWeight = FontWeight.SemiBold)
+            Text(text = title, color = contentColor, fontSize = 17.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive, fontWeight = FontWeight.SemiBold)
             Text(subtitle, color = Color.Gray, fontSize = 12.sp)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedThumbColor = primaryColor, checkedTrackColor = primaryColor.copy(alpha = 0.3f), uncheckedThumbColor = Color.Gray, uncheckedTrackColor = Color.DarkGray))

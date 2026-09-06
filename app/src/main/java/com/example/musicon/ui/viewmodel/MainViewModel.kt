@@ -200,14 +200,14 @@ class MainViewModel(
     private val _isSleepTimerPaused = MutableStateFlow(false)
     val isSleepTimerPaused: StateFlow<Boolean> = _isSleepTimerPaused.asStateFlow()
 
-    fun setSleepTimer(minutes: Int) {
+    fun setSleepTimer(hours: Int, minutes: Int, seconds: Int = 0) {
         sleepTimerJob?.cancel()
         _isSleepTimerPaused.value = false
-        if (minutes == 0) {
+        if (hours == 0 && minutes == 0 && seconds == 0) {
             _sleepTimerRemaining.value = null
             return
         }
-        _sleepTimerRemaining.value = minutes * 60 * 1000L
+        _sleepTimerRemaining.value = (hours * 3600 + minutes * 60 + seconds) * 1000L
         startSleepTimerJob()
     }
 
@@ -356,6 +356,14 @@ class MainViewModel(
         }
     }
 
+    fun updateCurrentTrackById(trackId: String) {
+        _currentPlayingTrackId.value = trackId
+        viewModelScope.launch {
+            musicRepository.recordTrackPlayed(trackId)
+            refreshStats()
+        }
+    }
+
     private suspend fun refreshStats() {
         _recentlyPlayed.value = musicRepository.getRecentlyPlayed(20)
         _mostPlayed.value = musicRepository.getMostPlayed(20)
@@ -397,22 +405,54 @@ class MainViewModel(
 
     fun bulkDelete(tracks: List<TrackEntity>) {
         viewModelScope.launch {
+            val deletedIds = tracks.map { it.id }.toSet()
+            if (_currentPlayingTrackId.value in deletedIds) {
+                _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK)
+                _currentPlayingTrackId.value = null
+            }
             tracks.forEach { musicRepository.deleteTrack(it) }
+            refreshStats()
         }
     }
 
     fun bulkUpload(tracks: List<TrackEntity>) {
-        tracks.filter { it.localPath != null && it.gDriveId == null }.forEach { uploadTrack(it) }
+        viewModelScope.launch {
+            tracks.forEach { track ->
+                // Ensure we only upload if it has local path
+                if (track.localPath != null) {
+                    android.util.Log.d("MainViewModel", "Queuing bulk upload for: ${track.displayName}")
+                    uploadTrack(track)
+                    delay(800) // Pace the uploads to Drive
+                }
+            }
+        }
     }
 
     fun removeFromLibrary(tracks: List<TrackEntity>) {
         viewModelScope.launch {
+            val removedIds = tracks.map { it.id }.toSet()
+            if (_currentPlayingTrackId.value in removedIds) {
+                _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK)
+                _currentPlayingTrackId.value = null
+            }
             tracks.forEach { musicRepository.removeTrack(it) }
+            refreshStats()
         }
     }
 
     fun syncAllLocalToCloud() {
-        bulkUpload(allTracks.value)
+        viewModelScope.launch {
+            // Force fetch latest tracks
+            val allLocal = musicRepository.allTracks.first()
+            val tracksToUpload = allLocal.filter { it.localPath != null && it.gDriveId == null }
+            if (tracksToUpload.isNotEmpty()) {
+                android.util.Log.d("MainViewModel", "Sync All: Starting bulk upload of ${tracksToUpload.size} tracks")
+                bulkUpload(tracksToUpload)
+            } else {
+                android.util.Log.d("MainViewModel", "Sync All: No new local tracks to upload, syncing cloud files instead")
+                syncCloudTracks()
+            }
+        }
     }
 
     fun bulkDownload(tracks: List<TrackEntity>) {
@@ -463,6 +503,21 @@ class MainViewModel(
 
     fun addTrackFromUrl(url: String, title: String) {
         viewModelScope.launch { musicRepository.addTrackFromUrl(url, title) }
+    }
+
+    fun playExternalFile(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val track = com.example.musicon.logic.MediaMetadataUtils.extractMetadata(
+                    settingsRepository.context, uri, "external_${System.currentTimeMillis()}"
+                )
+                if (track != null) {
+                    playTrack(track)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Failed to play external file", e)
+            }
+        }
     }
 
     init {

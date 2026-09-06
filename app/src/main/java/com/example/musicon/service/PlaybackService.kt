@@ -44,10 +44,16 @@ class PlaybackService : MediaSessionService() {
             override fun createDataSource(): HttpDataSource {
                 val dataSource = defaultFactory.createDataSource()
                 // Inject token for Google Drive requests
-                val token = runBlocking { cloudManager.getAccessTokenAsync() }
-                if (token != null) {
-                    dataSource.setRequestProperty("Authorization", "Bearer $token")
-                    android.util.Log.d("MusicOnService", "Injected token into request")
+                try {
+                    runBlocking {
+                        val token = cloudManager.getAccessTokenAsync()
+                        if (token != null) {
+                            dataSource.setRequestProperty("Authorization", "Bearer $token")
+                            android.util.Log.d("MusicOnService", "Injected token into request")
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("MusicOnService", "Failed to inject token", e)
                 }
                 return dataSource
             }

@@ -86,42 +86,47 @@ class MusicRepository(
         }
     }
 
-    suspend fun syncCloudTracks(folderId: String? = "14W_7EbfeM4oTwyXxS1FL7jt5Sf_6siCg") {
+    suspend fun syncCloudTracks() {
         try {
+            android.util.Log.d("MusicRepository", "Starting cloud sync...")
+            val folderId = cloudStorageManager.getOrCreateAppFolder()
+            android.util.Log.d("MusicRepository", "App folder ID: $folderId")
+            
             val cloudFiles = cloudStorageManager.listAudioFiles(folderId)
+            android.util.Log.d("MusicRepository", "Found ${cloudFiles.size} audio files on Drive")
+            
             val allLocalTracks = trackDao.getAllTracks().first()
             
             cloudFiles.forEach { file ->
-                // Duplicate Protection: Check if a track with same title already exists locally
-                val alreadyExists = allLocalTracks.any { 
+                // Duplicate Protection
+                val local = allLocalTracks.find { 
                     it.title.equals(file.name, ignoreCase = true) || 
                     it.displayName.equals(file.name, ignoreCase = true) ||
                     it.gDriveId == file.id
                 }
                 
-                if (!alreadyExists) {
+                if (local == null) {
+                    android.util.Log.d("MusicRepository", "Inserting new cloud track: ${file.name}")
                     trackDao.insertTrack(
                         TrackEntity(
                             id = file.id,
                             title = file.name,
                             artist = "Cloud Artist",
-                            album = "Cloud Album",
+                            album = "Google Drive",
                             duration = 0,
                             gDriveId = file.id,
-                            isDownloaded = false
+                            isDownloaded = false,
+                            customCoverPath = file.thumbnailLink // Store thumbnail
                         )
                     )
                 } else {
-                    android.util.Log.d("MusicRepository", "Cloud sync: skipping duplicate or already synced file: ${file.name}")
-                    // Optionally update the GDriveId if it was missing
-                    val local = allLocalTracks.find { 
-                        it.title.equals(file.name, ignoreCase = true) || it.displayName.equals(file.name, ignoreCase = true)
-                    }
-                    if (local != null && local.gDriveId == null) {
-                        trackDao.updateTrack(local.copy(gDriveId = file.id))
+                    // Update thumbnail if missing
+                    if (local.customCoverPath == null && file.thumbnailLink != null) {
+                        trackDao.updateTrack(local.copy(customCoverPath = file.thumbnailLink))
                     }
                 }
             }
+            android.util.Log.d("MusicRepository", "Cloud sync completed successfully")
         } catch (e: Exception) {
             android.util.Log.e("MusicRepository", "Cloud sync failed", e)
             throw e
@@ -190,7 +195,23 @@ class MusicRepository(
 
     suspend fun removeTrack(track: TrackEntity) {
         trackDao.deleteTrack(track)
-        // Clean up files? 
+        // Physically delete file if it's a local file
+        if (track.localPath != null && !track.localPath.startsWith("content://")) {
+            try {
+                val file = java.io.File(track.localPath)
+                if (file.exists()) {
+                    file.delete()
+                    android.util.Log.d("MusicRepository", "Physically deleted file: ${track.localPath}")
+                    
+                    // Trigger MediaScanner refresh
+                    val intent = android.content.Intent(android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+                    intent.data = android.net.Uri.fromFile(file)
+                    context.sendBroadcast(intent)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MusicRepository", "Failed to delete file: ${track.localPath}", e)
+            }
+        }
     }
 
     suspend fun recordTrackPlayed(trackId: String) {
