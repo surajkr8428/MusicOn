@@ -1,7 +1,8 @@
-- `[/]` Character Logos, Grid Selection & Cloud UI
-    - `[ ]` Implement procedural character logos (Batman, Spiderman, etc.) in `StellarBackground.kt`
-    - `[ ]` Refactor background mode selection to a Grid in `SettingsScreen.kt`
-    - `[ ]` Update `LibraryScreen.kt` with solid cloud icon overlays
-    - `[ ]` Improve Aurora/Character visibility for white icons
-- `[ ]` Verify all fixes and functional test
+- `[/]` Cinematic Hero Animations & Dual UI Selectors
+    - `[ ]` Overhaul `StellarBackground.kt` with advanced superhero logic (Batman rain, Spiderman crawl, Superman flight, etc.)
+    - `[ ]` Implement reusable `BackgroundGridDialog` logic
+    - `[ ]` Update `SettingsScreen.kt` to use the grid selector
+    - `[ ]` Update `PlayerScreen.kt` with "Change Background" menu and dialog
+    - `[ ]` Fix rotating image/disc logic in `PlayerScreen.kt`
+- `[ ]` Verify all animations and functional transitions
 - `[ ]` Create final walkthrough

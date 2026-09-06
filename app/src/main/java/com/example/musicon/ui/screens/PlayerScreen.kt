@@ -97,6 +97,7 @@ fun PlayerScreen(
     
     var selectedTab by remember { mutableIntStateOf(0) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showBackgroundDialog by remember { mutableStateOf(false) }
 
     BackHandler(onBack = onBack)
 
@@ -244,6 +245,11 @@ fun PlayerScreen(
                                     leadingIcon = { Icon(Icons.Default.CloudUpload, null) },
                                     onClick = { currentTrack?.let { viewModel.uploadTrack(it) }; showMoreMenu = false }
                                 )
+                                DropdownMenuItem(
+                                    text = { Text("Change Background") },
+                                    leadingIcon = { Icon(Icons.Default.Wallpaper, null) },
+                                    onClick = { showBackgroundDialog = true; showMoreMenu = false }
+                                )
                                 HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                                 DropdownMenuItem(
                                     text = { Text("Remove from List") },
@@ -382,6 +388,14 @@ fun PlayerScreen(
         SleepTimerDialog(
             onDismiss = { showSleepTimerDialog = false },
             onSet = { h, m, s -> viewModel.setSleepTimer(h, m, s); showSleepTimerDialog = false }
+        )
+    }
+
+    if (showBackgroundDialog) {
+        com.example.musicon.ui.components.BackgroundGridDialog(
+            currentMode = backgroundMode,
+            onDismiss = { showBackgroundDialog = false },
+            onModeSelected = { viewModel.updateBackgroundMode(it) }
         )
     }
 }

@@ -104,12 +104,12 @@ fun StellarBackground(
     )
     val driftOffset by backgroundTransition.animateFloat(
         initialValue = 0f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(animation = tween(40000, easing = LinearEasing), repeatMode = RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(animation = tween(35000, easing = LinearEasing), repeatMode = RepeatMode.Restart),
         label = "driftOffset"
     )
     val swirlRotation by backgroundTransition.animateFloat(
         initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(animation = tween(60000, easing = LinearEasing), repeatMode = RepeatMode.Restart),
+        animationSpec = infiniteRepeatable(animation = tween(50000, easing = LinearEasing), repeatMode = RepeatMode.Restart),
         label = "swirlRotation"
     )
 
@@ -124,6 +124,17 @@ fun StellarBackground(
     val isBright = (phase == DayPhase.DAY || phase == DayPhase.SUNRISE || themeMode == ThemeMode.LIGHT) && backgroundMode !in characterModes && backgroundMode != "AURORA"
 
     val leaves = remember { List(25) { Triple(Random.nextFloat(), Random.nextFloat(), Random.nextFloat() * 10f + 5f) } }
+    val heroPositions = remember { List(6) { Triple(Random.nextFloat(), Random.nextFloat(), Random.nextFloat() * 0.5f + 0.5f) } }
+
+    val shapes = remember {
+        List(12) { 
+            val x = Random.nextFloat()
+            val y = Random.nextFloat()
+            val size = Random.nextFloat() * 50f + 25f
+            val type = Random.nextInt(3) // 0: Square, 1: Circle ring, 2: Triangle
+            Triple(Offset(x, y), size, type)
+        }
+    }
 
     CompositionLocalProvider(LocalIsBackgroundBright provides isBright) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -158,6 +169,20 @@ fun StellarBackground(
                                     radius = canvasWidth * 0.8f * pulseScale, center = center
                                 )
                             }
+                            shapes.forEachIndexed { index, (pos, size, type) ->
+                                val shapeRotation = swirlRotation * (if (index % 2 == 0) 1.2f else -1.8f) + (index * 30f)
+                                val shapeAlpha = 0.1f + (0.3f * sin((driftOffset * 3 * Math.PI + index).toFloat()).coerceIn(0f, 1f))
+                                rotate(shapeRotation, Offset(pos.x * canvasWidth, pos.y * canvasHeight)) {
+                                    when (type) {
+                                        0 -> drawRect(color = cycleColor.copy(alpha = shapeAlpha), topLeft = Offset(pos.x * canvasWidth - size/2, pos.y * canvasHeight - size/2), size = androidx.compose.ui.geometry.Size(size, size), style = Stroke(width = 2.dp.toPx()))
+                                        1 -> drawCircle(color = Color.White.copy(alpha = shapeAlpha), radius = (size / 2) * pulseScale, center = Offset(pos.x * canvasWidth, pos.y * canvasHeight), style = Stroke(width = 1.5.dp.toPx()))
+                                        else -> {
+                                            val p = Path().apply { moveTo(pos.x * canvasWidth, pos.y * canvasHeight - size/2); lineTo(pos.x * canvasWidth - size/2, pos.y * canvasHeight + size/2); lineTo(pos.x * canvasWidth + size/2, pos.y * canvasHeight + size/2); close() }
+                                            drawPath(p, color = Color(0xFF00E5FF).copy(alpha = shapeAlpha), style = Stroke(width = 2.dp.toPx()))
+                                        }
+                                    }
+                                }
+                            }
                         }
                         
                         if (backgroundMode == "AURORA") {
@@ -173,54 +198,75 @@ fun StellarBackground(
                             }
                         }
 
-                        // THEMED LOGO ANIMATIONS
+                        // THEMED LOGO & CHARACTER ANIMATIONS
                         when (backgroundMode) {
                             "SUPERMAN" -> {
-                                for (i in 0..5) {
-                                    val x = (0.2f + i * 0.15f + driftOffset * 0.1f) % 1f
-                                    val y = (0.8f - i * 0.1f - driftOffset * 0.3f) % 1f
-                                    val s = 40.dp.toPx()
-                                    rotate(driftOffset * 60f + i * 45, Offset(x * canvasWidth, y * canvasHeight)) {
-                                        val p = Path().apply {
-                                            moveTo(x * canvasWidth, y * canvasHeight - s)
-                                            lineTo(x * canvasWidth + s, y * canvasHeight - s*0.2f)
-                                            lineTo(x * canvasWidth + s*0.6f, y * canvasHeight + s)
-                                            lineTo(x * canvasWidth - s*0.6f, y * canvasHeight + s)
-                                            lineTo(x * canvasWidth - s, y * canvasHeight - s*0.2f)
-                                            close()
-                                        }
-                                        drawPath(p, Color(0xFFFBC02D).copy(0.3f)) // Yellow Shield
-                                    }
+                                // Background Shield
+                                val sSize = canvasWidth * 0.7f
+                                val shieldPath = Path().apply {
+                                    moveTo(center.x, center.y - sSize/2); lineTo(center.x + sSize/2, center.y - sSize/4)
+                                    lineTo(center.x + sSize/3, center.y + sSize/2); lineTo(center.x - sSize/3, center.y + sSize/2)
+                                    lineTo(center.x - sSize/2, center.y - sSize/4); close()
+                                }
+                                drawPath(shieldPath, Color(0xFFFBC02D).copy(0.1f))
+                                // Flying Figures
+                                for (i in 0..3) {
+                                    val fx = (0.1f + i * 0.3f + driftOffset * 0.2f) % 1.2f - 0.1f
+                                    val fy = (0.2f + i * 0.2f + sin(driftOffset * 5f + i).toFloat() * 0.1f)
+                                    drawCircle(Color.Red.copy(0.2f), 15.dp.toPx(), Offset(fx * canvasWidth, fy * canvasHeight))
                                 }
                             }
                             "SPIDERMAN" -> {
-                                for (i in 1..4) {
-                                    val r = (canvasWidth * 0.3f * i * pulseScale) % (canvasWidth * 1.5f)
-                                    drawCircle(Color.White.copy(0.1f), r, center, style = Stroke(1.dp.toPx()))
-                                    for (j in 0..7) {
-                                        val ang = (j * 45f) * (Math.PI / 180f).toFloat()
-                                        drawLine(Color.White.copy(0.1f), center, Offset(center.x + cos(ang)*r, center.y + sin(ang)*r))
-                                    }
+                                // Background Symbol
+                                val r = canvasWidth * 0.3f
+                                drawCircle(Color.Black.copy(0.1f), r, center, style = Stroke(2.dp.toPx()))
+                                for (j in 0..7) {
+                                    val ang = (j * 45f) * (Math.PI / 180f).toFloat()
+                                    drawLine(Color.Black.copy(0.1f), center, Offset(center.x + cos(ang)*r*1.5f, center.y + sin(ang)*r*1.5f))
+                                }
+                                // Crawling Spiders
+                                for (i in 0..8) {
+                                    val ang = (driftOffset * 360f + i * 40) * (Math.PI / 180f).toFloat()
+                                    val dist = (50.dp.toPx() + i * 40.dp.toPx() + driftOffset * 100.dp.toPx()) % (canvasWidth * 0.8f)
+                                    drawCircle(Color.Black.copy(0.3f), 6.dp.toPx(), Offset(center.x + cos(ang)*dist, center.y + sin(ang)*dist))
                                 }
                             }
                             "BATMAN" -> {
-                                val bx = center.x + cos(driftOffset * 2 * Math.PI.toFloat()) * canvasWidth * 0.2f
-                                val by = center.y * 0.6f + sin(driftOffset * 2 * Math.PI.toFloat()) * canvasHeight * 0.1f
-                                drawCircle(Brush.radialGradient(listOf(Color(0xFFFFEA00).copy(0.2f), Color.Transparent), Offset(bx, by), canvasWidth * 0.4f), canvasWidth * 0.4f, Offset(bx, by))
-                                rotate(driftOffset * 30f, Offset(bx, by)) {
-                                    drawOval(Color.Black.copy(0.4f), Offset(bx - 60.dp.toPx(), by - 25.dp.toPx()), androidx.compose.ui.geometry.Size(120.dp.toPx(), 50.dp.toPx()))
+                                // Bat Symbol Rain
+                                for (i in 0..15) {
+                                    val x = (0.1f + i * 0.1f + sin(driftOffset * 2f + i).toFloat() * 0.05f) % 1f
+                                    val y = (driftOffset * (1.5f + (i%3)*0.2f) + i*0.1f) % 1.1f - 0.1f
+                                    val s = (15 + (i%5)*5).dp.toPx()
+                                    rotate(180f, Offset(x * canvasWidth, y * canvasHeight)) {
+                                        drawOval(Color.Black.copy(0.5f), Offset(x * canvasWidth - s, y * canvasHeight - s/2), androidx.compose.ui.geometry.Size(s*2, s))
+                                    }
                                 }
                             }
                             "IRONMAN" -> {
-                                drawCircle(Color(0xFF00E5FF).copy(0.15f * pulseScale), 80.dp.toPx() * pulseScale, center, style = Stroke(10.dp.toPx()))
-                                drawCircle(Color.White.copy(0.3f), 30.dp.toPx(), center)
+                                // Glowing Arc Reactors
+                                for (i in 0..4) {
+                                    val rx = (0.2f + i * 0.2f) * canvasWidth; val ry = (0.3f + (i%2) * 0.4f) * canvasHeight
+                                    val br = 30.dp.toPx() * (0.8f + pulseScale * 0.2f)
+                                    drawCircle(Color(0xFF00E5FF).copy(0.15f), br * 1.5f, Offset(rx, ry))
+                                    drawCircle(Color.White.copy(0.5f), br, Offset(rx, ry), style = Stroke(4.dp.toPx()))
+                                }
                             }
                             "CAPTAIN_AMERICA" -> {
                                 rotate(swirlRotation) {
-                                    drawCircle(Color.Red.copy(0.2f), canvasWidth * 0.45f, center)
-                                    drawCircle(Color.White.copy(0.2f), canvasWidth * 0.35f, center)
-                                    drawCircle(Color.Red.copy(0.2f), canvasWidth * 0.25f, center)
-                                    drawCircle(Color.Blue.copy(0.3f), canvasWidth * 0.15f, center)
+                                    drawCircle(Color(0xFFC62828).copy(0.3f), canvasWidth * 0.45f, center)
+                                    drawCircle(Color.White.copy(0.3f), canvasWidth * 0.35f, center)
+                                    drawCircle(Color(0xFFC62828).copy(0.3f), canvasWidth * 0.25f, center)
+                                    drawCircle(Color(0xFF1565C0).copy(0.4f), canvasWidth * 0.15f, center)
+                                }
+                                // Running Figure
+                                val rx = (driftOffset * 1.5f % 1.2f - 0.1f) * canvasWidth
+                                drawCircle(Color.DarkGray.copy(0.4f), 20.dp.toPx(), Offset(rx, canvasHeight * 0.85f))
+                            }
+                            "BLACK_PANTHER" -> {
+                                for (i in 0..4) {
+                                    val alpha = (0.2f * sin((driftOffset * 4 * Math.PI + i).toFloat()).coerceIn(0f, 1f))
+                                    val px = (0.15f + i * 0.2f) * canvasWidth; val py = (0.3f + (i%2) * 0.4f) * canvasHeight
+                                    drawRect(Color.Black.copy(alpha = alpha + 0.2f), Offset(px - 25.dp.toPx(), py - 50.dp.toPx()), androidx.compose.ui.geometry.Size(50.dp.toPx(), 100.dp.toPx()))
                                 }
                             }
                             "NARUTO_SASUKE", "SHINOBI" -> {
@@ -231,13 +277,35 @@ fun StellarBackground(
                                     }
                                 }
                             }
-                            "BLACK_PANTHER" -> {
-                                for (i in 0..3) {
-                                    val r = (canvasWidth * 0.3f + i * 60.dp.toPx() + driftOffset * 100.dp.toPx()) % canvasWidth
-                                    drawCircle(Color(0xFF7B1FA2).copy(0.2f), r, center, style = Stroke(4.dp.toPx()))
-                                }
-                            }
                         }
+                    }
+                }
+            }
+
+            val characterResId = when (backgroundMode) {
+                "SHINOBI" -> "ic_shinobi"
+                "SUPERMAN" -> "ic_superman"
+                "SPIDERMAN" -> "ic_spiderman"
+                "BATMAN" -> "ic_batman"
+                "IRONMAN" -> "ic_ironman"
+                "NARUTO_SASUKE" -> "ic_sasuke_naruto"
+                "TOM_JERRY" -> "ic_tom_jerry"
+                "THOR" -> "ic_thor"
+                "CAPTAIN_AMERICA" -> "ic_captain_america"
+                "BLACK_PANTHER" -> "ic_black_panther"
+                else -> null
+            }
+            
+            if (characterResId != null && showInternalBackground) {
+                val context = LocalContext.current
+                val resId = context.resources.getIdentifier(characterResId, "drawable", context.packageName)
+                if (resId != 0) {
+                    Box(Modifier.fillMaxSize().padding(bottom = 100.dp), contentAlignment = Alignment.BottomCenter) {
+                        androidx.compose.foundation.Image(
+                            painter = androidx.compose.ui.res.painterResource(resId),
+                            contentDescription = null,
+                            modifier = Modifier.size(180.dp).offset(y = (sin(driftOffset * 2 * Math.PI) * 10).dp)
+                        )
                     }
                 }
             }

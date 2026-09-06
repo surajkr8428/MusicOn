@@ -69,34 +69,35 @@ fun SettingsScreen(
                     "NARUTO_SASUKE", "TOM_JERRY", "THOR", "CAPTAIN_AMERICA", "BLACK_PANTHER"
                 )
                 
-                // Vertical Grid for Animation Modes
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    modes.chunked(3).forEach { rowModes ->
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            rowModes.forEach { mode ->
-                                val isSelected = backgroundMode == mode
-                                Button(
-                                    onClick = { viewModel.updateBackgroundMode(mode) },
-                                    modifier = Modifier.weight(1f).height(40.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isSelected) primaryColor else MaterialTheme.colorScheme.surfaceVariant, 
-                                        contentColor = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(0.dp)
-                                ) {
-                                    Text(
-                                        text = mode.replace("_", " "), 
-                                        fontSize = 8.sp, 
-                                        maxLines = 1, 
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                // Vertical Grid for Animation Modes (3 columns)
+                modes.chunked(3).forEach { rowModes ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowModes.forEach { mode ->
+                            val isSelected = backgroundMode == mode
+                            Button(
+                                onClick = { viewModel.updateBackgroundMode(mode) },
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSelected) primaryColor else MaterialTheme.colorScheme.surfaceVariant, 
+                                    contentColor = if (isSelected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = mode.replace("_", " "), 
+                                    fontSize = 8.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
-                            // Fill empty slots in last row
-                            repeat(3 - rowModes.size) {
-                                Spacer(Modifier.weight(1f))
-                            }
+                        }
+                        // Fill empty slots in last row
+                        repeat(3 - rowModes.size) {
+                            Spacer(Modifier.weight(1f))
                         }
                     }
                 }
