@@ -120,11 +120,11 @@ fun StellarBackground(
         label = "cycleColor"
     )
 
-    val characterModes = listOf("SHINOBI", "SUPERMAN", "SPIDERMAN", "BATMAN", "IRONMAN", "NARUTO_SASUKE", "TOM_JERRY", "THOR", "CAPTAIN_AMERICA", "BLACK_PANTHER")
+    val characterModes = listOf("SHINOBI", "SUPERMAN", "SPIDERMAN", "BATMAN", "IRONMAN", "NARUTO_SASUKE", "TOM_JERRY", "THOR", "CAPTAIN_AMERICA", "BLACK_PANTHER", "GOKU")
     val isBright = (phase == DayPhase.DAY || phase == DayPhase.SUNRISE || themeMode == ThemeMode.LIGHT) && backgroundMode !in characterModes && backgroundMode != "AURORA"
 
     val leaves = remember { List(25) { Triple(Random.nextFloat(), Random.nextFloat(), Random.nextFloat() * 10f + 5f) } }
-    val heroPositions = remember { List(6) { Triple(Random.nextFloat(), Random.nextFloat(), Random.nextFloat() * 0.5f + 0.5f) } }
+    val heroFigures = remember { List(8) { Triple(Random.nextFloat(), Random.nextFloat(), Random.nextFloat() * 0.5f + 0.5f) } }
 
     val shapes = remember {
         List(12) { 
@@ -201,54 +201,69 @@ fun StellarBackground(
                         // THEMED LOGO & CHARACTER ANIMATIONS
                         when (backgroundMode) {
                             "SUPERMAN" -> {
-                                // Background Shield
-                                val sSize = canvasWidth * 0.7f
+                                // Background Symbol
+                                val sSize = canvasWidth * 0.6f
+                                drawCircle(Color.Red.copy(0.05f), sSize/2, center)
                                 val shieldPath = Path().apply {
                                     moveTo(center.x, center.y - sSize/2); lineTo(center.x + sSize/2, center.y - sSize/4)
                                     lineTo(center.x + sSize/3, center.y + sSize/2); lineTo(center.x - sSize/3, center.y + sSize/2)
                                     lineTo(center.x - sSize/2, center.y - sSize/4); close()
                                 }
                                 drawPath(shieldPath, Color(0xFFFBC02D).copy(0.1f))
-                                // Flying Figures
-                                for (i in 0..3) {
-                                    val fx = (0.1f + i * 0.3f + driftOffset * 0.2f) % 1.2f - 0.1f
-                                    val fy = (0.2f + i * 0.2f + sin(driftOffset * 5f + i).toFloat() * 0.1f)
-                                    drawCircle(Color.Red.copy(0.2f), 15.dp.toPx(), Offset(fx * canvasWidth, fy * canvasHeight))
-                                }
-                            }
-                            "SPIDERMAN" -> {
-                                // Background Symbol
-                                val r = canvasWidth * 0.3f
-                                drawCircle(Color.Black.copy(0.1f), r, center, style = Stroke(2.dp.toPx()))
-                                for (j in 0..7) {
-                                    val ang = (j * 45f) * (Math.PI / 180f).toFloat()
-                                    drawLine(Color.Black.copy(0.1f), center, Offset(center.x + cos(ang)*r*1.5f, center.y + sin(ang)*r*1.5f))
-                                }
-                                // Crawling Spiders
-                                for (i in 0..8) {
-                                    val ang = (driftOffset * 360f + i * 40) * (Math.PI / 180f).toFloat()
-                                    val dist = (50.dp.toPx() + i * 40.dp.toPx() + driftOffset * 100.dp.toPx()) % (canvasWidth * 0.8f)
-                                    drawCircle(Color.Black.copy(0.3f), 6.dp.toPx(), Offset(center.x + cos(ang)*dist, center.y + sin(ang)*dist))
-                                }
-                            }
-                            "BATMAN" -> {
-                                // Bat Symbol Rain
-                                for (i in 0..15) {
-                                    val x = (0.1f + i * 0.1f + sin(driftOffset * 2f + i).toFloat() * 0.05f) % 1f
-                                    val y = (driftOffset * (1.5f + (i%3)*0.2f) + i*0.1f) % 1.1f - 0.1f
-                                    val s = (15 + (i%5)*5).dp.toPx()
-                                    rotate(180f, Offset(x * canvasWidth, y * canvasHeight)) {
-                                        drawOval(Color.Black.copy(0.5f), Offset(x * canvasWidth - s, y * canvasHeight - s/2), androidx.compose.ui.geometry.Size(s*2, s))
+
+                                // Flying Silhouettes
+                                heroFigures.forEachIndexed { i, (x, y, scale) ->
+                                    val fx = (x + driftOffset * (0.3f + i*0.05f)) % 1.2f - 0.1f
+                                    val fy = (y + sin(driftOffset * 5f + i).toFloat() * 0.1f)
+                                    rotate(-15f, Offset(fx * canvasWidth, fy * canvasHeight)) {
+                                        drawRect(Color.Red.copy(0.3f), Offset(fx * canvasWidth - 10.dp.toPx(), fy * canvasHeight), androidx.compose.ui.geometry.Size(30.dp.toPx() * scale, 12.dp.toPx() * scale))
+                                        drawCircle(Color.Blue.copy(0.4f), 8.dp.toPx() * scale, Offset(fx * canvasWidth, fy * canvasHeight))
                                     }
                                 }
                             }
+                            "SPIDERMAN" -> {
+                                // Background Logo
+                                val r = canvasWidth * 0.3f
+                                drawCircle(Color.Red.copy(0.1f), r, center, style = Stroke(2.dp.toPx()))
+                                for (j in 0..11) {
+                                    val ang = (j * 30f) * (Math.PI / 180f).toFloat()
+                                    drawLine(Color.Black.copy(0.1f), center, Offset(center.x + cos(ang)*r*2f, center.y + sin(ang)*r*2f))
+                                }
+                                // Crawling Figures
+                                heroFigures.forEachIndexed { i, (x, y, scale) ->
+                                    val move = (driftOffset + i * 0.2f) % 1f
+                                    val sx = if (i % 2 == 0) move * canvasWidth else (1-move) * canvasWidth
+                                    val sy = if (i % 3 == 0) y * canvasHeight else (0.1f + i*0.1f) * canvasHeight
+                                    drawCircle(Color.Black.copy(0.4f), 6.dp.toPx() * scale, Offset(sx, sy))
+                                    for(l in 0..7) {
+                                        val la = (l * 45f + sin(driftOffset * 20f + i) * 20f) * (Math.PI/180f).toFloat()
+                                        drawLine(Color.Black.copy(0.4f), Offset(sx, sy), Offset(sx + cos(la)*10.dp.toPx(), sy + sin(la)*10.dp.toPx()))
+                                    }
+                                }
+                            }
+                            "BATMAN" -> {
+                                // Black Symbol Rain
+                                for (i in 0..15) {
+                                    val x = (0.1f + i * 0.1f) % 1f
+                                    val y = (driftOffset * (1.5f + (i%3)*0.2f) + i*0.1f) % 1.1f - 0.1f
+                                    val s = (15 + (i%5)*5).dp.toPx()
+                                    rotate(180f, Offset(x * canvasWidth, y * canvasHeight)) {
+                                        drawOval(Color.Black.copy(0.6f), Offset(x * canvasWidth - s, y * canvasHeight - s/2), androidx.compose.ui.geometry.Size(s*2, s))
+                                        drawCircle(Color.Black.copy(0.6f), s/3, Offset(x * canvasWidth, y * canvasHeight - s/2))
+                                    }
+                                }
+                                val bx = center.x + cos(driftOffset * 2 * Math.PI.toFloat()) * canvasWidth * 0.2f
+                                val by = center.y * 0.4f + sin(driftOffset * 2 * Math.PI.toFloat()) * canvasHeight * 0.1f
+                                drawCircle(Brush.radialGradient(listOf(Color(0xFFFFEA00).copy(0.2f), Color.Transparent), Offset(bx, by), canvasWidth * 0.4f), canvasWidth * 0.4f, Offset(bx, by))
+                            }
                             "IRONMAN" -> {
-                                // Glowing Arc Reactors
-                                for (i in 0..4) {
-                                    val rx = (0.2f + i * 0.2f) * canvasWidth; val ry = (0.3f + (i%2) * 0.4f) * canvasHeight
-                                    val br = 30.dp.toPx() * (0.8f + pulseScale * 0.2f)
-                                    drawCircle(Color(0xFF00E5FF).copy(0.15f), br * 1.5f, Offset(rx, ry))
-                                    drawCircle(Color.White.copy(0.5f), br, Offset(rx, ry), style = Stroke(4.dp.toPx()))
+                                // Multi Reactors
+                                heroFigures.forEachIndexed { i, (x, y, scale) ->
+                                    val rx = x * canvasWidth; val ry = y * canvasHeight
+                                    val br = (20 + (i % 3) * 10).dp.toPx() * (0.9f + pulseScale * 0.1f) * scale
+                                    val gc = if (i % 2 == 0) Color(0xFF00E5FF) else Color(0xFFFFD740)
+                                    drawCircle(gc.copy(0.2f), br * 1.5f, Offset(rx, ry))
+                                    drawCircle(gc.copy(0.5f), br, Offset(rx, ry), style = Stroke(3.dp.toPx()))
                                 }
                             }
                             "CAPTAIN_AMERICA" -> {
@@ -258,15 +273,18 @@ fun StellarBackground(
                                     drawCircle(Color(0xFFC62828).copy(0.3f), canvasWidth * 0.25f, center)
                                     drawCircle(Color(0xFF1565C0).copy(0.4f), canvasWidth * 0.15f, center)
                                 }
-                                // Running Figure
+                                // Running Silhouette
                                 val rx = (driftOffset * 1.5f % 1.2f - 0.1f) * canvasWidth
-                                drawCircle(Color.DarkGray.copy(0.4f), 20.dp.toPx(), Offset(rx, canvasHeight * 0.85f))
+                                drawCircle(Color.DarkGray.copy(0.5f), 20.dp.toPx(), Offset(rx, canvasHeight * 0.85f))
+                                drawLine(Color.DarkGray.copy(0.5f), Offset(rx, canvasHeight * 0.85f), Offset(rx - 10.dp.toPx(), canvasHeight * 0.85f + 30.dp.toPx()), 4.dp.toPx())
                             }
                             "BLACK_PANTHER" -> {
-                                for (i in 0..4) {
-                                    val alpha = (0.2f * sin((driftOffset * 4 * Math.PI + i).toFloat()).coerceIn(0f, 1f))
-                                    val px = (0.15f + i * 0.2f) * canvasWidth; val py = (0.3f + (i%2) * 0.4f) * canvasHeight
-                                    drawRect(Color.Black.copy(alpha = alpha + 0.2f), Offset(px - 25.dp.toPx(), py - 50.dp.toPx()), androidx.compose.ui.geometry.Size(50.dp.toPx(), 100.dp.toPx()))
+                                heroFigures.take(4).forEachIndexed { i, (x, y, s) ->
+                                    val alpha = (0.2f + 0.3f * sin((driftOffset * 5 * Math.PI + i).toFloat()).coerceIn(0f, 1f))
+                                    val px = x * canvasWidth; val py = y * canvasHeight
+                                    rotate(sin(driftOffset.toDouble() + i).toFloat() * 20f, Offset(px, py)) {
+                                        drawRect(Color.Black.copy(alpha = alpha + 0.2f), Offset(px - 20.dp.toPx(), py - 40.dp.toPx()), androidx.compose.ui.geometry.Size(40.dp.toPx() * s, 80.dp.toPx() * s))
+                                    }
                                 }
                             }
                             "NARUTO_SASUKE", "SHINOBI" -> {
@@ -293,6 +311,7 @@ fun StellarBackground(
                 "THOR" -> "ic_thor"
                 "CAPTAIN_AMERICA" -> "ic_captain_america"
                 "BLACK_PANTHER" -> "ic_black_panther"
+                "GOKU" -> "ic_goku"
                 else -> null
             }
             

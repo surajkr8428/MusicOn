@@ -1,8 +1,6 @@
-- `[/]` Cinematic Hero Animations & Dual UI Selectors
-    - `[ ]` Overhaul `StellarBackground.kt` with advanced superhero logic (Batman rain, Spiderman crawl, Superman flight, etc.)
-    - `[ ]` Implement reusable `BackgroundGridDialog` logic
-    - `[ ]` Update `SettingsScreen.kt` to use the grid selector
-    - `[ ]` Update `PlayerScreen.kt` with "Change Background" menu and dialog
-    - `[ ]` Fix rotating image/disc logic in `PlayerScreen.kt`
-- `[ ]` Verify all animations and functional transitions
+- `[/]` Startup Playback Readiness
+    - `[ ]` Update `MainViewModel.kt` to load initial queue in `init`
+    - `[ ]` Update `MainActivity.kt` to populate player on startup
+    - `[ ]` Ensure `MiniPlayer` handles initial state correctly
+- `[ ]` Verify cold start playback
 - `[ ]` Create final walkthrough

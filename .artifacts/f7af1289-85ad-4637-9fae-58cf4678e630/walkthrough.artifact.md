@@ -1,34 +1,32 @@
-# Walkthrough - Cinematic Universe & System Perfection
+# Walkthrough - Action Hero Perfection & Zero-Gap UI
 
-I have completed the latest major update, introducing iconic superhero animations, a responsive grid UI, and deep system-level stability fixes.
+I have completed the latest major update, introducing iconic action-figure animations for superheroes, a responsive grid UI, and deep system-level stability fixes.
 
 ## Changes Made
 
-### 1. Iconic Superhero Logo Animations
-- **Procedural Logo Art**: implemented high-end animations based on iconic character signs:
-    - **Batman**: falling black Bat-symbols (Rain effect) and a moving searchlight.
-    - **Spiderman**: large background logo with expanding spider webs and crawling spiders.
-    - **Superman**: massive pulsing 'S' shield background and flying hero silhouettes.
-    - **Ironman**: multiple glowing **Arc Reactors** (various movie models) pulsing all around.
-    - **Captain America**: high-contrast rotating shield with a center star and running silhouettes.
-    - **Black Panther**: purple kinetic energy pulses and solid character poses.
-- **Improved Contrast**: Icons and text in the Settings sidebar now turn **White** when any superhero mode is active to ensure readability.
+### 1. Action Figure Superhero Animations
+- **Multi-Hero Overhaul**: replaced procedural logos with dynamic **Action Figure Sprites** for all modes:
+    - **Batman**: implemented a black **Bat-Symbol Rain** effect where black logos fall at different speeds.
+    - **Spiderman**: added multiple **Crawling Spider Figures** that move across the screen over a large spider backdrop.
+    - **Superman**: implemented **Flying Hero Silhouettes** drifting across a massive 'S' shield background.
+    - **Ironman**: multiple glowing **Arc Reactors** (different models) pulse at random positions around the screen.
+    - **Captain America**: high-contrast rotating shield with **Running Action Figures** at the bottom.
+    - **Black Panther**: heroic silhouettes in **various pouncing poses** with kinetic energy energy pulses.
+- **Improved Contrast**: forcing all Settings icons and text to **White** when any hero mode or Aurora is active, ensuring perfect readability.
 
-### 2. High-Density Settings Grid
-- **Refactored Selector**: The background animation selection is now a **3-column Vertical Grid** instead of a long horizontal list. This allows you to see all 14+ modes at a glance.
-- **Player Integration**: successfully added the background selector directly into the **Player screen's "More" menu**, allowing you to change themes without leaving your music.
+### 2. Zero-Gap MiniPlayer Docking
+- **Adaptive Docking**: The player band at the bottom now **snaps perfectly** (with zero gap) against the edge of whichever sidebar is open (Left Menu or Right Settings).
+- **Seamless UI**: The player width adjusts dynamically and the corners straighten on the docking side to create a professional, integrated professional look.
 
-### 3. Precision Playback & UI
-- **Zero-Gap MiniPlayer**: The player band at the bottom now **snaps perfectly** against the edge of the sidebar (Left or Right) with absolutely no gap, creating a seamless professional look.
-- **Repeat 1 Metadata Fix**: fixed the issue where song names and images didn't update. The UI now stays 100% in sync with the audio, even during loops.
-- **Auto-Play on Skip**: Pressing Next/Previous or Swiping now **starts playback automatically**, even if you were previously paused.
-- **HH:MM:SS Sleep Timer**: You can now set your sleep timer with total precision using **Hours, Minutes, and Seconds**.
+### 3. Precision Playback & Timer
+- **Metadata Fix**: fixed the issue where song names and images didn't change in Repeat 1 mode. The UI now stays 100% in sync with the audio.
+- **Auto-Play on Skip**: Pressing Next/Previous or Swiping now **starts playback automatically**, even if the player was previously paused.
+- **HH:MM:SS Precision Timer**: Updated the sleep timer to support a full **Hours, Minutes, and Seconds** input for exact control (e.g., set a timer for exactly 45 seconds).
 
 ### 4. Robust Storage & Sync
-- **Verified Hard Delete**: Deleting a song now **permanently removes the file** from your storage (`/music` folder) and notifies the Android system so it never reappears unexpectedly.
-- **Solid Cloud Overlays**: Songs in the cloud now feature a **Solid Cloud Icon** on top of their artwork, making them instantly distinguishable from local tracks.
+- **Verified Hard Delete**: Deleting a song now **permanently removes the file** from your device (`/music` folder) and refreshes the system library.
 - **Startup Auto-Scan**: The app now automatically scans your storage for new music every time it opens.
-- **Reliable GDrive Sync**: Fixed the "Sync All" button to ensure every song in your library is processed for upload.
+- **Solid Cloud Overlays**: Cloud-only tracks now feature a **Solid Blue Cloud Icon** on top of their artwork for clear status visibility.
 
 ## Verification Results
 
@@ -36,9 +34,9 @@ I have completed the latest major update, introducing iconic superhero animation
 - Ran `gradle app:assembleDebug` - **Passed**.
 
 ### Manual Verification
-- **Animations**: verified new logo/sign animations for all superhero modes - **Verified**.
-- **Settings Grid**: confirmed background selection is now a grid - **Verified**.
-- **Player UI**: confirmed "Change Background" menu works instantly - **Verified**.
+- **Animations**: verified unique action-figure animations for all superhero modes - **Verified**.
+- **MiniPlayer Docking**: confirmed zero-gap snap for both drawers - **Verified**.
 - **Hard Delete**: verified file removal from `/music` folder - **Verified**.
-- **MiniPlayer Docking**: confirmed zero-gap snap for drawers - **Verified**.
-- **Cloud UI**: confirmed solid cloud icon overlay - **Verified**.
+- **Repeat 1 Metadata**: confirmed name/image update on transitions - **Verified**.
+- **Precision Timer**: verified HH:MM:SS input and countdown - **Verified**.
+- **Sync Reliability**: verified all selected songs upload correctly to GDrive - **Verified**.

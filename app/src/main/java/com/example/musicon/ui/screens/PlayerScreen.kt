@@ -192,13 +192,18 @@ fun PlayerScreen(
                                 color = primaryColor
                             )
                         },
-                        modifier = Modifier.width(160.dp)
+                        modifier = Modifier.width(140.dp)
                     ) {
-                        Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Player", color = if (selectedTab == 0) contentColor else secondaryColor, fontSize = 14.sp) } )
-                        Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) contentColor else secondaryColor, fontSize = 14.sp) } )
+                        Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Player", color = if (selectedTab == 0) contentColor else secondaryColor, fontSize = 12.sp) } )
+                        Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) contentColor else secondaryColor, fontSize = 12.sp) } )
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Background Selection Dialog Button
+                        IconButton(onClick = { showBackgroundDialog = true }) {
+                            Icon(Icons.Default.Wallpaper, null, tint = contentColor)
+                        }
+
                         // Player UI View Toggle
                         IconButton(onClick = {
                             val nextMode = when (imageMode) {

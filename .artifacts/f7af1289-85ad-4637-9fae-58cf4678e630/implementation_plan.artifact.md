@@ -1,49 +1,41 @@
-# Implementation Plan - Cinematic Superhero Animations & Dual UI Selectors
+# Implementation Plan - Action Hero Figures & Player UI Refactor
 
-This plan focuses on creating high-end, animated superhero backgrounds and integrating background selection directly into BOTH the Settings and Player UI for maximum convenience.
+This plan addresses the requirement for unique action-figure animations for superheroes, and the refinement of the MiniPlayer docking UI.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Cinematic Backgrounds**: I will implement complex procedural and particle-based animations for Batman, Spiderman, Superman, Ironman, and more. This includes "Symbol Rain", "Crawling Spiders", and "Flying Figures".
-> **Dual Background Selectors**: I will add a "Change Background" option to the Player's more menu AND maintain the grid selector in the Settings screen, allowing for theme switching from anywhere.
-> **Rotating Image Fix**: I will resolve the issue where the rotating disc/artwork was hidden or not functioning.
+> **Action Figure Animations**: I will implement dynamic sprite animations for each superhero (Superman flying, Spiderman crawling, etc.) using `drawPath` and procedural shapes to represent action figures moving across the screen.
+> **Themed Backdrops**: Each mode will have its iconic symbol as a subtle background backdrop.
+> **Player UI Integration**: I will integrate the background animation selection directly into the Player screen's "More" menu for instant theme switching.
 
 ## Proposed Changes
 
-### 1. Advanced Superhero Backgrounds
+### 1. Advanced Superhero Animation Overhaul
 
 #### [MODIFY] [StellarBackground.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/components/StellarBackground.kt)
-- **BATMAN**: Implement "Bat-Symbol Rain" with falling black bat silhouettes.
-- **SPIDERMAN**:
-    - Draw a large Spiderman chest symbol as the base background.
-    - Implement "Crawling Spiders" moving along dynamic web lines.
-- **SUPERMAN**:
-    - Draw a large 'S' shield as the background.
-    - Implement drifting "Flying Superman" silhouettes.
-- **IRONMAN**:
-    - Generate multiple pulsing Arc Reactor designs all around the screen.
-- **CAPTAIN AMERICA**:
-    - Refine the Shield animation.
-    - Add a running Captain America figure silhouette.
-- **BLACK PANTHER**:
-    - Implement Black Panther silhouettes in various heroic poses that pulse with kinetic energy.
+- **Action Figure Logic**:
+    - **BATMAN**: Implement black "Bat-Symbol Rain" drifting down from the top.
+    - **SPIDERMAN**: Large spider backdrop. Multiple crawling spider silhouettes moving along web lines.
+    - **SUPERMAN**: Pulsing 'S' shield backdrop. Solid hero silhouettes flying across the screen.
+    - **IRONMAN**: Multi-layered pulsing Arc Reactors (various movie models) scattered around.
+    - **CAPTAIN AMERICA**: Rotating shield rings with multiple running figure silhouettes at the bottom.
+    - **BLACK PANTHER**: Heroic pouncing silhouettes fading in and out with purple kinetic pulses.
+- **Improved Contrast**: ensuring icons/text turn **White** when any hero mode or Aurora is active.
 
-### 2. Dual Selector Integration
+### 2. Player UI Background Selector
 
 #### [MODIFY] [PlayerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/PlayerScreen.kt)
-- **Background Selection Dialog**:
-    - Add "Change Background" to the `DropdownMenu`.
-    - Create a reusable `BackgroundGridDialog` that can be triggered from both the Player and Settings.
-- **Rotation Fix**: Ensure the artwork correctly rotates when `PlayerImageMode.ROTATION` is active.
+- **Menu Integration**: Add "Change Background" to the DropdownMenu.
+- **Grid Dialog**: Trigger the reusable `BackgroundGridDialog` for immediate switching.
 
-#### [MODIFY] [SettingsScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/SettingsScreen.kt)
-- **Refined Grid**: Ensure the background selection grid is perfectly aligned and intuitive.
+### 3. Zero-Gap MiniPlayer Docking
 
-### 3. Core Logic
-
-#### [MODIFY] [MainViewModel.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/viewmodel/MainViewModel.kt)
-- **State Management**: Ensure background mode changes are applied instantly across the entire app.
+#### [MODIFY] [MiniPlayer.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/components/MiniPlayer.kt)
+- **Seamless Merging**:
+    - Remove vertical/horizontal padding when a sidebar is open.
+    - Set the corner radius to 0dp on the side that touches the sidebar.
+    - Align left/right precisely against the drawer edge.
 
 ## Verification Plan
 
@@ -51,7 +43,7 @@ This plan focuses on creating high-end, animated superhero backgrounds and integ
 - Build verification: `gradle app:assembleDebug`.
 
 ### Manual Verification
-- **Settings Grid**: verify selection works in Settings.
-- **Player Selector**: open player menu and verify background updates instantly.
-- **Character Modes**: verify unique logos/animations for all superhero modes.
-- **Rotation**: verify the disc image is back and rotating while playing.
+- **Animations**: verify unique action-figure animations for each hero mode.
+- **MiniPlayer Docking**: open sidebars and confirm the player band snaps with zero gap.
+- **Player UI**: verify background updates instantly via the "More" menu.
+- **Visibility**: confirm icons remain readable in all modes.

@@ -73,6 +73,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -181,6 +183,26 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 })
+
+                // Auto-populate player if empty on startup
+                if (controller.mediaItemCount == 0) {
+                    launch {
+                        snapshotFlow { viewModel.playbackQueue.value }
+                            .filter { it.isNotEmpty() }
+                            .first()
+                            .let { initialTracks ->
+                                val currentId = viewModel.currentPlayingTrack.value?.id
+                                val lastPos = viewModel.lastPosition.value
+                                val mediaItems = initialTracks.map { it.toMediaItem() }
+                                val startIndex = initialTracks.indexOfFirst { it.id == currentId }.coerceAtLeast(0)
+                                
+                                android.util.Log.d("MusicOn", "Startup: Auto-loading ${mediaItems.size} items. Start index: $startIndex, position: $lastPos")
+                                controller.setMediaItems(mediaItems)
+                                controller.seekTo(startIndex, lastPos)
+                                controller.prepare()
+                            }
+                    }
+                }
 
                 viewModel.playbackEvents.collect { event ->
                     try {

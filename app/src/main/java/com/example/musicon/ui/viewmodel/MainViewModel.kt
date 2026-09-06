@@ -410,7 +410,7 @@ class MainViewModel(
                 _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK)
                 _currentPlayingTrackId.value = null
             }
-            tracks.forEach { musicRepository.deleteTrack(it) }
+            tracks.forEach { musicRepository.removeTrack(it) }
             refreshStats()
         }
     }
@@ -418,11 +418,10 @@ class MainViewModel(
     fun bulkUpload(tracks: List<TrackEntity>) {
         viewModelScope.launch {
             tracks.forEach { track ->
-                // Ensure we only upload if it has local path
                 if (track.localPath != null) {
-                    android.util.Log.d("MainViewModel", "Queuing bulk upload for: ${track.displayName}")
+                    android.util.Log.d("MainViewModel", "Bulk Uploading: ${track.displayName}")
                     uploadTrack(track)
-                    delay(800) // Pace the uploads to Drive
+                    delay(800)
                 }
             }
         }
@@ -442,15 +441,19 @@ class MainViewModel(
 
     fun syncAllLocalToCloud() {
         viewModelScope.launch {
-            // Force fetch latest tracks
+            // 1. Sync Cloud to Local first to get latest GDrive state (IDs, etc.)
+            syncCloudTracks()
+            
+            // 2. Fetch latest local list
             val allLocal = musicRepository.allTracks.first()
+            // 3. Upload anything that doesn't have a GDrive ID
             val tracksToUpload = allLocal.filter { it.localPath != null && it.gDriveId == null }
+            
             if (tracksToUpload.isNotEmpty()) {
                 android.util.Log.d("MainViewModel", "Sync All: Starting bulk upload of ${tracksToUpload.size} tracks")
                 bulkUpload(tracksToUpload)
             } else {
-                android.util.Log.d("MainViewModel", "Sync All: No new local tracks to upload, syncing cloud files instead")
-                syncCloudTracks()
+                android.util.Log.d("MainViewModel", "Sync All: All songs already synced or no local files found.")
             }
         }
     }
@@ -529,21 +532,15 @@ class MainViewModel(
                 }
             }
             
-            // Resume last played track
-            val lastTrackId = settingsRepository.lastTrackIdFlow.first()
-            if (lastTrackId != null) {
-                val track = musicRepository.getTrackById(lastTrackId)
-                if (track != null) {
-                    _currentPlayingTrackId.value = track.id
-                    // Pre-fill queue with all songs starting from this one
-                    val tracks = musicRepository.allTracks.first()
-                    val index = tracks.indexOfFirst { it.id == track.id }
-                    if (index != -1) {
-                        _playbackQueue.value = tracks.drop(index)
-                    } else {
-                        _playbackQueue.value = listOf(track)
-                    }
-                }
+            // Wait for tracks to be available and load initial queue
+            val tracks = musicRepository.allTracks.first()
+            if (tracks.isNotEmpty()) {
+                val lastTrackId = settingsRepository.lastTrackIdFlow.first()
+                val startTrack = tracks.find { it.id == lastTrackId } ?: tracks.first()
+                
+                _currentPlayingTrackId.value = startTrack.id
+                _playbackQueue.value = tracks
+                android.util.Log.d("MainViewModel", "Startup: Loaded ${tracks.size} tracks into queue. Default: ${startTrack.displayName}")
             }
             
             refreshStats()

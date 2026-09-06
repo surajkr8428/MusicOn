@@ -89,7 +89,10 @@ fun MiniPlayer(
                 .width(animatedWidth)
                 .align(if (isLeftMenuOpen) Alignment.BottomEnd else if (isRightSidebarOpen) Alignment.BottomStart else Alignment.BottomCenter)
                 .padding(vertical = if (isLeftMenuOpen || isRightSidebarOpen) 0.dp else 4.dp)
-                .padding(horizontal = if (isLeftMenuOpen || isRightSidebarOpen) 0.dp else 8.dp)
+                .padding(
+                    start = if (isLeftMenuOpen) 0.dp else 8.dp,
+                    end = if (isRightSidebarOpen) 0.dp else 8.dp
+                )
                 .height(64.dp)
                 .clip(playerShape)
                 .background(if (isBright) Color.White.copy(0.95f) else Color(0xFF1E1B36))
