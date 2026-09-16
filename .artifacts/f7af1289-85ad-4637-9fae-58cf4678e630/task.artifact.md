@@ -1,6 +1,8 @@
-- `[/]` Startup Playback Readiness
-    - `[ ]` Update `MainViewModel.kt` to load initial queue in `init`
-    - `[ ]` Update `MainActivity.kt` to populate player on startup
-    - `[ ]` Ensure `MiniPlayer` handles initial state correctly
-- `[ ]` Verify cold start playback
+- `[/]` App Icon, MiniPlayer Controls & UI Refinement
+    - `[ ]` Replace app icon with provided image in `res/mipmap`
+    - `[ ]` Add Previous, Play/Pause, and Next buttons to `MiniPlayer.kt`
+    - `[ ]` Relocate `SyncProgressBar` in `LibraryScreen.kt`
+    - `[ ]` Remove Shuffle/Play buttons from `LibraryScreen.kt`
+    - `[ ]` Ensure startup persistence for the last played song in `MainViewModel.kt`
+- `[ ]` Verify all UI changes and functionality
 - `[ ]` Create final walkthrough

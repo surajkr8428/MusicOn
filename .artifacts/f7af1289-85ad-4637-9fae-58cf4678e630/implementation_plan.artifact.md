@@ -1,41 +1,38 @@
-# Implementation Plan - Action Hero Figures & Player UI Refactor
+# Implementation Plan - App Icon, MiniPlayer Controls & UI Refinement
 
-This plan addresses the requirement for unique action-figure animations for superheroes, and the refinement of the MiniPlayer docking UI.
+This plan covers the app icon replacement, adding playback controls to the MiniPlayer, and repositioning the progress bar for better accessibility in portrait mode.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Action Figure Animations**: I will implement dynamic sprite animations for each superhero (Superman flying, Spiderman crawling, etc.) using `drawPath` and procedural shapes to represent action figures moving across the screen.
-> **Themed Backdrops**: Each mode will have its iconic symbol as a subtle background backdrop.
-> **Player UI Integration**: I will integrate the background animation selection directly into the Player screen's "More" menu for instant theme switching.
+> **App Icon**: I will set the provided image as the new primary app icon. This will replace the default Android icon on your home screen and in the app drawer.
+> **MiniPlayer Controls**: I will add Previous, Play/Pause, and Next buttons to the bottom player band. This will make it slightly taller or more densely packed to accommodate the new controls.
+> **UI Cleanup**: I will remove the "Shuffle" and "Play" buttons from the top of the library tabs to clean up the header space.
 
 ## Proposed Changes
 
-### 1. Advanced Superhero Animation Overhaul
+### 1. App Icon Replacement
+- **Provided Image**: I will save the provided image to `res/mipmap-xxxhdpi/ic_launcher.png` (and other densities) and update the `AndroidManifest.xml` to ensure it's used as the icon.
 
-#### [MODIFY] [StellarBackground.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/components/StellarBackground.kt)
-- **Action Figure Logic**:
-    - **BATMAN**: Implement black "Bat-Symbol Rain" drifting down from the top.
-    - **SPIDERMAN**: Large spider backdrop. Multiple crawling spider silhouettes moving along web lines.
-    - **SUPERMAN**: Pulsing 'S' shield backdrop. Solid hero silhouettes flying across the screen.
-    - **IRONMAN**: Multi-layered pulsing Arc Reactors (various movie models) scattered around.
-    - **CAPTAIN AMERICA**: Rotating shield rings with multiple running figure silhouettes at the bottom.
-    - **BLACK PANTHER**: Heroic pouncing silhouettes fading in and out with purple kinetic pulses.
-- **Improved Contrast**: ensuring icons/text turn **White** when any hero mode or Aurora is active.
-
-### 2. Player UI Background Selector
-
-#### [MODIFY] [PlayerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/PlayerScreen.kt)
-- **Menu Integration**: Add "Change Background" to the DropdownMenu.
-- **Grid Dialog**: Trigger the reusable `BackgroundGridDialog` for immediate switching.
-
-### 3. Zero-Gap MiniPlayer Docking
+### 2. MiniPlayer Enhancement
 
 #### [MODIFY] [MiniPlayer.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/components/MiniPlayer.kt)
-- **Seamless Merging**:
-    - Remove vertical/horizontal padding when a sidebar is open.
-    - Set the corner radius to 0dp on the side that touches the sidebar.
-    - Align left/right precisely against the drawer edge.
+- **New Buttons**:
+    - Add an `IconButton` for **Skip Previous** (left of song info).
+    - Maintain the **Play/Pause** button.
+    - Add an `IconButton` for **Skip Next** (right of play button).
+- **Layout**: Use a more compact `Row` structure to fit all controls while maintaining readability.
+
+### 3. Progress Bar & Header Refactor
+
+#### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
+- **Relocation**: In `LibraryTopBar`, move the `SyncProgressBar` from the row to a new line directly below the "MusicOn" title and status pills.
+- **Removal**: Delete the `StellarActionButton` row (Shuffle/Play) from the `SongsTab` to streamline the library view.
+
+### 4. Logic & Persistence
+
+#### [MODIFY] [MainViewModel.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/viewmodel/MainViewModel.kt)
+- **Persistence**: Ensure the `lastTrackId` is properly loaded on startup and that the playback queue is initialized so that pressing "Play" in the MiniPlayer works immediately after a fresh launch.
 
 ## Verification Plan
 
@@ -43,7 +40,8 @@ This plan addresses the requirement for unique action-figure animations for supe
 - Build verification: `gradle app:assembleDebug`.
 
 ### Manual Verification
-- **Animations**: verify unique action-figure animations for each hero mode.
-- **MiniPlayer Docking**: open sidebars and confirm the player band snaps with zero gap.
-- **Player UI**: verify background updates instantly via the "More" menu.
-- **Visibility**: confirm icons remain readable in all modes.
+- **App Icon**: check the emulator/device home screen for the new icon.
+- **MiniPlayer**: verify all three buttons (Prev, Play/Pause, Next) work as expected.
+- **Progress Bar**: verify it appears below the title in portrait mode.
+- **Tabs**: verify the "Shuffle" and "Play All" buttons are gone.
+- **Persistence**: Play a song, force close the app, reopen, and verify the song is still loaded in the MiniPlayer.

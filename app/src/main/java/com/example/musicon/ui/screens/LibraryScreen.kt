@@ -272,14 +272,23 @@ fun LibraryTopBar(
                 val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
                 val headerTextColor = if (isBright) Color.Black else Color.White
 
-                Text("MusicOn", color = headerTextColor, fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("MusicOn", color = headerTextColor, fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp)
+                    
+                    if (!isLandscape) {
+                        // Portrait Mode: Progress Bar below Title
+                        SyncProgressBar(syncStatus, Modifier.fillMaxWidth().height(16.dp))
+                    }
+                }
                 
                 Spacer(Modifier.width(12.dp))
                 HeaderStatusPill(isOnline, isWifi)
                 
-                // Bolder, Elongated Progress Bar
-                Box(Modifier.weight(1f).padding(horizontal = 8.dp)) {
-                    SyncProgressBar(syncStatus, Modifier.fillMaxWidth())
+                if (isLandscape) {
+                    // Landscape Mode: Progress Bar in the same row
+                    Box(Modifier.width(100.dp).padding(horizontal = 8.dp)) {
+                        SyncProgressBar(syncStatus, Modifier.fillMaxWidth())
+                    }
                 }
                 
                 if (timerRemaining != null) {
@@ -422,7 +431,6 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
 
 @Composable fun SongsTab(tracks: List<TrackEntity>, selectedIds: Set<String>, viewMode: LibraryViewMode, isLandscape: Boolean, listState: androidx.compose.foundation.lazy.LazyListState, gridState: androidx.compose.foundation.lazy.grid.LazyGridState, onTrackClick: (TrackEntity) -> Unit, onTrackLongClick: (TrackEntity) -> Unit, onOptions: (TrackEntity) -> Unit, onShuffleAll: () -> Unit, onPlayAll: () -> Unit, onToggleFavorite: (TrackEntity) -> Unit) {
     Column(Modifier.fillMaxSize()) {
-        if (selectedIds.isEmpty()) { Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (isLandscape) 4.dp else 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) { StellarActionButton(label = "Shuffle", icon = Icons.Default.Shuffle, modifier = Modifier.weight(1f), onClick = onShuffleAll); StellarActionButton(label = "Play", icon = Icons.Default.PlayArrow, modifier = Modifier.weight(1f), onClick = onPlayAll) } }
         if (viewMode == LibraryViewMode.GRID) LazyVerticalGrid(state = gridState, columns = GridCells.Adaptive(minSize = 100.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) { items(tracks) { StellarGridItem(it, it.id in selectedIds, onTrackClick, onTrackLongClick, { onToggleFavorite(it) }) } }
         else LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { items(tracks) { StellarTrackItem(it, it.id in selectedIds, { onTrackClick(it) }, { onTrackLongClick(it) }, { onOptions(it) }, { onToggleFavorite(it) }) } }
     }

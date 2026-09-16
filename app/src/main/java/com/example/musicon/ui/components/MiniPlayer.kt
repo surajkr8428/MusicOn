@@ -6,10 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +20,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import com.example.musicon.logic.formatSleepTime
@@ -50,11 +51,8 @@ fun MiniPlayer(
 
     val animatedWidth by animateDpAsState(targetValue = targetWidth, label = "width")
 
-    val currentPlayingTrack by viewModel.currentPlayingTrack.collectAsState()
-    val sleepTimerRemaining by viewModel.sleepTimerRemaining.collectAsState()
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var currentMediaItem by remember { mutableStateOf(player.currentMediaItem) }
-    var position by remember { mutableLongStateOf(player.currentPosition) }
 
     val listener = object : Player.Listener {
         override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
@@ -67,10 +65,7 @@ fun MiniPlayer(
     }
 
     LaunchedEffect(isPlaying) {
-        while (isPlaying) {
-            position = player.currentPosition
-            kotlinx.coroutines.delay(1000)
-        }
+        // Position update removed as it's not shown in the compact controls anymore
     }
 
     val isBright = LocalIsBackgroundBright.current
@@ -121,56 +116,38 @@ fun MiniPlayer(
                         text = currentMediaItem?.mediaMetadata?.title?.toString() ?: "No Song",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                         color = contentColor,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = currentMediaItem?.mediaMetadata?.artist?.toString() ?: "Unknown Artist",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = secondaryColor,
-                            maxLines = 1,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "${formatTime(position)} / ${formatTime(player.duration)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = contentColor.copy(alpha = 0.6f)
-                        )
-                        sleepTimerRemaining?.let { remaining ->
-                            Spacer(Modifier.width(8.dp))
-                            Surface(
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    text = formatSleepTime(remaining),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                )
-                            }
-                        }
+                    Text(
+                        text = currentMediaItem?.mediaMetadata?.artist?.toString() ?: "Unknown Artist",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = secondaryColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { player.seekToPrevious(); player.play() }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.SkipPrevious, null, tint = contentColor, modifier = Modifier.size(20.dp))
                     }
-                }
-                IconButton(onClick = { currentPlayingTrack?.let { viewModel.toggleFavorite(it) } }) {
-                    Icon(
-                        if (currentPlayingTrack?.isFavorite == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = null,
-                        tint = if (currentPlayingTrack?.isFavorite == true) Color.Red else (if (isBright) Color.DarkGray else Color(0xFFC3B1E1))
-                    )
-                }
-                IconButton(onClick = { if (isPlaying) player.pause() else player.play() }) {
-                    Icon(
-                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, 
-                        contentDescription = null,
-                        tint = contentColor
-                    )
+                    IconButton(onClick = { if (isPlaying) player.pause() else player.play() }, modifier = Modifier.size(40.dp)) {
+                        Icon(
+                            if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, 
+                            contentDescription = null,
+                            tint = contentColor,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    IconButton(onClick = { player.seekToNext(); player.play() }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.SkipNext, null, tint = contentColor, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
             
             // Progress Line
-            val progress = if (player.duration > 0) position.toFloat() / player.duration else 0f
+            val progress = if (player.duration > 0) player.currentPosition.toFloat() / player.duration else 0f
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
@@ -184,9 +161,4 @@ fun MiniPlayer(
     }
 }
 
-private fun formatTime(millis: Long): String {
-    val totalSeconds = millis / 1000
-    val minutes = totalSeconds / 60
-    val seconds = totalSeconds % 60
-    return String.format("%d:%02d", minutes, seconds)
-}
+// Time formatting helper removed
