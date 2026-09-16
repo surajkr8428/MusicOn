@@ -17,19 +17,16 @@ import com.example.musicon.data.SettingsRepository
 import com.example.musicon.data.remote.CloudStorageManager
 import com.example.musicon.logic.audio.AudioEffectsManager
 import com.example.musicon.widget.MusicWidgetProvider
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 
 class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private var effectsManager: AudioEffectsManager? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var cloudManager: CloudStorageManager
+    private var positionSavingJob: Job? = null
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
@@ -104,6 +101,21 @@ class PlaybackService : MediaSessionService() {
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(pendingIntent)
             .build()
+            
+        startPositionSaving(player, settingsRepository)
+    }
+
+    private fun startPositionSaving(player: Player, settings: SettingsRepository) {
+        positionSavingJob?.cancel()
+        positionSavingJob = serviceScope.launch {
+            while (isActive) {
+                val trackId = player.currentMediaItem?.mediaId
+                if (trackId != null) {
+                    settings.updateLastPlaybackState(trackId, player.currentPosition)
+                }
+                delay(2000) // Save every 2 seconds
+            }
+        }
     }
 
     private fun observeEffectsSettings(settings: SettingsRepository) {

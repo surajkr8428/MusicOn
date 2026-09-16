@@ -1,8 +1,8 @@
-- `[/]` App Icon, MiniPlayer Controls & UI Refinement
-    - `[ ]` Replace app icon with provided image in `res/mipmap`
-    - `[ ]` Add Previous, Play/Pause, and Next buttons to `MiniPlayer.kt`
-    - `[ ]` Relocate `SyncProgressBar` in `LibraryScreen.kt`
-    - `[ ]` Remove Shuffle/Play buttons from `LibraryScreen.kt`
-    - `[ ]` Ensure startup persistence for the last played song in `MainViewModel.kt`
-- `[ ]` Verify all UI changes and functionality
+- `[/]` Final Raag UI Polish & Feature Reliability
+    - `[ ]` Refactor `MiniPlayer.kt` with Skip Previous, Play/Pause, and Skip Next buttons
+    - `[ ]` Fix `LibraryScreen.kt` header to stretch progress bar and align "Raag" branding
+    - `[ ]` Add "More" options to playlists in `LibraryScreen.kt` (Grid & List)
+    - `[ ]` Implement robust `shareTrack` and `sharePlaylist` in `MainViewModel.kt`
+    - `[ ]` Ensure Song Info dialog is high-fidelity
+- `[ ]` Verify all interactive UI components
 - `[ ]` Create final walkthrough

@@ -6,8 +6,17 @@ import kotlinx.coroutines.flow.asStateFlow
 
 sealed class SyncStatus {
     object Idle : SyncStatus()
-    data class Loading(val message: String, val progress: Float = -1f) : SyncStatus()
-    data class Success(val message: String) : SyncStatus()
+    data class Loading(
+        val message: String, 
+        val progress: Float = -1f,
+        val current: Int = 0,
+        val total: Int = 0
+    ) : SyncStatus()
+    data class Success(
+        val message: String,
+        val uploaded: Int = 0,
+        val failed: Int = 0
+    ) : SyncStatus()
     data class Error(val message: String) : SyncStatus()
 }
 

@@ -101,7 +101,7 @@ class MainViewModel(
     }
 
     val lastPosition: StateFlow<Long> = settingsRepository.lastPositionFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), -1L)
 
     // Equalizer & FX
     val eqEnabled: StateFlow<Boolean> = settingsRepository.eqEnabledFlow
@@ -364,6 +364,84 @@ class MainViewModel(
         }
     }
 
+    fun shareTrack(track: TrackEntity) {
+        val path = track.localPath ?: return
+        val file = java.io.File(path)
+        if (!file.exists()) return
+        val uri = FileProvider.getUriForFile(settingsRepository.context, "${settingsRepository.context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "audio/*"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        settingsRepository.context.startActivity(Intent.createChooser(intent, "Share Song").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    fun shareTracks(tracks: List<TrackEntity>) {
+        if (tracks.isEmpty()) return
+        val uris = ArrayList<Uri>()
+        tracks.forEach { track ->
+            track.localPath?.let { path ->
+                val file = java.io.File(path)
+                if (file.exists()) {
+                    uris.add(FileProvider.getUriForFile(settingsRepository.context, "${settingsRepository.context.packageName}.fileprovider", file))
+                }
+            }
+        }
+        if (uris.isEmpty()) return
+        
+        val intent = Intent(if (uris.size == 1) Intent.ACTION_SEND else Intent.ACTION_SEND_MULTIPLE).apply {
+            type = "audio/*"
+            if (uris.size == 1) putExtra(Intent.EXTRA_STREAM, uris[0])
+            else putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        settingsRepository.context.startActivity(Intent.createChooser(intent, "Share Songs").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    fun renamePlaylist(playlistId: String, newName: String) {
+        viewModelScope.launch {
+            val playlists = allPlaylists.value
+            val playlist = playlists.find { it.id == playlistId } ?: return@launch
+            musicRepository.updatePlaylist(playlist.copy(name = newName))
+        }
+    }
+
+    fun deletePlaylist(playlist: Playlist) {
+        viewModelScope.launch {
+            musicRepository.deletePlaylist(playlist)
+        }
+    }
+
+    fun sharePlaylist(playlist: Playlist) {
+        viewModelScope.launch {
+            val tracks = musicRepository.getTracksForPlaylist(playlist.id).first()
+            if (tracks.isEmpty()) return@launch
+            
+            val uris = ArrayList<Uri>()
+            tracks.forEach { track ->
+                track.localPath?.let { path ->
+                    val file = java.io.File(path)
+                    if (file.exists()) {
+                        uris.add(FileProvider.getUriForFile(settingsRepository.context, "${settingsRepository.context.packageName}.fileprovider", file))
+                    }
+                }
+            }
+            
+            if (uris.isEmpty()) return@launch
+            
+            val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "audio/*"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            settingsRepository.context.startActivity(Intent.createChooser(intent, "Share Playlist").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
     private suspend fun refreshStats() {
         _recentlyPlayed.value = musicRepository.getRecentlyPlayed(20)
         _mostPlayed.value = musicRepository.getMostPlayed(20)
@@ -417,13 +495,39 @@ class MainViewModel(
 
     fun bulkUpload(tracks: List<TrackEntity>) {
         viewModelScope.launch {
+            val total = tracks.size
+            var uploaded = 0
+            var failed = 0
+            
             tracks.forEach { track ->
                 if (track.localPath != null) {
-                    android.util.Log.d("MainViewModel", "Bulk Uploading: ${track.displayName}")
-                    uploadTrack(track)
+                    val currentProgress = (uploaded + failed).toFloat() / total
+                    com.example.musicon.data.remote.CloudSyncManager.updateStatus(
+                        com.example.musicon.data.remote.SyncStatus.Loading(
+                            message = "Uploading ${track.displayName}",
+                            progress = currentProgress,
+                            current = uploaded + failed + 1,
+                            total = total
+                        )
+                    )
+                    
+                    try {
+                        uploadTrack(track)
+                        uploaded++
+                    } catch (e: Exception) {
+                        failed++
+                    }
                     delay(800)
                 }
             }
+            
+            com.example.musicon.data.remote.CloudSyncManager.updateStatus(
+                com.example.musicon.data.remote.SyncStatus.Success(
+                    message = "Upload Finished",
+                    uploaded = uploaded,
+                    failed = failed
+                )
+            )
         }
     }
 
@@ -532,15 +636,15 @@ class MainViewModel(
                 }
             }
             
-            // Wait for tracks to be available and load initial queue
-            val tracks = musicRepository.allTracks.first()
-            if (tracks.isNotEmpty()) {
+            // Wait for tracks to be available (useful if scanning is ongoing)
+            allTracks.filter { it.isNotEmpty() }.first().let { tracks ->
                 val lastTrackId = settingsRepository.lastTrackIdFlow.first()
+                val lastPos = settingsRepository.lastPositionFlow.first()
                 val startTrack = tracks.find { it.id == lastTrackId } ?: tracks.first()
                 
                 _currentPlayingTrackId.value = startTrack.id
                 _playbackQueue.value = tracks
-                android.util.Log.d("MainViewModel", "Startup: Loaded ${tracks.size} tracks into queue. Default: ${startTrack.displayName}")
+                android.util.Log.d("MainViewModel", "Startup: Loaded ${tracks.size} tracks into queue. Default: ${startTrack.displayName}, position: $lastPos")
             }
             
             refreshStats()

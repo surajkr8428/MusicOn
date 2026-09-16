@@ -129,24 +129,25 @@ fun PlayerScreen(
         // Full Screen Background (Back Layer)
         if (imageMode == PlayerImageMode.FULL_SCREEN && currentTrack != null) {
             val trackForBg = currentTrack 
-            val artworkUri = remember(trackForBg.id) {
+            val artworkUri = remember(trackForBg.id, trackForBg.customCoverPath) {
                 val path = trackForBg.customCoverPath ?: trackForBg.localPath
                 if (path != null) {
-                    if (path.startsWith("content://")) Uri.parse(path) else File(path)
-                } else {
-                    R.drawable.ic_launcher_foreground
-                }
+                    if (path.startsWith("content://") || path.startsWith("http")) Uri.parse(path) else File(path)
+                } else null
             }
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(artworkUri)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)))
+            
+            if (artworkUri != null) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(artworkUri)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)))
+            }
         }
 
         // Mid Layer: Stellar Background
@@ -492,19 +493,31 @@ fun PlayerLayoutPortrait(
                 }
 
                 Box(contentAlignment = Alignment.Center) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(artworkUri ?: R.drawable.ic_launcher_foreground)
-                            .crossfade(true)
-                            .build(), 
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxSize(0.85f)
-                            .aspectRatio(1f)
-                            .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
-                            .rotate(if (imageMode == PlayerImageMode.ROTATION && isPlaying) rotation else 0f),
-                        contentScale = ContentScale.Crop
-                    )
+                    val hasImage = artworkUri != null
+                    
+                    if (hasImage) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(artworkUri)
+                                .crossfade(true)
+                                .build(), 
+                            contentDescription = null,
+                            modifier = Modifier
+                                .fillMaxSize(0.85f)
+                                .aspectRatio(1f)
+                                .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
+                                .rotate(if (imageMode == PlayerImageMode.ROTATION && isPlaying) rotation else 0f),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        // Fallback: Show static high-fidelity icon with NO rotation/rectangle
+                        Icon(
+                            Icons.Default.MusicNote,
+                            null,
+                            tint = primaryColor.copy(alpha = 0.6f),
+                            modifier = Modifier.size(120.dp)
+                        )
+                    }
                     
                     if (currentTrack.customCoverPath == null) {
                         IconButton(
@@ -608,19 +621,30 @@ fun PlayerLayoutLandscape(
                     }
 
                     Box(contentAlignment = Alignment.Center) {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(artworkUri ?: R.drawable.ic_launcher_foreground)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxHeight(0.9f)
-                                .aspectRatio(1f)
-                                .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
-                                .rotate(if (imageMode == PlayerImageMode.ROTATION && isPlaying) rotation else 0f),
-                            contentScale = ContentScale.Crop
-                        )
+                        val hasImage = artworkUri != null
+                        
+                        if (hasImage) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(artworkUri)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxHeight(0.9f)
+                                    .aspectRatio(1f)
+                                    .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
+                                    .rotate(if (imageMode == PlayerImageMode.ROTATION && isPlaying) rotation else 0f),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.MusicNote,
+                                null,
+                                tint = primaryColor.copy(alpha = 0.6f),
+                                modifier = Modifier.size(100.dp)
+                            )
+                        }
                     }
                 }
             }

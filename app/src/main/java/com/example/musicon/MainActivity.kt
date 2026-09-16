@@ -18,6 +18,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -27,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
@@ -65,6 +67,7 @@ import com.example.musicon.data.local.TrackEntity
 import com.example.musicon.ui.theme.ThemeMode
 import com.example.musicon.data.remote.CloudSyncManager
 import com.example.musicon.ui.components.MiniPlayer
+import com.example.musicon.ui.components.RenameDialog
 import com.example.musicon.ui.screens.*
 import com.example.musicon.ui.theme.MusicOnTheme
 import com.example.musicon.ui.viewmodel.MainViewModel
@@ -73,7 +76,9 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -187,20 +192,27 @@ class MainActivity : ComponentActivity() {
                 // Auto-populate player if empty on startup
                 if (controller.mediaItemCount == 0) {
                     launch {
-                        snapshotFlow { viewModel.playbackQueue.value }
-                            .filter { it.isNotEmpty() }
-                            .first()
-                            .let { initialTracks ->
-                                val currentId = viewModel.currentPlayingTrack.value?.id
-                                val lastPos = viewModel.lastPosition.value
-                                val mediaItems = initialTracks.map { it.toMediaItem() }
-                                val startIndex = initialTracks.indexOfFirst { it.id == currentId }.coerceAtLeast(0)
-                                
-                                android.util.Log.d("MusicOn", "Startup: Auto-loading ${mediaItems.size} items. Start index: $startIndex, position: $lastPos")
-                                controller.setMediaItems(mediaItems)
-                                controller.seekTo(startIndex, lastPos)
-                                controller.prepare()
-                            }
+                        // Wait for both queue and lastPosition to be initialized from DataStore
+                        val startupData = combine(
+                            viewModel.playbackQueue,
+                            viewModel.lastPosition,
+                            viewModel.currentPlayingTrack
+                        ) { queue, pos, track ->
+                            if (queue.isNotEmpty() && pos != -1L) Triple(queue, pos, track) else null
+                        }.filterNotNull().first()
+                        
+                        val initialTracks = startupData.first
+                        val lastPos = startupData.second
+                        val currentTrack = startupData.third
+                        
+                        val mediaItems = initialTracks.map { it.toMediaItem() }
+                        // Match currentPlayingTrack or default to first
+                        val startIndex = initialTracks.indexOfFirst { it.id == currentTrack?.id }.coerceAtLeast(0)
+                        
+                        android.util.Log.d("MusicOn", "Startup: Auto-loading ${mediaItems.size} items. Start index: $startIndex, position: $lastPos")
+                        controller.setMediaItems(mediaItems)
+                        controller.seekTo(startIndex, lastPos)
+                        controller.prepare()
                     }
                 }
 
@@ -321,7 +333,16 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     } else {
-                        Box(Modifier.fillMaxSize().background(Color(0xFF0D0B1F)))
+                        Box(Modifier.fillMaxSize().background(Color(0xFF0D0B1F)), contentAlignment = Alignment.Center) {
+
+                         continuue   // Using foreground vector to avoid adaptive icon XML crash
+                            Icon(
+                                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground),
+                                contentDescription = null,
+                                modifier = Modifier.size(120.dp),
+                                tint = Color.White
+                            )
+                        }
                     }
                 }
             }
@@ -556,12 +577,6 @@ fun MusicOnApp(
         }
         if (showSignInPrompt) AlertDialog(onDismissRequest = { showSignInPrompt = false }, title = { Text("Sign in Required") }, text = { Text("Please sign in with Google to use cloud features.") }, confirmButton = { Button(onClick = { showSignInPrompt = false; onSignInClick() }) { Text("Sign In") } }, dismissButton = { TextButton(onClick = { showSignInPrompt = false }) { Text("Cancel") } })
     }
-}
-
-@Composable
-fun RenameDialog(initialName: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-    var name by remember { mutableStateOf(initialName) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Rename", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) }, text = { OutlinedTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedTextColor = MaterialTheme.colorScheme.onSurface, unfocusedTextColor = MaterialTheme.colorScheme.onSurface, focusedBorderColor = MaterialTheme.colorScheme.primary, unfocusedBorderColor = Color.Gray)) }, confirmButton = { Button(onClick = { onConfirm(name) }) { Text("Rename") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Color.Gray) } })
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)

@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.media3.common.Player
 import coil.compose.AsyncImage
 import com.example.musicon.logic.formatSleepTime
+import kotlinx.coroutines.delay
 
 @Composable
 fun MiniPlayer(
@@ -51,8 +52,10 @@ fun MiniPlayer(
 
     val animatedWidth by animateDpAsState(targetValue = targetWidth, label = "width")
 
+    val currentPlayingTrack by viewModel.currentPlayingTrack.collectAsState()
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var currentMediaItem by remember { mutableStateOf(player.currentMediaItem) }
+    var position by remember { mutableLongStateOf(player.currentPosition) }
 
     val listener = object : Player.Listener {
         override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
@@ -65,7 +68,10 @@ fun MiniPlayer(
     }
 
     LaunchedEffect(isPlaying) {
-        // Position update removed as it's not shown in the compact controls anymore
+        while (isPlaying) {
+            position = player.currentPosition
+            delay(1000)
+        }
     }
 
     val isBright = LocalIsBackgroundBright.current
@@ -85,8 +91,8 @@ fun MiniPlayer(
                 .align(if (isLeftMenuOpen) Alignment.BottomEnd else if (isRightSidebarOpen) Alignment.BottomStart else Alignment.BottomCenter)
                 .padding(vertical = if (isLeftMenuOpen || isRightSidebarOpen) 0.dp else 4.dp)
                 .padding(
-                    start = if (isLeftMenuOpen) 0.dp else 8.dp,
-                    end = if (isRightSidebarOpen) 0.dp else 8.dp
+                    start = if (isLeftMenuOpen || isRightSidebarOpen) 0.dp else 8.dp,
+                    end = if (isLeftMenuOpen || isRightSidebarOpen) 0.dp else 8.dp
                 )
                 .height(64.dp)
                 .clip(playerShape)
@@ -129,19 +135,19 @@ fun MiniPlayer(
                 }
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { player.seekToPrevious(); player.play() }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.SkipPrevious, null, tint = contentColor, modifier = Modifier.size(20.dp))
+                    IconButton(onClick = { player.seekToPrevious(); player.play() }) {
+                        Icon(Icons.Default.SkipPrevious, null, tint = contentColor, modifier = Modifier.size(24.dp))
                     }
-                    IconButton(onClick = { if (isPlaying) player.pause() else player.play() }, modifier = Modifier.size(40.dp)) {
+                    IconButton(onClick = { if (isPlaying) player.pause() else player.play() }) {
                         Icon(
                             if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, 
                             contentDescription = null,
                             tint = contentColor,
-                            modifier = Modifier.size(28.dp)
+                            modifier = Modifier.size(32.dp)
                         )
                     }
-                    IconButton(onClick = { player.seekToNext(); player.play() }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.SkipNext, null, tint = contentColor, modifier = Modifier.size(20.dp))
+                    IconButton(onClick = { player.seekToNext(); player.play() }) {
+                        Icon(Icons.Default.SkipNext, null, tint = contentColor, modifier = Modifier.size(24.dp))
                     }
                 }
             }

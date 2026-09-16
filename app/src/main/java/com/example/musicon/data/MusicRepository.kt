@@ -189,6 +189,14 @@ class MusicRepository(
         playlistDao.removeTrackFromPlaylist(playlistId, trackId)
     }
 
+    suspend fun updatePlaylist(playlist: Playlist) {
+        playlistDao.updatePlaylist(playlist)
+    }
+
+    suspend fun deletePlaylist(playlist: Playlist) {
+        playlistDao.deletePlaylist(playlist)
+    }
+
     fun getTracksForPlaylist(playlistId: String): Flow<List<TrackEntity>> {
         return playlistDao.getTracksForPlaylist(playlistId)
     }
