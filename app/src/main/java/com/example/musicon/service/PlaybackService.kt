@@ -83,6 +83,14 @@ class PlaybackService : MediaSessionService() {
 
             override fun onEvents(player: Player, events: Player.Events) {
                 if (events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_PLAY_WHEN_READY_CHANGED)) {
+                    // Save state on any significant event
+                    val trackId = player.currentMediaItem?.mediaId
+                    if (trackId != null) {
+                        serviceScope.launch {
+                            settingsRepository.updateLastPlaybackState(trackId, player.currentPosition)
+                        }
+                    }
+
                     if (effectsManager == null) {
                         val sessionId = (player as? ExoPlayer)?.audioSessionId ?: 0
                         if (sessionId != 0) {

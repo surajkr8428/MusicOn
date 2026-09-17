@@ -251,12 +251,13 @@ fun LibraryScreen(
                 when (action) {
                     "play" -> {
                         scope.launch {
-                            val tracks = viewModel.getTracksForPlaylist(selectedPlaylistOptions!!.id).first()
-                            if (tracks.isNotEmpty()) viewModel.playTrackList(tracks, tracks.first())
+                            val pid = selectedPlaylistOptions?.id ?: return@launch
+                            val pTracks = viewModel.getTracksForPlaylist(pid).first()
+                            if (pTracks.isNotEmpty()) viewModel.playTrackList(pTracks, pTracks.first())
                         }
                     }
                     "rename" -> { playlistToRename = selectedPlaylistOptions }
-                    "share" -> { viewModel.sharePlaylist(selectedPlaylistOptions!!) }
+                    "share" -> { selectedPlaylistOptions?.let { viewModel.sharePlaylist(it) } }
                     "remove" -> { playlistToRemoveConfirm = selectedPlaylistOptions }
                     "delete" -> { playlistToDeleteConfirm = selectedPlaylistOptions }
                 }
@@ -344,12 +345,12 @@ fun LibraryTopBar(
                     Icon(
                         painter = androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground),
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(28.dp),
                         tint = Color.White
                     )
-                    
+
                     // Stretched Progress Bar from Icon to Header Actions (Settings)
-                    SyncProgressBar(syncStatus, Modifier.weight(1f).padding(horizontal = 16.dp))
+                    SyncProgressBar(syncStatus, Modifier.weight(1f).padding(horizontal = 12.dp))
                 }
                 
                 if (timerRemaining != null) {
@@ -473,9 +474,9 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
             val uploaded = syncStatus.uploaded
             val failed = syncStatus.failed
             val text = if (uploaded > 0 || failed > 0) {
-                "Upload complete! $uploaded up, $failed failed"
+                "Upload finished! $uploaded successful, $failed failed"
             } else {
-                "Complete"
+                "Sync Complete"
             }
             Text(
                 text = text,
@@ -485,7 +486,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
             )
         } else if (syncStatus is com.example.musicon.data.remote.SyncStatus.Loading && syncStatus.total > 0) {
             Text(
-                text = "${syncStatus.current} / ${syncStatus.total} songs",
+                text = "Uploading: ${syncStatus.current} / ${syncStatus.total}",
                 color = Color.Black,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold

@@ -334,8 +334,7 @@ class MainActivity : ComponentActivity() {
                         }
                     } else {
                         Box(Modifier.fillMaxSize().background(Color(0xFF0D0B1F)), contentAlignment = Alignment.Center) {
-
-                         continuue   // Using foreground vector to avoid adaptive icon XML crash
+                            // Using foreground vector to avoid adaptive icon XML crash
                             Icon(
                                 painter = androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground),
                                 contentDescription = null,

@@ -360,6 +360,8 @@ class MainViewModel(
         _currentPlayingTrackId.value = trackId
         viewModelScope.launch {
             musicRepository.recordTrackPlayed(trackId)
+            // Immediately save track change to persistence
+            settingsRepository.updateLastPlaybackState(trackId, 0L)
             refreshStats()
         }
     }

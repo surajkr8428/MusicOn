@@ -494,6 +494,8 @@ fun PlayerLayoutPortrait(
 
                 Box(contentAlignment = Alignment.Center) {
                     val hasImage = artworkUri != null
+                    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+                    val fallbackColor = if (isBright) Color.Black else Color.White
                     
                     if (hasImage) {
                         AsyncImage(
@@ -510,12 +512,12 @@ fun PlayerLayoutPortrait(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        // Fallback: Show static high-fidelity icon with NO rotation/rectangle
+                        // NO image: Hide disc/rect, show clean note icon
                         Icon(
-                            Icons.Default.MusicNote,
-                            null,
-                            tint = primaryColor.copy(alpha = 0.6f),
-                            modifier = Modifier.size(120.dp)
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = fallbackColor.copy(alpha = 0.4f),
+                            modifier = Modifier.size(160.dp)
                         )
                     }
                     
@@ -622,6 +624,8 @@ fun PlayerLayoutLandscape(
 
                     Box(contentAlignment = Alignment.Center) {
                         val hasImage = artworkUri != null
+                        val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+                        val fallbackColor = if (isBright) Color.Black else Color.White
                         
                         if (hasImage) {
                             AsyncImage(
@@ -639,10 +643,10 @@ fun PlayerLayoutLandscape(
                             )
                         } else {
                             Icon(
-                                Icons.Default.MusicNote,
-                                null,
-                                tint = primaryColor.copy(alpha = 0.6f),
-                                modifier = Modifier.size(100.dp)
+                                imageVector = Icons.Default.MusicNote,
+                                contentDescription = null,
+                                tint = fallbackColor.copy(alpha = 0.4f),
+                                modifier = Modifier.size(110.dp)
                             )
                         }
                     }
