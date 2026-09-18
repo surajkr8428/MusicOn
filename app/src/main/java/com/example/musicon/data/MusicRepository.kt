@@ -40,8 +40,11 @@ class MusicRepository(
             val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
             
             val existingTracks = trackDao.getAllTracks().first()
+            
+            fun String.normalize() = this.lowercase().removeSuffix(".mp3").trim()
+            
             val existingFingerprints = existingTracks.map { 
-                "${it.displayName.lowercase().trim()}_${it.displayArtist.lowercase().trim()}" 
+                "${it.displayName.normalize()}_${it.displayArtist.normalize()}" 
             }.toSet()
             val existingPaths = existingTracks.mapNotNull { it.localPath?.lowercase() }.toSet()
 
@@ -98,10 +101,12 @@ class MusicRepository(
             val allLocalTracks = trackDao.getAllTracks().first()
             
             cloudFiles.forEach { file ->
-                // Duplicate Protection
+                fun String.normalize() = this.lowercase().removeSuffix(".mp3").trim()
+                val cleanCloudName = file.name.normalize()
+                
                 val local = allLocalTracks.find { 
-                    it.title.equals(file.name, ignoreCase = true) || 
-                    it.displayName.equals(file.name, ignoreCase = true) ||
+                    it.displayName.normalize() == cleanCloudName ||
+                    it.title.normalize() == cleanCloudName ||
                     it.gDriveId == file.id
                 }
                 
@@ -110,7 +115,7 @@ class MusicRepository(
                     trackDao.insertTrack(
                         TrackEntity(
                             id = file.id,
-                            title = file.name,
+                            title = file.name.removeSuffix(".mp3"),
                             artist = "Cloud Artist",
                             album = "Google Drive",
                             duration = 0,
@@ -120,10 +125,13 @@ class MusicRepository(
                         )
                     )
                 } else {
-                    // Update thumbnail if missing
-                    if (local.customCoverPath == null && file.thumbnailLink != null) {
-                        trackDao.updateTrack(local.copy(customCoverPath = file.thumbnailLink))
-                    }
+                    // Merging: Update existing entry with cloud link
+                    android.util.Log.d("MusicRepository", "Linking cloud file to existing track: ${local.displayName}")
+                    val updatedLocal = local.copy(
+                        gDriveId = file.id,
+                        customCoverPath = local.customCoverPath ?: file.thumbnailLink
+                    )
+                    trackDao.updateTrack(updatedLocal)
                 }
             }
             android.util.Log.d("MusicRepository", "Cloud sync completed successfully")

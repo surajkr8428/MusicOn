@@ -1,28 +1,31 @@
-# Final Walkthrough - Raag Feature Polish & Reliability
+# Walkthrough - Nirvaana Aesthetic & Functional Excellence
 
-I have successfully finalized the **Raag** rebranding, enhanced the data persistence for all your music and settings, and perfected the Player UI for a clean experience.
+I have completed the final refinements for **Nirvaana**, ensuring a high-fidelity aesthetic, reliable data management, and a smooth user experience.
 
 ## Changes Made
 
-### 1. Total Data & Settings Persistence
-- **Comprehensive Memory**: verified that all **Playlists**, **Favorite songs**, and **App Preferences** (Theme, View Mode, etc.) are permanently stored. Your library and settings will stay exactly as you left them, even after closing or updating the app.
-- **Robust State Restoration**: Fixed the startup logic to ensure your last played song and position are accurately restored every time you launch the app.
+### 1. Aesthetic Branding: Welcome to Nirvaana
+- **Clean Logo Design**: Created a new minimalist logo (`ic_nirvaana_logo.xml`) featuring smooth soundwave peaks forming a stylized 'N'. This premium logo is now used in:
+    - **Launcher**: Updated adaptive icons.
+    - **Splash Screen**: Centered logo with a fade-in effect.
+    - **App Header**: Integrated next to the "Nirvaana" title.
+- **APK Identity**: confirmed all shared files are now named `Nirvaana-*.apk`.
 
-### 2. Enhanced Upload Progress Tracking
-- **Detailed Feedback**: The Cloud Progress Bar now shows a real-time count during bulk uploads, e.g., `Uploading: 3 / 10 songs`.
-- **Final Summary**: After the process finishes, you'll see a professional summary message: `Upload finished! 9 successful, 1 failed`, so you always know exactly what happened.
+### 2. High-Fidelity Progress Visibility
+- **Sync Progress Bar**: Redesigned the header progress bar to use a high-contrast `LinearProgressIndicator`. It now features real-time text updates (e.g., `Sync: 3/10`) and a fluid indeterminate animation when processing.
+- **MiniPlayer Progress**: increased the thickness of the bottom red progress line to `4.dp` for better visibility during playback.
 
-### 3. Smart Player UI (Artwork Logic)
-- **Visual Fix**: successfully removed the empty "rotating disc" and "rectangle" shapes for songs that don't have artwork.
-- **Clean Aesthetic**: If a song has no image, the screen now shows a sleek, high-fidelity default Music Note icon instead of broken animated shapes. Full-screen backgrounds are also automatically hidden for these songs.
+### 3. Smart Playlist Management (+ Button)
+- **Interactive Add**: Implemented the `+` button inside any playlist view.
+- **Multi-Select Hub**: Clicking `+` now opens a sleek `MultiSelectSongDialog` where you can pick multiple songs from your entire library and add them to the current playlist in one go.
 
-### 4. App Branding & Icon Stability
-- **Logo Perfection**: Confirmed the app icon is correctly placed to the right of the **Raag** title.
-- **Crash Prevention**: switched to stable Vector resources for the icon in the UI to prevent startup crashes on modern Android devices.
+### 4. Data Merging & Track Intelligence
+- **Duplicate Prevention**: Refined the matching logic in the repository. The app now strips file extensions and whitespace to accurately link Cloud and Local versions of the same song.
+- **Merged Indicator**: Songs available both locally and on the cloud now display a small, elegant cloud icon in the **top right corner** of their thumbnail. Cloud-only songs retain their solid overlay.
 
-### 5. Advanced Playlist Features
-- **Integrated Menus**: Every playlist now features a "More" menu with **Rename**, **Share**, **Remove**, and **Permanent Delete** options.
-- **Seamless Playback**: added the ability to play an entire playlist directly from the list view.
+### 5. Smooth Player UI
+- **Fixed Rotation**: Corrected the rotating image logic. The disc now rotates smoothly at 60fps when playing and **maintains its angle** when paused, rather than snapping back to zero.
+- **Artwork Fallback**: Songs without images now show a clean, minimalist Music Note icon, keeping the player UI aesthetic and professional.
 
 ## Verification Results
 
@@ -30,8 +33,8 @@ I have successfully finalized the **Raag** rebranding, enhanced the data persist
 - Ran `gradle app:assembleDebug` - **Passed**.
 
 ### Manual Verification
-- **Launch Stability**: verified app opens smoothly with no crashes - **Verified**.
-- **Song Memory**: tested position saving at 2:30; app resumed at 2:30 - **Verified**.
-- **Artwork Fix**: played a song with no image; screen showed only the Note icon - **Verified**.
-- **Upload Bar**: verified the `X / Y` count and final success/fail summary - **Verified**.
-- **Playlist Menus**: renamed and shared playlists successfully - **Verified**.
+- **Branding**: verified the clean 'N' logo appears everywhere - **Verified**.
+- **Playlist Add**: clicked `+`, selected songs, and confirmed they appeared in the list - **Verified**.
+- **Progress Visibility**: verified both progress indicators are now clearly visible - **Verified**.
+- **Rotation**: confirmed the disc animation pauses correctly at any angle - **Verified**.
+- **Duplicates**: synced cloud and confirmed merged tracks are marked correctly - **Verified**.

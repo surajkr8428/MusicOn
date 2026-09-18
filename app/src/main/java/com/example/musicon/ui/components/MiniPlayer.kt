@@ -67,10 +67,14 @@ fun MiniPlayer(
         onDispose { player.removeListener(listener) }
     }
 
-    LaunchedEffect(isPlaying) {
-        while (isPlaying) {
+    LaunchedEffect(player, isPlaying) {
+        if (isPlaying) {
+            while (true) {
+                position = player.currentPosition
+                delay(500) // Update twice a second for smoothness
+            }
+        } else {
             position = player.currentPosition
-            delay(1000)
         }
     }
 
@@ -98,11 +102,10 @@ fun MiniPlayer(
                 .clip(playerShape)
                 .background(if (isBright) Color.White.copy(0.95f) else Color(0xFF1E1B36))
                 .clickable { onNavigateToPlayer() }
-                .padding(8.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize().padding(8.dp)
             ) {
                 AsyncImage(
                     model = currentMediaItem?.mediaMetadata?.artworkUri,
@@ -152,16 +155,16 @@ fun MiniPlayer(
                 }
             }
             
-            // Progress Line
-            val progress = if (player.duration > 0) player.currentPosition.toFloat() / player.duration else 0f
+            // Progress Line - Reactive fix
+            val progress = if (player.duration > 0) position.toFloat() / player.duration else 0f
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .height(2.dp),
+                    .height(4.dp),
                 color = Color.Red,
-                trackColor = Color.Transparent
+                trackColor = Color.White.copy(alpha = 0.1f)
             )
         }
     }

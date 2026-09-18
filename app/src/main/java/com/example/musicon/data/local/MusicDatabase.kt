@@ -25,7 +25,6 @@ abstract class MusicDatabase : RoomDatabase() {
                     MusicDatabase::class.java,
                     "music_database"
                 )
-                .fallbackToDestructiveMigration() // For development simplicity
                 .build()
                 INSTANCE = instance
                 instance

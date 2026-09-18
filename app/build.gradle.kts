@@ -46,7 +46,7 @@ android {
 androidComponents {
     onVariants { variant ->
         variant.outputs.forEach { output ->
-            val name = "MusicOn-${variant.name}.apk"
+            val name = "Nirvaana-${variant.name}.apk"
             output.outputFileName.set(name)
         }
     }

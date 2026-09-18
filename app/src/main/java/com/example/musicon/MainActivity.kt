@@ -334,12 +334,12 @@ class MainActivity : ComponentActivity() {
                         }
                     } else {
                         Box(Modifier.fillMaxSize().background(Color(0xFF0D0B1F)), contentAlignment = Alignment.Center) {
-                            // Using foreground vector to avoid adaptive icon XML crash
+                            // Using the new high-fidelity Nirvaana logo
                             Icon(
-                                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_launcher_foreground),
+                                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_nirvaana_logo),
                                 contentDescription = null,
-                                modifier = Modifier.size(120.dp),
-                                tint = Color.White
+                                modifier = Modifier.size(140.dp),
+                                tint = Color.Unspecified
                             )
                         }
                     }
@@ -451,7 +451,7 @@ fun MusicOnApp(
                     if (shareDir.exists()) shareDir.deleteRecursively()
                     shareDir.mkdirs()
                     
-                    val destFile = File(shareDir, "MusicOn.apk")
+                    val destFile = File(shareDir, "Nirvaana.apk")
                     sourceFile.copyTo(destFile, overwrite = true)
                     destFile.setReadable(true, false)
                     
@@ -463,9 +463,9 @@ fun MusicOnApp(
                         type = "application/vnd.android.package-archive"
                         putExtra(android.content.Intent.EXTRA_STREAM, uri)
                         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        clipData = android.content.ClipData.newRawUri("MusicOn APK", uri)
+                        clipData = android.content.ClipData.newRawUri("Nirvaana APK", uri)
                     }
-                    val chooser = android.content.Intent.createChooser(intent, "Share MusicOn APK")
+                    val chooser = android.content.Intent.createChooser(intent, "Share Nirvaana APK")
                     chooser.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                     chooser.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     context.startActivity(chooser)
@@ -516,7 +516,7 @@ fun MusicOnApp(
                             HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                             val primaryColor = MaterialTheme.colorScheme.primary
                             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("MusicOn", style = MaterialTheme.typography.headlineMedium.copy(color = primaryColor, fontWeight = FontWeight.Bold))
+                                Text("Nirvaana", style = MaterialTheme.typography.headlineMedium.copy(color = primaryColor, fontWeight = FontWeight.Bold))
                                 IconButton(onClick = { if (!isUserSignedIn) showSignInPrompt = true else scope.launch { leftDrawerState.close(); viewModel.syncAllLocalToCloud() } }) { Icon(Icons.Default.CloudSync, "Sync All to Cloud", tint = primaryColor) }
                             }
                             HorizontalDivider(color = Color.White.copy(alpha = 0.1f))

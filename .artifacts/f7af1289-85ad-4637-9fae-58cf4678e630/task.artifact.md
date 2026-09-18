@@ -1,8 +1,7 @@
-- `[/]` Final Raag UI Polish & Feature Reliability
-    - `[ ]` Refactor `MiniPlayer.kt` with Skip Previous, Play/Pause, and Skip Next buttons
-    - `[ ]` Fix `LibraryScreen.kt` header to stretch progress bar and align "Raag" branding
-    - `[ ]` Add "More" options to playlists in `LibraryScreen.kt` (Grid & List)
-    - `[ ]` Implement robust `shareTrack` and `sharePlaylist` in `MainViewModel.kt`
-    - `[ ]` Ensure Song Info dialog is high-fidelity
-- `[ ]` Verify all interactive UI components
+- `[/]` Final Aesthetic Branding & Functional UX
+    - `[ ]` Refactor `ic_nirvaana_logo.xml` for maximum aesthetic appeal
+    - `[ ]` Implement `MultiSelectSongDialog` in `LibraryScreen.kt` for adding songs to playlists
+    - `[ ]` Fix visibility of progress bars in `LibraryScreen.kt` and `MiniPlayer.kt`
+    - `[ ]` Correct image rotation logic in `PlayerScreen.kt`
+- `[ ]` Verify all functional flows
 - `[ ]` Create final walkthrough

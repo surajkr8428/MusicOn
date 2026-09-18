@@ -496,41 +496,16 @@ class MainViewModel(
     }
 
     fun bulkUpload(tracks: List<TrackEntity>) {
-        viewModelScope.launch {
-            val total = tracks.size
-            var uploaded = 0
-            var failed = 0
-            
-            tracks.forEach { track ->
-                if (track.localPath != null) {
-                    val currentProgress = (uploaded + failed).toFloat() / total
-                    com.example.musicon.data.remote.CloudSyncManager.updateStatus(
-                        com.example.musicon.data.remote.SyncStatus.Loading(
-                            message = "Uploading ${track.displayName}",
-                            progress = currentProgress,
-                            current = uploaded + failed + 1,
-                            total = total
-                        )
-                    )
-                    
-                    try {
-                        uploadTrack(track)
-                        uploaded++
-                    } catch (e: Exception) {
-                        failed++
-                    }
-                    delay(800)
-                }
-            }
-            
-            com.example.musicon.data.remote.CloudSyncManager.updateStatus(
-                com.example.musicon.data.remote.SyncStatus.Success(
-                    message = "Upload Finished",
-                    uploaded = uploaded,
-                    failed = failed
-                )
-            )
-        }
+        val trackIds = tracks.map { it.id }.toTypedArray()
+        val data = Data.Builder()
+            .putString("sync_type", "bulk_upload")
+            .putStringArray("track_ids", trackIds as Array<String?>)
+            .build()
+        WorkManager.getInstance(settingsRepository.context).enqueue(
+            OneTimeWorkRequestBuilder<com.example.musicon.service.SyncWorker>()
+                .setInputData(data)
+                .build()
+        )
     }
 
     fun removeFromLibrary(tracks: List<TrackEntity>) {
@@ -685,6 +660,10 @@ class MainViewModel(
 
     fun addTrackToPlaylist(playlistId: String, trackId: String) {
         viewModelScope.launch { musicRepository.addTrackToPlaylist(playlistId, trackId) }
+    }
+
+    fun removeTrackFromPlaylist(playlistId: String, trackId: String) {
+        viewModelScope.launch { musicRepository.removeTrackFromPlaylist(playlistId, trackId) }
     }
 
     fun getTracksForPlaylist(playlistId: String): Flow<List<TrackEntity>> {

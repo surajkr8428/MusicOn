@@ -54,10 +54,8 @@ class SyncWorker(
                 try {
                     CloudSyncManager.updateStatus(SyncStatus.Loading("Checking cloud for $fileName...", 0.05f))
                     
-                    // Duplicate Protection: Check by name
                     val existingFile = cloudManager.findFileByName(fileName)
                     val gDriveId = if (existingFile != null) {
-                        android.util.Log.d("SyncWorker", "Duplicate found: $fileName, using existing ID: ${existingFile.id}")
                         existingFile.id
                     } else {
                         CloudSyncManager.updateStatus(SyncStatus.Loading("Uploading $fileName...", 0.1f))
@@ -69,17 +67,60 @@ class SyncWorker(
                         if (existingTrack != null) {
                             database.trackDao().updateTrack(existingTrack.copy(gDriveId = gDriveId))
                         }
-                        CloudSyncManager.updateStatus(SyncStatus.Success("Upload Complete"))
+                        CloudSyncManager.updateStatus(SyncStatus.Success("Upload Complete", uploaded = 1))
                         Result.success()
                     } else {
-                        CloudSyncManager.updateStatus(SyncStatus.Error("Upload failed: Storage or connection issue"))
+                        CloudSyncManager.updateStatus(SyncStatus.Error("Upload failed"))
                         Result.failure()
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("SyncWorker", "Upload error", e)
-                    CloudSyncManager.updateStatus(SyncStatus.Error("Sync failed: ${e.localizedMessage ?: "Unknown error"}"))
+                    CloudSyncManager.updateStatus(SyncStatus.Error("Sync failed: ${e.localizedMessage}"))
                     Result.failure()
                 }
+            }
+            "bulk_upload" -> {
+                val trackIds = inputData.getStringArray("track_ids") ?: return Result.failure()
+                val total = trackIds.size
+                var uploaded = 0
+                var failed = 0
+                
+                trackIds.forEachIndexed { index, trackId ->
+                    val track = database.trackDao().getTrackById(trackId)
+                    if (track?.localPath != null) {
+                        try {
+                            CloudSyncManager.updateStatus(
+                                SyncStatus.Loading(
+                                    message = "Uploading ${track.displayName}",
+                                    progress = (index.toFloat() / total),
+                                    current = index + 1,
+                                    total = total
+                                )
+                            )
+                            
+                            val fileName = track.displayName
+                            val existingFile = cloudManager.findFileByName(fileName)
+                            val gDriveId = existingFile?.id ?: cloudManager.uploadFile(track.localPath, fileName)
+                            
+                            if (gDriveId != null) {
+                                database.trackDao().updateTrack(track.copy(gDriveId = gDriveId))
+                                uploaded++
+                            } else {
+                                failed++
+                            }
+                        } catch (e: Exception) {
+                            failed++
+                        }
+                    }
+                }
+                
+                CloudSyncManager.updateStatus(
+                    SyncStatus.Success(
+                        message = "Bulk upload finished",
+                        uploaded = uploaded,
+                        failed = failed
+                    )
+                )
+                Result.success()
             }
             else -> Result.failure()
         }

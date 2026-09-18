@@ -426,12 +426,18 @@ fun PlayerLayoutPortrait(
     repeatMode: Int,
     sleepTimerRemaining: Long?
 ) {
-    val rotationTransition = rememberInfiniteTransition(label = "rotation")
-    val rotation by rotationTransition.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(animation = tween(10000, easing = LinearEasing), repeatMode = RepeatMode.Restart),
-        label = "rotation"
-    )
+    var rotationAngle by remember { mutableStateOf(0f) }
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            val startTime = System.currentTimeMillis()
+            val startAngle = rotationAngle
+            while (true) {
+                val elapsed = System.currentTimeMillis() - startTime
+                rotationAngle = (startAngle + (elapsed / 30f)) % 360f
+                kotlinx.coroutines.delay(16)
+            }
+        }
+    }
 
     var hasSkippedInSession by remember { mutableStateOf(false) }
     val coverPicker = rememberLauncherForActivityResult(
@@ -508,7 +514,7 @@ fun PlayerLayoutPortrait(
                                 .fillMaxSize(0.85f)
                                 .aspectRatio(1f)
                                 .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
-                                .rotate(if (imageMode == PlayerImageMode.ROTATION && isPlaying) rotation else 0f),
+                                .rotate(if (imageMode == PlayerImageMode.ROTATION) rotationAngle else 0f),
                             contentScale = ContentScale.Crop
                         )
                     } else {
@@ -577,12 +583,18 @@ fun PlayerLayoutLandscape(
     repeatMode: Int,
     sleepTimerRemaining: Long?
 ) {
-    val rotationTransition = rememberInfiniteTransition(label = "rotation")
-    val rotation by rotationTransition.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(animation = tween(10000, easing = LinearEasing), repeatMode = RepeatMode.Restart),
-        label = "rotation"
-    )
+    var rotationAngle by remember { mutableStateOf(0f) }
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            val startTime = System.currentTimeMillis()
+            val startAngle = rotationAngle
+            while (true) {
+                val elapsed = System.currentTimeMillis() - startTime
+                rotationAngle = (startAngle + (elapsed / 30f)) % 360f
+                kotlinx.coroutines.delay(16)
+            }
+        }
+    }
     
     var hasSkippedInSession by remember { mutableStateOf(false) }
 
@@ -638,8 +650,8 @@ fun PlayerLayoutLandscape(
                                     .fillMaxHeight(0.9f)
                                     .aspectRatio(1f)
                                     .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
-                                    .rotate(if (imageMode == PlayerImageMode.ROTATION && isPlaying) rotation else 0f),
-                                contentScale = ContentScale.Crop
+                                .rotate(if (imageMode == PlayerImageMode.ROTATION) rotationAngle else 0f),
+                            contentScale = ContentScale.Crop
                             )
                         } else {
                             Icon(

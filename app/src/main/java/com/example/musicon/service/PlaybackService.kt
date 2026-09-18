@@ -168,7 +168,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        // Do not stopSelf() here to keep the service alive in the background
         super.onTaskRemoved(rootIntent)
-        stopSelf()
     }
 }
