@@ -518,12 +518,12 @@ fun PlayerLayoutPortrait(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        // NO image: Hide disc/rect, show clean note icon
+                        // Big Rotating Music Note Fallback
                         Icon(
                             imageVector = Icons.Default.MusicNote,
                             contentDescription = null,
                             tint = fallbackColor.copy(alpha = 0.4f),
-                            modifier = Modifier.size(160.dp)
+                            modifier = Modifier.size(200.dp).rotate(rotationAngle)
                         )
                     }
                     
@@ -650,15 +650,15 @@ fun PlayerLayoutLandscape(
                                     .fillMaxHeight(0.9f)
                                     .aspectRatio(1f)
                                     .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
-                                .rotate(if (imageMode == PlayerImageMode.ROTATION) rotationAngle else 0f),
-                            contentScale = ContentScale.Crop
+                                    .rotate(if (imageMode == PlayerImageMode.ROTATION) rotationAngle else 0f),
+                                contentScale = ContentScale.Crop
                             )
                         } else {
                             Icon(
                                 imageVector = Icons.Default.MusicNote,
                                 contentDescription = null,
                                 tint = fallbackColor.copy(alpha = 0.4f),
-                                modifier = Modifier.size(110.dp)
+                                modifier = Modifier.size(140.dp).rotate(rotationAngle)
                             )
                         }
                     }
@@ -724,7 +724,7 @@ fun PlayerLayoutLandscape(
                         if (path != null) {
                             if (path.startsWith("content://")) Uri.parse(path) else File(path)
                         } else {
-                            R.drawable.ic_launcher_foreground
+                            R.drawable.ic_music_note
                         }
                     }
                     AsyncImage(
@@ -891,7 +891,7 @@ fun PlayerControls(
                         if (path != null) {
                             if (path.startsWith("content://")) Uri.parse(path) else File(path)
                         } else {
-                            R.drawable.ic_launcher_foreground
+                            R.drawable.ic_music_note
                         }
                     }
                     AsyncImage(

@@ -59,6 +59,15 @@ class MainViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.example.musicon.data.PlayerImageMode.SQUARE)
 
     val allTracks: StateFlow<List<TrackEntity>> = musicRepository.allTracks
+        .map { tracks ->
+            // Filter only local files for the main library
+            val localTracks = tracks.filter { it.localPath != null }
+            localTracks.distinctBy { 
+                val cleanTitle = (it.customTitle ?: it.title).lowercase().removeSuffix(".mp3").trim().replace(" ", "")
+                val cleanArtist = (it.customArtist ?: it.artist).lowercase().trim().replace(" ", "")
+                "${cleanTitle}_${cleanArtist}"
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allPlaylists: StateFlow<List<Playlist>> = musicRepository.allPlaylists
@@ -116,6 +125,9 @@ class MainViewModel(
     // Smart Playlists
     private val _recentlyPlayed = MutableStateFlow<List<TrackEntity>>(emptyList())
     val recentlyPlayed: StateFlow<List<TrackEntity>> = _recentlyPlayed.asStateFlow()
+
+    private val _sessionRecentlyPlayed = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val sessionRecentlyPlayed: StateFlow<List<TrackEntity>> = _sessionRecentlyPlayed.asStateFlow()
 
     private val _mostPlayed = MutableStateFlow<List<TrackEntity>>(emptyList())
     val mostPlayed: StateFlow<List<TrackEntity>> = _mostPlayed.asStateFlow()
@@ -262,16 +274,19 @@ class MainViewModel(
         songSortOrder, 
         isUserSignedIn.asFlow()
     ) { tracks, query, sort, signedIn ->
-        val localFiltered = if (query.isEmpty()) tracks else {
-            tracks.filter { 
+        // Only show local songs in the main list
+        val localOnly = tracks.filter { it.localPath != null }
+        
+        val localFiltered = if (query.isEmpty()) localOnly else {
+            localOnly.filter { 
                 it.displayName.contains(query, ignoreCase = true) ||
                 it.displayArtist.contains(query, ignoreCase = true) ||
                 it.displayAlbum.contains(query, ignoreCase = true)
             }
         }
         
-        // Search from Cloud too if online, searching, AND signed in
         var list = localFiltered
+        // If searching and signed in, we can still show cloud results if they match query but aren't local
         if (query.isNotEmpty() && isOnline.value && signedIn) {
             try {
                 val cloudFiles = musicRepository.cloudStorageManager.listAudioFiles(null)
@@ -284,10 +299,10 @@ class MainViewModel(
                     )
                 }
                 // Merge and remove duplicates (prefer local)
-                val cloudOnly = cloudTracks.filter { ct -> 
+                val cloudOnlyMatches = cloudTracks.filter { ct -> 
                     list.none { it.title.equals(ct.title, true) || it.gDriveId == ct.gDriveId } 
                 }
-                list = list + cloudOnly
+                list = list + cloudOnlyMatches
             } catch (e: Exception) {
                 android.util.Log.e("MainViewModel", "Cloud search failed", e)
             }
@@ -333,6 +348,7 @@ class MainViewModel(
         _currentPlayingTrackId.value = track.id
         viewModelScope.launch {
             musicRepository.recordTrackPlayed(track.id)
+            _sessionRecentlyPlayed.value = (listOf(track) + _sessionRecentlyPlayed.value).distinctBy { it.id }
             refreshStats()
         }
     }
@@ -344,6 +360,7 @@ class MainViewModel(
         viewModelScope.launch {
             _playbackEvents.emit(PlaybackEvent.PlayTrackList(tracks, index))
             musicRepository.recordTrackPlayed(startTrack.id)
+            _sessionRecentlyPlayed.value = (listOf(startTrack) + _sessionRecentlyPlayed.value).distinctBy { it.id }
             refreshStats()
         }
     }

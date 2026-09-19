@@ -431,6 +431,7 @@ fun MusicOnApp(
         val scope = rememberCoroutineScope()
         val isUserSignedIn by viewModel.isUserSignedIn
         val context = LocalContext.current
+        val syncStatus by com.example.musicon.data.remote.CloudSyncManager.status.collectAsState()
         
         var isPlayerVisible by rememberSaveable { mutableStateOf(false) }
         var isEqualizerVisible by rememberSaveable { mutableStateOf(false) }
@@ -484,14 +485,21 @@ fun MusicOnApp(
         } else if (cutterTrack != null) {
             Mp3CutterScreen(track = cutterTrack!!, viewModel = viewModel, onBack = { cutterTrack = null })
         } else {
-            // Dual Drawer Implementation: Left for Menu, Right for Settings
+            // Adaptive Sidebar Widths
+            val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+            val screenWidth = configuration.screenWidthDp.dp
+            val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            
+            val adaptiveWidth = if (isLandscape) 360.dp else screenWidth * 0.85f
+
+            // Dual Drawer Implementation
             val leftDrawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
             val rightDrawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
             ModalNavigationDrawer(
                 drawerState = leftDrawerState,
                 drawerContent = {
-                    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), modifier = Modifier.width(300.dp)) {
+                    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), modifier = Modifier.width(adaptiveWidth)) {
                         Column(Modifier.fillMaxHeight()) {
                             Spacer(Modifier.height(48.dp))
                             if (!isUserSignedIn) {
@@ -524,6 +532,15 @@ fun MusicOnApp(
                             NavigationDrawerItem(label = { Text("Cloud Browser") }, selected = false, onClick = { if (!isUserSignedIn) showSignInPrompt = true else { scope.launch { leftDrawerState.close() }; isCloudBrowserVisible = true } }, icon = { Icon(Icons.Default.CloudQueue, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
                             NavigationDrawerItem(label = { Text("Equalizer") }, selected = false, onClick = { scope.launch { leftDrawerState.close() }; isEqualizerVisible = true }, icon = { Icon(Icons.Default.Tune, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
                             NavigationDrawerItem(label = { Text("Share App (APK)") }, selected = false, onClick = { scope.launch { leftDrawerState.close() }; shareAppApk() }, icon = { Icon(Icons.Default.Share, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                            
+                            Spacer(Modifier.weight(1f))
+                            
+                            // Giant Aesthetic Circular Progress in Sidebar
+                            com.example.musicon.ui.components.CircularSyncProgressBar(
+                                syncStatus = syncStatus,
+                                modifier = Modifier.padding(16.dp).fillMaxWidth()
+                            )
+                            
                             Spacer(Modifier.weight(1f))
                         }
                     }
@@ -534,7 +551,7 @@ fun MusicOnApp(
                         drawerState = rightDrawerState,
                         drawerContent = {
                             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                                ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), modifier = Modifier.width(320.dp).fillMaxHeight()) {
+                                ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), modifier = Modifier.width(adaptiveWidth).fillMaxHeight()) {
                                     Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(onClick = { scope.launch { rightDrawerState.close() } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }
                                         Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)

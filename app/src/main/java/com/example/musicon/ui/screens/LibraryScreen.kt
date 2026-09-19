@@ -28,9 +28,11 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -59,6 +61,34 @@ import kotlinx.coroutines.launch
 import java.io.File
 import com.example.musicon.ui.components.PlaylistOptionsBottomSheet
 import com.example.musicon.ui.components.RenameDialog
+
+// Curated set of aesthetic music icons for playlists and tabs
+private val libraryTabIcons = listOf(
+    Icons.Default.History,      // Recent
+    Icons.Default.MusicNote,    // All Songs
+    Icons.Default.Album,        // Albums
+    Icons.Default.Person,       // Artists
+    Icons.Default.Category      // Genres
+)
+
+private val playlistIcons = listOf(
+    Icons.Default.QueueMusic,
+    Icons.Default.Headphones,
+    Icons.Default.Mic,
+    Icons.Default.Piano,
+    Icons.Default.Audiotrack,
+    Icons.Default.Speaker,
+    Icons.Default.GraphicEq,
+    Icons.Default.Radio,
+    Icons.Default.Brush,
+    Icons.Default.Favorite
+)
+
+private fun getPlaylistIcon(playlistName: String): ImageVector {
+    if (playlistName == "Favorite") return Icons.Default.Favorite
+    val index = Math.abs(playlistName.hashCode()) % playlistIcons.size
+    return playlistIcons[index]
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -107,10 +137,11 @@ fun LibraryScreen(
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     val isSelectionMode = selectedIds.isNotEmpty()
     var showBulkPlaylistDialog by remember { mutableStateOf(false) }
+    var addingToPlaylistId by remember { mutableStateOf<String?>(null) }
 
-    val baseTabs = listOf("All Songs", "Playlists", "Albums", "Artists", "Genres", "Recent", "Popular")
+    val baseTabs = listOf("Recent", "All Songs", "Albums", "Artists", "Genres")
     val tabs = baseTabs + customFolders.map { it.substringAfterLast("/").ifBlank { "Folder" } }
-    val pagerState = rememberPagerState { tabs.size }
+    val pagerState = rememberPagerState(initialPage = 1) { tabs.size }
 
     val songListState = rememberLazyListState()
     val songGridState = rememberLazyGridState()
@@ -140,44 +171,96 @@ fun LibraryScreen(
     }
 
     if (currentPlaylistDetail != null) {
-        PlaylistDetailScreen(playlist = currentPlaylistDetail!!, viewModel = viewModel, onBack = { currentPlaylistDetail = null }, viewMode = viewMode, isLandscape = isLandscape)
+        PlaylistDetailScreen(
+            playlist = currentPlaylistDetail!!, 
+            viewModel = viewModel, 
+            onBack = { currentPlaylistDetail = null }, 
+            viewMode = viewMode, 
+            isLandscape = isLandscape,
+            onAddSongs = { 
+                addingToPlaylistId = currentPlaylistDetail!!.id
+                currentPlaylistDetail = null
+                scope.launch { pagerState.animateScrollToPage(0) }
+            }
+        )
     } else {
         StellarBackground(themeMode = themeMode, backgroundMode = backgroundMode) {
             Scaffold(
                 containerColor = Color.Transparent,
                 topBar = {
-                    if (isSelectionMode) {
-                        SelectionTopBar(count = selectedIds.size, onClose = { selectedIds = emptySet() }, onSelectAll = { val all = tracks.map { it.id }.toSet(); selectedIds = if (selectedIds.size == all.size) emptySet() else all })
+                    if (addingToPlaylistId != null) {
+                        SelectionTopBar(
+                            count = selectedIds.size, 
+                            onClose = { 
+                                selectedIds = emptySet()
+                                addingToPlaylistId = null
+                            }, 
+                            onSelectAll = { 
+                                val all = tracks.map { it.id }.toSet()
+                                selectedIds = if (selectedIds.size == all.size) emptySet() else all 
+                            },
+                            title = "Add to Playlist"
+                        )
+                    } else if (isSelectionMode) {
+                        SelectionTopBar(
+                            count = selectedIds.size, 
+                            onClose = { selectedIds = emptySet() }, 
+                            onSelectAll = { 
+                                val all = tracks.map { it.id }.toSet()
+                                selectedIds = if (selectedIds.size == all.size) emptySet() else all 
+                            }
+                        )
                     } else {
                         LibraryTopBar(searchQuery, isSearchActive, { isSearchActive = !isSearchActive }, { viewModel.updateSearchQuery(it) }, onOpenDrawer, onOpenSettings, { showSortMenu = true }, { viewModel.updateLibraryViewMode(if (viewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST) }, viewMode, sleepTimerRemaining, isLandscape, viewModel, isOnline, isWifi, syncStatus)
                     }
                 },
                 bottomBar = {
-                    AnimatedVisibility(visible = isSelectionMode, enter = expandVertically(), exit = shrinkVertically()) {
-                        SelectionBottomBar(
-                            onPlay = { viewModel.playSelected(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
-                            onNext = { viewModel.addToQueueNext(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
-                            onPlaylist = { showBulkPlaylistDialog = true },
-                            onShare = { 
-                                val toShare = allTracks.filter { it.id in selectedIds }
-                                if (toShare.isNotEmpty()) viewModel.shareTracks(toShare)
-                                selectedIds = emptySet()
-                            },
-                            onDelete = { tracksToBulkDeleteConfirm = allTracks.filter { it.id in selectedIds } },
-                            onUpload = { 
-                                if (!viewModel.isUserSignedIn.value) {
-                                    showSignInRequiredDialog = true 
-                                } else { 
-                                    val toUpload = allTracks.filter { it.id in selectedIds }
-                                    if (toUpload.isNotEmpty()) {
-                                        android.widget.Toast.makeText(context, "Starting GDrive sync for ${toUpload.size} songs", android.widget.Toast.LENGTH_SHORT).show()
-                                        viewModel.bulkUpload(toUpload)
+                    Box {
+                        if (addingToPlaylistId != null) {
+                            Surface(color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth().height(70.dp)) {
+                                Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                                    Button(
+                                        onClick = {
+                                            viewModel.bulkAddTracksToPlaylist(addingToPlaylistId!!, selectedIds.toList())
+                                            selectedIds = emptySet()
+                                            addingToPlaylistId = null
+                                        },
+                                        enabled = selectedIds.isNotEmpty()
+                                    ) {
+                                        Icon(Icons.Default.Check, null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Add ${selectedIds.size} songs")
                                     }
-                                    selectedIds = emptySet() 
-                                } 
-                            },
-                            onRemove = { viewModel.removeFromLibrary(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() }
-                        )
+                                }
+                            }
+                        } else {
+                            AnimatedVisibility(visible = isSelectionMode, enter = expandVertically(), exit = shrinkVertically()) {
+                                SelectionBottomBar(
+                                    onPlay = { viewModel.playSelected(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
+                                    onNext = { viewModel.addToQueueNext(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
+                                    onPlaylist = { showBulkPlaylistDialog = true },
+                                    onShare = { 
+                                        val toShare = allTracks.filter { it.id in selectedIds }
+                                        if (toShare.isNotEmpty()) viewModel.shareTracks(toShare)
+                                        selectedIds = emptySet()
+                                    },
+                                    onDelete = { tracksToBulkDeleteConfirm = allTracks.filter { it.id in selectedIds } },
+                                    onUpload = { 
+                                        if (!viewModel.isUserSignedIn.value) {
+                                            showSignInRequiredDialog = true 
+                                        } else { 
+                                            val toUpload = allTracks.filter { it.id in selectedIds }
+                                            if (toUpload.isNotEmpty()) {
+                                                android.widget.Toast.makeText(context, "Starting GDrive sync for ${toUpload.size} songs", android.widget.Toast.LENGTH_SHORT).show()
+                                                viewModel.bulkUpload(toUpload)
+                                            }
+                                            selectedIds = emptySet() 
+                                        } 
+                                    },
+                                    onRemove = { viewModel.removeFromLibrary(allTracks.filter { it.id in selectedIds }); selectedIds = emptySet() }
+                                )
+                            }
+                        }
                     }
                 }
             ) { innerPadding ->
@@ -192,7 +275,15 @@ fun LibraryScreen(
                                     Tab(
                                         selected = isSelected, 
                                         onClick = { scope.launch { pagerState.animateScrollToPage(index) } }, 
-                                        text = { Text(title, color = tabColor) }
+                                        text = { 
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                if (index < libraryTabIcons.size) {
+                                                    Icon(libraryTabIcons[index], null, modifier = Modifier.size(16.dp), tint = tabColor.copy(alpha = 0.8f))
+                                                    Spacer(Modifier.width(6.dp))
+                                                }
+                                                Text(title, color = tabColor) 
+                                            }
+                                        }
                                     ) 
                                 }
                             }
@@ -200,12 +291,18 @@ fun LibraryScreen(
                         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                             when (page) {
                                 0 -> SongsTab(tracks, selectedIds, viewMode, isLandscape, songListState, songGridState, { if (isSelectionMode) selectedIds = if (it.id in selectedIds) selectedIds - it.id else selectedIds + it.id else viewModel.playTrackList(tracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(tracks.shuffled()) }, { viewModel.playSelected(tracks) }, { viewModel.toggleFavorite(it) })
-                                1 -> PlaylistsTab(playlists, viewMode, playlistListState, playlistGridState, { currentPlaylistDetail = it }, { showCreatePlaylistDialog = true }, { selectedPlaylistOptions = it })
-                                2 -> GroupedTab(allTracks, "Album", viewMode, groupedListStates.getOrPut("Album"){rememberLazyListState()}, groupedGridStates.getOrPut("Album"){rememberLazyGridState()}) { viewModel.playSelected(it) }
-                                3 -> GroupedTab(allTracks, "Artist", viewMode, groupedListStates.getOrPut("Artist"){rememberLazyListState()}, groupedGridStates.getOrPut("Artist"){rememberLazyGridState()}) { viewModel.playSelected(it) }
-                                4 -> GroupedTab(allTracks, "Genre", viewMode, groupedListStates.getOrPut("Genre"){rememberLazyListState()}, groupedGridStates.getOrPut("Genre"){rememberLazyGridState()}) { viewModel.playSelected(it) }
-                                5 -> { val recent by viewModel.recentlyPlayed.collectAsState(); SongsTab(recent, selectedIds, viewMode, isLandscape, rememberLazyListState(), rememberLazyGridState(), { viewModel.playTrackList(recent, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(recent.shuffled()) }, { viewModel.playSelected(recent) }, { viewModel.toggleFavorite(it) }) }
-                                6 -> { val popular by viewModel.mostPlayed.collectAsState(); SongsTab(popular, selectedIds, viewMode, isLandscape, rememberLazyListState(), rememberLazyGridState(), { viewModel.playTrackList(popular, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(popular.shuffled()) }, { viewModel.playSelected(popular) }, { viewModel.toggleFavorite(it) }) }
+                                1 -> PlaylistsTab(playlists, viewMode, playlistListState, playlistGridState, { currentPlaylistDetail = it }, { showCreatePlaylistDialog = true }, { selectedPlaylistOptions = it }, { viewModel.getTracksForPlaylist(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } })
+                                2 -> GroupedTab(allTracks, "Album", viewMode, groupedListStates.getOrPut("Album"){rememberLazyListState()}, groupedGridStates.getOrPut("Album"){rememberLazyGridState()}, { viewModel.playSelected(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) })
+                                3 -> GroupedTab(allTracks, "Artist", viewMode, groupedListStates.getOrPut("Artist"){rememberLazyListState()}, groupedGridStates.getOrPut("Artist"){rememberLazyGridState()}, { viewModel.playSelected(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) })
+                                4 -> GroupedTab(allTracks, "Genre", viewMode, groupedListStates.getOrPut("Genre"){rememberLazyListState()}, groupedGridStates.getOrPut("Genre"){rememberLazyGridState()}, { viewModel.playSelected(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) })
+                                5 -> { 
+                                    val recent by viewModel.recentlyPlayed.collectAsState()
+                                    GroupedTab(recent, "Recently Played", viewMode, rememberLazyListState(), rememberLazyGridState(), { viewModel.playSelected(it) }, { viewModel.playTrackList(recent, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }) 
+                                }
+                                6 -> { 
+                                    val popular by viewModel.mostPlayed.collectAsState()
+                                    GroupedTab(popular, "Popular Songs", viewMode, rememberLazyListState(), rememberLazyGridState(), { viewModel.playSelected(it) }, { viewModel.playTrackList(popular, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }) 
+                                }
                                 else -> {
                                     val path = customFolders[page - 7]
                                     val fTracks = allTracks.filter { it.localPath?.startsWith(path) == true }
@@ -301,7 +398,7 @@ fun LibraryScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, viewModel: MainViewModel, onBack: () -> Unit, viewMode: LibraryViewMode, isLandscape: Boolean) {
+fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, viewModel: MainViewModel, onBack: () -> Unit, viewMode: LibraryViewMode, isLandscape: Boolean, onAddSongs: () -> Unit) {
     val tracks by viewModel.getTracksForPlaylist(playlist.id).collectAsState(emptyList())
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var selectedTrackOptions by remember { mutableStateOf<TrackEntity?>(null) }
@@ -340,7 +437,7 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
                         title = { Text(playlist.name, color = Color.White, fontFamily = FontFamily.Cursive, fontSize = if (isLandscape) 18.sp else 24.sp) }, 
                         navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } }, 
                         actions = { 
-                            IconButton(onClick = { showMultiSelectDialog = true }) { Icon(Icons.Default.Add, null, tint = Color.White) }
+                            IconButton(onClick = onAddSongs) { Icon(Icons.Default.Add, null, tint = Color.White) }
                         }, 
                         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
                     )
@@ -501,9 +598,6 @@ fun LibraryTopBar(
                         modifier = Modifier.size(32.dp),
                         tint = Color.Unspecified
                     )
-
-                    // Stretched Progress Bar from Icon to Header Actions (Settings)
-                    SyncProgressBar(syncStatus, Modifier.weight(1f).padding(horizontal = 12.dp))
                 }
                 
                 if (timerRemaining != null) {
@@ -569,10 +663,7 @@ fun HeaderStatusPill(isOnline: Boolean, isWifi: Boolean) {
 
 @Composable
 fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modifier: Modifier = Modifier) {
-    if (syncStatus is com.example.musicon.data.remote.SyncStatus.Idle) {
-        Box(modifier.height(36.dp))
-        return
-    }
+    if (syncStatus is com.example.musicon.data.remote.SyncStatus.Idle) return
 
     val barColor = when (syncStatus) {
         is com.example.musicon.data.remote.SyncStatus.Loading -> Color.Yellow
@@ -598,21 +689,17 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
         label = "indeterminate_shift"
     )
 
-    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
-    val textColor = if (isBright) Color.Black else Color.White
-
     Box(modifier = modifier.height(36.dp).padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {
         val sweepProgress = if (progress >= 0f) progress else indeterminateShift
         
-        // Use standard LinearProgressIndicator for guaranteed visibility
         LinearProgressIndicator(
             progress = { sweepProgress },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(20.dp)
-                .clip(RoundedCornerShape(10.dp)),
+                .height(24.dp)
+                .clip(RoundedCornerShape(12.dp)),
             color = barColor,
-            trackColor = Color.White.copy(alpha = 0.15f)
+            trackColor = Color.White.copy(alpha = 0.2f)
         )
 
         if (syncStatus is com.example.musicon.data.remote.SyncStatus.Success) {
@@ -626,7 +713,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
             Text(
                 text = text,
                 color = Color.Black,
-                fontSize = 9.sp,
+                fontSize = 8.sp,
                 fontWeight = FontWeight.Black
             )
         } else if (syncStatus is com.example.musicon.data.remote.SyncStatus.Loading) {
@@ -638,7 +725,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
             Text(
                 text = text,
                 color = Color.Black,
-                fontSize = 10.sp,
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Black
             )
         } else if (syncStatus is com.example.musicon.data.remote.SyncStatus.Error) {
@@ -655,7 +742,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
 @Composable fun SortMenu(currentOrder: String, onDismiss: () -> Unit, onSortSelected: (String) -> Unit) { AlertDialog(onDismissRequest = onDismiss, title = { Text("Sort Songs By", fontSize = 16.sp, fontWeight = FontWeight.Bold) }, text = { Column { SortCategory("Name", "NAME", currentOrder, onSortSelected); SortCategory("Artist", "ARTIST", currentOrder, onSortSelected); SortCategory("Recent", "RECENT", currentOrder, onSortSelected); SortCategory("Duration", "DURATION", currentOrder, onSortSelected) } }, confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }, shape = RoundedCornerShape(12.dp)) }
 @Composable fun SortCategory(label: String, baseValue: String, current: String, onSelect: (String) -> Unit) { Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) { Text(label, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) { SortMiniButton(if (baseValue == "RECENT") "Newest" else if (baseValue == "DURATION") "Longest" else "A-Z", "${baseValue}_ASC", current, onSelect, Modifier.weight(1f)); SortMiniButton(if (baseValue == "RECENT") "Oldest" else if (baseValue == "DURATION") "Shortest" else "Z-A", "${baseValue}_DESC", current, onSelect, Modifier.weight(1f)) } } }
 @Composable fun SortMiniButton(label: String, value: String, current: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) { val isSelected = value == current; Button(onClick = { onSelect(value) }, modifier = modifier.height(36.dp), colors = ButtonDefaults.buttonColors(containerColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(0.05f), contentColor = if (isSelected) Color.Black else Color.White), contentPadding = PaddingValues(horizontal = 8.dp), shape = RoundedCornerShape(8.dp)) { Text(label, fontSize = 11.sp, maxLines = 1) } }
-@OptIn(ExperimentalMaterial3Api::class) @Composable fun SelectionTopBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Unit) { TopAppBar(title = { Text("$count selected", color = Color.White) }, navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = Color.White) } }, windowInsets = WindowInsets(0), actions = { IconButton(onClick = onSelectAll) { Icon(Icons.Default.SelectAll, "Select All", tint = Color.White) } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(alpha = 0.1f))) }
+@OptIn(ExperimentalMaterial3Api::class) @Composable fun SelectionTopBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Unit, title: String = "selected") { TopAppBar(title = { Text(if (title == "selected") "$count selected" else title, color = Color.White) }, navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = Color.White) } }, windowInsets = WindowInsets(0), actions = { IconButton(onClick = onSelectAll) { Icon(Icons.Default.SelectAll, "Select All", tint = Color.White) } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White.copy(alpha = 0.1f))) }
 @Composable fun SelectionBottomBar(onPlay: () -> Unit, onNext: () -> Unit, onPlaylist: () -> Unit, onShare: () -> Unit, onUpload: () -> Unit, onRemove: () -> Unit, onDelete: () -> Unit) { Surface(color = Color(0xFF1E1B36).copy(alpha = 0.95f), modifier = Modifier.fillMaxWidth().height(70.dp)) { Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) { SelectionActionItem(Icons.Default.PlayArrow, "Play", onPlay); SelectionActionItem(Icons.AutoMirrored.Filled.PlaylistPlay, "Next", onNext); SelectionActionItem(Icons.AutoMirrored.Filled.PlaylistAdd, "Playlist", onPlaylist); SelectionActionItem(Icons.Default.Share, "Share", onShare); SelectionActionItem(Icons.Default.CloudUpload, "GDrive", onUpload); SelectionActionItem(Icons.Default.RemoveCircleOutline, "Remove", onRemove); SelectionActionItem(Icons.Default.Delete, "Delete", onDelete) } } }
 @Composable fun SelectionActionItem(icon: ImageVector, label: String, onClick: () -> Unit) { IconButton(onClick = onClick) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = Color.White, modifier = Modifier.size(24.dp)); Text(label, fontSize = 9.sp, color = Color.White) } } }
 
@@ -666,16 +753,166 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
     }
 }
 
-@Composable fun PlaylistsTab(playlists: List<com.example.musicon.data.local.Playlist>, viewMode: LibraryViewMode, listState: androidx.compose.foundation.lazy.LazyListState, gridState: androidx.compose.foundation.lazy.grid.LazyGridState, onPlaylistClick: (com.example.musicon.data.local.Playlist) -> Unit, onCreatePlaylist: () -> Unit, onOptions: (com.example.musicon.data.local.Playlist) -> Unit) {
-    if (viewMode == LibraryViewMode.GRID) LazyVerticalGrid(state = gridState, columns = GridCells.Adaptive(minSize = 100.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) { items(playlists) { PlaylistGridItem(it, onPlaylistClick, onOptions) }; item { Column(modifier = Modifier.padding(6.dp).clickable { onCreatePlaylist() }, horizontalAlignment = Alignment.CenterHorizontally) { Box(Modifier.size(70.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(0.1f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, null, tint = Color.Gray, modifier = Modifier.size(32.dp)) }; Spacer(Modifier.height(6.dp)); Text("Add Playlist", color = Color.White, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center) } } }
-    else LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { items(playlists) { ListItem(headlineContent = { Text(it.name, color = Color.White) }, leadingContent = { val icon = if (it.name == "Favorite") Icons.Default.Favorite else Icons.AutoMirrored.Filled.PlaylistAdd; Icon(icon, null, tint = if (it.name == "Favorite") Color.Red else Color.White) }, trailingContent = { IconButton(onClick = { onOptions(it) }) { Icon(Icons.Default.MoreVert, null, tint = Color.Gray) } }, modifier = Modifier.clickable { onPlaylistClick(it) }, colors = ListItemDefaults.colors(containerColor = Color.Transparent)) }; item { ListItem(headlineContent = { Text("Add Playlist", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }, leadingContent = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary) }, modifier = Modifier.clickable { onCreatePlaylist() }, colors = ListItemDefaults.colors(containerColor = Color.Transparent) ) } }
+@Composable fun PlaylistsTab(
+    playlists: List<com.example.musicon.data.local.Playlist>, 
+    viewMode: LibraryViewMode, 
+    listState: androidx.compose.foundation.lazy.LazyListState, 
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState, 
+    onPlaylistClick: (com.example.musicon.data.local.Playlist) -> Unit, 
+    onCreatePlaylist: () -> Unit, 
+    onOptions: (com.example.musicon.data.local.Playlist) -> Unit,
+    getTracks: (String) -> kotlinx.coroutines.flow.Flow<List<TrackEntity>>,
+    onTrackClick: (TrackEntity) -> Unit,
+    onTrackLongClick: (TrackEntity) -> Unit,
+    onTrackOptions: (TrackEntity) -> Unit,
+    onToggleFavorite: (TrackEntity) -> Unit,
+    onAddSongs: (String) -> Unit
+) {
+    var expandedPlaylistId by remember { mutableStateOf<String?>(null) }
+    var infoPlaylistId by remember { mutableStateOf<String?>(null) }
+    var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.LIST) }
+
+    if (viewMode == LibraryViewMode.GRID) {
+        LazyVerticalGrid(state = gridState, columns = GridCells.Adaptive(minSize = 100.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) { 
+            items(playlists) { playlist ->
+                val pTracks by getTracks(playlist.id).collectAsState(emptyList())
+                val isExpanded = expandedPlaylistId == playlist.id
+                
+                Column(modifier = Modifier.animateContentSize()) {
+                    PlaylistGridItem(
+                        playlist = playlist, 
+                        onClick = { expandedPlaylistId = if (isExpanded) null else playlist.id }, 
+                        onOptions = onOptions, 
+                        isInfoExpanded = infoPlaylistId == playlist.id, 
+                        onInfoToggle = { infoPlaylistId = if (infoPlaylistId == playlist.id) null else playlist.id }, 
+                        songCount = pTracks.size
+                    )
+                    
+                    if (isExpanded) {
+                        Column(modifier = Modifier.padding(horizontal = 8.dp).background(Color.White.copy(0.05f), RoundedCornerShape(8.dp))) {
+                            if (pTracks.isEmpty()) {
+                                IconButton(onClick = { onAddSongs(playlist.id) }, modifier = Modifier.fillMaxWidth().height(80.dp)) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(Icons.Default.AddCircle, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp))
+                                        Text("Add Songs", fontSize = 10.sp, color = Color.White)
+                                    }
+                                }
+                            } else {
+                                Row(Modifier.fillMaxWidth().padding(4.dp), horizontalArrangement = Arrangement.End) {
+                                    IconButton(onClick = { subViewMode = if (subViewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }, modifier = Modifier.size(24.dp)) {
+                                        Icon(if (subViewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                                if (subViewMode == LibraryViewMode.LIST) {
+                                    pTracks.forEach { track -> StellarTrackItem(track, false, { onTrackClick(track) }, { onTrackLongClick(track) }, { onTrackOptions(track) }, { onToggleFavorite(track) }) }
+                                } else {
+                                    FlowRow(modifier = Modifier.fillMaxWidth()) {
+                                        pTracks.forEach { track -> Box(Modifier.width(80.dp)) { StellarGridItem(track, false, { onTrackClick(track) }, { onTrackLongClick(track) }, { onTrackOptions(track) }, { onToggleFavorite(track) }) } }
+                                    }
+                                }
+                                TextButton(onClick = { onPlaylistClick(playlist) }, modifier = Modifier.fillMaxWidth()) { Text("Manage songs", fontSize = 10.sp) }
+                            }
+                        }
+                    }
+                }
+            }
+            item { Column(modifier = Modifier.padding(6.dp).clickable { onCreatePlaylist() }, horizontalAlignment = Alignment.CenterHorizontally) { Box(Modifier.size(70.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(0.1f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, null, tint = Color.Gray, modifier = Modifier.size(32.dp)) }; Spacer(Modifier.height(6.dp)); Text("Add Playlist", color = Color.White, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center) } } 
+        }
+    } else {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { 
+            items(playlists) { playlist ->
+                val isExpanded = expandedPlaylistId == playlist.id
+                val isInfoExpanded = infoPlaylistId == playlist.id
+                Column(modifier = Modifier.fillMaxWidth().animateContentSize()) {
+                    ListItem(
+                        headlineContent = { Text(playlist.name, color = Color.White) }, 
+                        leadingContent = { Icon(getPlaylistIcon(playlist.name), null, tint = if (playlist.name == "Favorite") Color.Red else Color.White) }, 
+                        trailingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(onClick = { infoPlaylistId = if (isInfoExpanded) null else playlist.id }) {
+                                    Icon(Icons.Default.Info, null, tint = if (isInfoExpanded) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.6f), modifier = Modifier.size(20.dp))
+                                }
+                                IconButton(onClick = { expandedPlaylistId = if (isExpanded) null else playlist.id }) {
+                                    Icon(if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null, tint = Color.Gray)
+                                }
+                                IconButton(onClick = { onOptions(playlist) }) { Icon(Icons.Default.MoreVert, null, tint = Color.Gray) }
+                            }
+                        }, 
+                        modifier = Modifier.clickable { expandedPlaylistId = if (isExpanded) null else playlist.id }, 
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                    
+                    if (isInfoExpanded) {
+                        val pTracks by getTracks(playlist.id).collectAsState(emptyList())
+                        val totalDuration = pTracks.sumOf { it.duration }
+                        Surface(
+                            color = Color.White.copy(alpha = 0.08f),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                        ) {
+                            Column(Modifier.padding(16.dp)) {
+                                Text("Playlist Insights", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
+                                Spacer(Modifier.height(8.dp))
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Column {
+                                        Text("Song Count", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                        Text("${pTracks.size} Tracks", style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text("Total Length", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                                        Text(formatDuration(totalDuration), style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                                    }
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                Text("Sync Status: ${if (pTracks.all { it.gDriveId != null }) "Cloud Backed" else "Local Only"}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            }
+                        }
+                    }
+                    
+                    if (isExpanded) {
+                        val pTracks by getTracks(playlist.id).collectAsState(emptyList())
+                        Column(modifier = Modifier.padding(start = 16.dp).background(Color.White.copy(alpha = 0.03f))) {
+                            if (pTracks.isEmpty()) {
+                                IconButton(onClick = { onAddSongs(playlist.id) }, modifier = Modifier.fillMaxWidth().height(60.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.AddCircle, null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Add Songs to ${playlist.name}", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                }
+                            } else {
+                                Row(Modifier.fillMaxWidth().padding(4.dp), horizontalArrangement = Arrangement.End) {
+                                    IconButton(onClick = { subViewMode = if (subViewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }, modifier = Modifier.size(24.dp)) {
+                                        Icon(if (subViewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                                if (subViewMode == LibraryViewMode.LIST) {
+                                    pTracks.forEach { track -> StellarTrackItem(track, false, { onTrackClick(track) }, { onTrackLongClick(track) }, { onTrackOptions(track) }, { onToggleFavorite(track) }) }
+                                } else {
+                                    FlowRow(modifier = Modifier.fillMaxWidth()) {
+                                        pTracks.forEach { track -> Box(Modifier.width(100.dp)) { StellarGridItem(track, false, { onTrackClick(track) }, { onTrackLongClick(track) }, { onTrackOptions(track) }, { onToggleFavorite(track) }) } }
+                                    }
+                                }
+                                Button(onClick = { onPlaylistClick(playlist) }, modifier = Modifier.padding(8.dp)) {
+                                    Text("Manage Songs")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            item { ListItem(headlineContent = { Text("Add Playlist", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }, leadingContent = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary) }, modifier = Modifier.clickable { onCreatePlaylist() }, colors = ListItemDefaults.colors(containerColor = Color.Transparent) ) } 
+        }
+    }
 }
 
-@Composable fun PlaylistGridItem(playlist: com.example.musicon.data.local.Playlist, onClick: (com.example.musicon.data.local.Playlist) -> Unit, onOptions: (com.example.musicon.data.local.Playlist) -> Unit) { 
+@Composable fun PlaylistGridItem(playlist: com.example.musicon.data.local.Playlist, onClick: (com.example.musicon.data.local.Playlist) -> Unit, onOptions: (com.example.musicon.data.local.Playlist) -> Unit, isInfoExpanded: Boolean = false, onInfoToggle: () -> Unit = {}, songCount: Int = 0) { 
     Column(
         modifier = Modifier
             .padding(6.dp)
-            .width(IntrinsicSize.Min),
+            .width(IntrinsicSize.Min)
+            .animateContentSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) { 
         Box(
@@ -687,7 +924,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
                 .clickable { onClick(playlist) }
         ) { 
             Icon(
-                imageVector = if (playlist.name == "Favorite") Icons.Default.Favorite else Icons.AutoMirrored.Filled.PlaylistAdd, 
+                imageVector = getPlaylistIcon(playlist.name), 
                 contentDescription = null, 
                 tint = if (playlist.name == "Favorite") Color.Red else Color.Gray, 
                 modifier = Modifier.size(36.dp)
@@ -708,7 +945,26 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
                     modifier = Modifier.size(18.dp)
                 ) 
             } 
+
+            // Info button for Grid Playlist - Bottom Right
+            IconButton(
+                onClick = { onInfoToggle() },
+                modifier = Modifier.align(Alignment.BottomEnd).size(24.dp).padding(4.dp)
+            ) {
+                Icon(Icons.Default.Info, null, tint = if (isInfoExpanded) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+            }
         }
+        
+        if (isInfoExpanded) {
+            Surface(
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                shape = RoundedCornerShape(4.dp),
+                modifier = Modifier.padding(top = 4.dp)
+            ) {
+                Text("${songCount} Songs", color = MaterialTheme.colorScheme.primary, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+            }
+        }
+
         Spacer(Modifier.height(8.dp))
         Text(
             text = playlist.name, 
@@ -721,100 +977,260 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
     } 
 }
 
-@Composable fun GroupedTab(tracks: List<TrackEntity>, groupType: String, viewMode: LibraryViewMode, listState: androidx.compose.foundation.lazy.LazyListState, gridState: androidx.compose.foundation.lazy.grid.LazyGridState, onPlayGroup: (List<TrackEntity>) -> Unit) {
-    val grouped = remember(tracks) { when (groupType) { "Album" -> tracks.groupBy { it.displayAlbum }; "Artist" -> tracks.groupBy { it.displayArtist }; "Genre" -> tracks.groupBy { it.genre ?: "Unknown" }; else -> emptyMap() } }
+@Composable fun GroupedTab(
+    tracks: List<TrackEntity>, 
+    groupType: String, 
+    viewMode: LibraryViewMode, 
+    listState: androidx.compose.foundation.lazy.LazyListState, 
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState, 
+    onPlayGroup: (List<TrackEntity>) -> Unit,
+    onTrackClick: (TrackEntity) -> Unit,
+    onTrackLongClick: (TrackEntity) -> Unit,
+    onTrackOptions: (TrackEntity) -> Unit,
+    onToggleFavorite: (TrackEntity) -> Unit
+) {
+    val grouped = remember(tracks, groupType) { 
+        when (groupType) { 
+            "Album" -> tracks.groupBy { it.displayAlbum }
+            "Artist" -> tracks.groupBy { it.displayArtist }
+            "Genre" -> tracks.groupBy { it.genre ?: "Unknown" }
+            "Recently Played" -> mapOf("Recent" to tracks)
+            "Popular Songs" -> mapOf("Popular" to tracks)
+            else -> emptyMap() 
+        } 
+    }
+    var expandedGroupName by remember { mutableStateOf<String?>(null) }
+    var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.LIST) }
+
     if (grouped.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No $groupType found", color = Color.Gray) }
-    else { if (viewMode == LibraryViewMode.GRID) LazyVerticalGrid(state = gridState, columns = GridCells.Adaptive(minSize = 100.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) { grouped.forEach { (name, gTracks) -> item { GroupGridItem(name, gTracks, onPlayGroup) } } } else LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { grouped.forEach { (name, gTracks) -> item { ListItem(headlineContent = { Text(name, color = Color.White, fontWeight = FontWeight.Bold) }, supportingContent = { Text("${gTracks.size} songs", color = Color.Gray) }, leadingContent = { Box(Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Album, null, tint = Color.Gray) } }, modifier = Modifier.clickable { onPlayGroup(gTracks) }, colors = ListItemDefaults.colors(containerColor = Color.Transparent)) } } } }
+    else { 
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { 
+            grouped.forEach { (name, gTracks) -> 
+                item { 
+                    val isExpanded = expandedGroupName == name
+                    Column(modifier = Modifier.fillMaxWidth().animateContentSize()) {
+                        ListItem(
+                            headlineContent = { Text(name, color = Color.White, fontWeight = FontWeight.Bold) }, 
+                            supportingContent = { Text("${gTracks.size} songs", color = Color.Gray) }, 
+                            leadingContent = { Box(Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Album, null, tint = Color.Gray) } }, 
+                            trailingContent = {
+                                IconButton(onClick = { expandedGroupName = if (isExpanded) null else name }) {
+                                    Icon(if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown, null, tint = Color.Gray)
+                                }
+                            },
+                            modifier = Modifier.clickable { expandedGroupName = if (isExpanded) null else name }, 
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                        
+                        if (isExpanded) {
+                            Column(modifier = Modifier.padding(start = 16.dp).background(Color.White.copy(alpha = 0.03f))) {
+                                Row(Modifier.fillMaxWidth().padding(4.dp), horizontalArrangement = Arrangement.End) {
+                                    IconButton(onClick = { subViewMode = if (subViewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }, modifier = Modifier.size(24.dp)) {
+                                        Icon(if (subViewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.Gray, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                                if (subViewMode == LibraryViewMode.LIST) {
+                                    gTracks.forEach { track ->
+                                        StellarTrackItem(
+                                            track = track,
+                                            isSelected = false,
+                                            onPlay = { onTrackClick(track) },
+                                            onLongClick = { onTrackLongClick(track) },
+                                            onOptions = { onTrackOptions(track) },
+                                            onToggleFavorite = { onToggleFavorite(track) }
+                                        )
+                                    }
+                                } else {
+                                    FlowRow(modifier = Modifier.fillMaxWidth()) {
+                                        gTracks.forEach { track ->
+                                            Box(Modifier.width(100.dp)) {
+                                                StellarGridItem(
+                                                    track = track,
+                                                    isSelected = false,
+                                                    onPlay = { onTrackClick(track) },
+                                                    onLongClick = { onTrackLongClick(track) },
+                                                    onOptions = { onTrackOptions(track) },
+                                                    onToggleFavorite = { onToggleFavorite(track) }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } 
+            } 
+        } 
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class) @Composable fun StellarTrackItem(track: TrackEntity, isSelected: Boolean, onPlay: () -> Unit, onLongClick: () -> Unit, onOptions: () -> Unit, onToggleFavorite: () -> Unit) {
     val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
     val primaryTextColor = if (isBright) Color.Black else LavenderTitle
     val secondaryTextColor = if (isBright) Color.DarkGray else Color.LightGray
+    var isExpanded by remember { mutableStateOf(false) }
 
-    Row(modifier = Modifier.fillMaxWidth().background(if (isSelected) (if (isBright) Color.Black.copy(0.05f) else Color.White.copy(0.1f)) else Color.Transparent).combinedClickable(onClick = onPlay, onLongClick = onLongClick, onDoubleClick = onToggleFavorite).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { 
-        Box { 
-            val imageModel = remember(track.customCoverPath, track.localPath) {
-                if (track.customCoverPath?.startsWith("http") == true) track.customCoverPath
-                else track.customCoverPath?.let { File(it) }?.takeIf { it.exists() }
-                    ?: track.localPath?.let { if (it.startsWith("content://")) it else File(it) }
-                    ?: R.drawable.ic_launcher_foreground
-            }
-            AsyncImage(model = imageModel, contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
-            if (isSelected) Box(modifier = Modifier.size(48.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) } 
-            
-            // Cloud Icon Overlay - Solid indicator for cloud-only
-            if (track.gDriveId != null && track.localPath == null && !track.isDownloaded) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "note_rotation")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(10000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
+    Column(modifier = Modifier.fillMaxWidth().animateContentSize()) {
+        Row(modifier = Modifier.fillMaxWidth().background(if (isSelected) (if (isBright) Color.Black.copy(0.05f) else Color.White.copy(0.1f)) else Color.Transparent).combinedClickable(onClick = onPlay, onLongClick = onLongClick, onDoubleClick = onToggleFavorite).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { 
+            Box { 
+                val imagePath = track.customCoverPath ?: track.localPath
+                val hasImage = imagePath != null && !imagePath.startsWith("http") && (if (imagePath.startsWith("content://")) true else File(imagePath).exists())
+                
+                if (hasImage || track.customCoverPath?.startsWith("http") == true) {
+                    AsyncImage(
+                        model = track.customCoverPath ?: track.localPath, 
+                        contentDescription = null, 
+                        modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), 
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Color.White.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote, 
+                            contentDescription = null, 
+                            tint = Color.Gray, 
+                            modifier = Modifier.size(44.dp).rotate(rotation) // Big rotating note
+                        )
+                    }
+                }
+                
+                if (isSelected) Box(modifier = Modifier.size(48.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) } 
+                    
+                // Cloud Icon Overlay - Top Left
+                if (track.gDriveId != null) {
                     Surface(
-                        color = Color.White,
+                        color = Color.White.copy(alpha = 0.9f),
                         shape = CircleShape,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(2.dp)
+                            .size(16.dp)
                     ) {
                         Icon(
                             Icons.Default.Cloud, 
                             null, 
-                            tint = Color(0xFF1976D2), // Standard cloud blue
-                            modifier = Modifier.padding(3.dp)
+                            tint = Color(0xFF1976D2),
+                            modifier = Modifier.padding(2.dp)
                         )
                     }
                 }
             }
+            Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) { 
+                Row(verticalAlignment = Alignment.CenterVertically) { 
+                    Text(text = track.displayName, style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Cursive, color = primaryTextColor, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    IconButton(onClick = onToggleFavorite, modifier = Modifier.size(24.dp)) { Icon(if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, modifier = Modifier.size(16.dp), tint = if (track.isFavorite) Color.Red else secondaryTextColor) } 
+                }
+                Text(text = "${track.displayArtist} | ${formatDuration(track.duration)}", style = MaterialTheme.typography.labelSmall, color = secondaryTextColor, maxLines = 1) 
+            }
             
-            // Merged Icon (Local + Cloud) - Top Right
-            if (track.gDriveId != null && track.localPath != null) {
-                Surface(
-                    color = Color.White.copy(alpha = 0.9f),
-                    shape = CircleShape,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(2.dp)
-                        .size(16.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Cloud, 
-                        null, 
-                        tint = Color(0xFF1976D2),
-                        modifier = Modifier.padding(2.dp)
-                    )
+            Column(horizontalAlignment = Alignment.End) {
+                // 3 Dots Menu - Top Right
+                IconButton(onClick = onOptions, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.MoreVert, null, tint = secondaryTextColor, modifier = Modifier.size(20.dp)) } 
+                
+                Spacer(Modifier.height(4.dp))
+                
+                // "i" Info Icon - Bottom Right
+                IconButton(onClick = { isExpanded = !isExpanded }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Info, null, tint = if (isExpanded) MaterialTheme.colorScheme.primary else secondaryTextColor.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
                 }
             }
         }
-        Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) { 
-            Row(verticalAlignment = Alignment.CenterVertically) { 
-                Text(text = track.displayName, style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Cursive, color = primaryTextColor, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                IconButton(onClick = onToggleFavorite, modifier = Modifier.size(24.dp)) { Icon(if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, modifier = Modifier.size(16.dp), tint = if (track.isFavorite) Color.Red else secondaryTextColor) } 
+        
+        if (isExpanded) {
+            Surface(
+                color = Color.White.copy(alpha = 0.08f),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("Technical Specification", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column(Modifier.weight(1f)) {
+                            InfoLabelValue("Artist", track.displayArtist)
+                            InfoLabelValue("Album", track.displayAlbum)
+                            InfoLabelValue("Quality", track.bitrate ?: "320 kbps")
+                        }
+                        Column(Modifier.weight(1f)) {
+                            InfoLabelValue("Duration", formatDuration(track.duration))
+                            InfoLabelValue("Source", if (track.gDriveId != null) "Cloud Synced" else "Local Storage")
+                            InfoLabelValue("File Type", "MPEG Audio (MP3)")
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Location:", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                    Text(track.localPath ?: "Remote Google Drive", style = MaterialTheme.typography.bodySmall, color = secondaryTextColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
             }
-            Text(text = "${track.displayArtist} | ${formatDuration(track.duration)}", style = MaterialTheme.typography.labelSmall, color = secondaryTextColor, maxLines = 1) 
         }
-        IconButton(onClick = onOptions) { Icon(Icons.Default.MoreVert, null, tint = secondaryTextColor, modifier = Modifier.size(20.dp)) } 
+    }
+}
+
+@Composable
+fun InfoLabelValue(label: String, value: String) {
+    Column(Modifier.padding(vertical = 2.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = Color.Gray)
+        Text(value, style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 @OptIn(ExperimentalFoundationApi::class) @Composable fun StellarGridItem(track: TrackEntity, isSelected: Boolean, onPlay: (TrackEntity) -> Unit, onLongClick: (TrackEntity) -> Unit, onOptions: () -> Unit, onToggleFavorite: () -> Unit) {
     val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
     val primaryTextColor = if (isBright) Color.Black else LavenderTitle
     val secondaryTextColor = if (isBright) Color.DarkGray else Color.Gray
+    var isExpanded by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).combinedClickable(onClick = { onPlay(track) }, onLongClick = { onLongClick(track) }, onDoubleClick = onToggleFavorite).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) { 
+    val infiniteTransition = rememberInfiniteTransition(label = "note_rotation")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(10000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
+    Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).combinedClickable(onClick = { onPlay(track) }, onLongClick = { onLongClick(track) }, onDoubleClick = onToggleFavorite).padding(4.dp).animateContentSize(), horizontalAlignment = Alignment.CenterHorizontally) { 
         Box { 
-            val imageModel = remember(track.customCoverPath, track.localPath) {
-                if (track.customCoverPath?.startsWith("http") == true) track.customCoverPath
-                else track.customCoverPath?.let { File(it) }?.takeIf { it.exists() }
-                    ?: track.localPath?.let { if (it.startsWith("content://")) it else File(it) }
-                    ?: R.drawable.ic_launcher_foreground
+            val imagePath = track.customCoverPath ?: track.localPath
+            val hasImage = imagePath != null && !imagePath.startsWith("http") && (if (imagePath.startsWith("content://")) true else File(imagePath).exists())
+
+            if (hasImage || track.customCoverPath?.startsWith("http") == true) {
+                AsyncImage(
+                    model = track.customCoverPath ?: track.localPath, 
+                    contentDescription = null, 
+                    modifier = Modifier.aspectRatio(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp)), 
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(Modifier.aspectRatio(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote, 
+                        contentDescription = null, 
+                        tint = Color.Gray, 
+                        modifier = Modifier.size(80.dp).rotate(rotation) // Very big rotating note
+                    )
+                }
             }
-            AsyncImage(model = imageModel, contentDescription = null, modifier = Modifier.aspectRatio(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
             
-            // 3 dots button for Grid items
+            // 3 dots button for Grid items - Top Right
             IconButton(
                 onClick = onOptions,
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
+                    .align(Alignment.TopEnd)
                     .size(28.dp)
                     .padding(4.dp)
                     .background(Color.Black.copy(alpha = 0.3f), CircleShape)
@@ -822,38 +1238,27 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
                 Icon(Icons.Default.MoreVert, null, tint = Color.White, modifier = Modifier.size(16.dp))
             }
 
-            if (isSelected) Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) }
-            
-            // Cloud Icon Overlay - Solid indicator for cloud-only
-            if (track.gDriveId != null && track.localPath == null && !track.isDownloaded) {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Surface(
-                        color = Color.White,
-                        shape = CircleShape,
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Cloud, 
-                            null, 
-                            tint = Color(0xFF1976D2),
-                            modifier = Modifier.padding(4.dp)
-                        )
-                    }
-                }
+            // Info button for Grid - Bottom Right
+            IconButton(
+                onClick = { isExpanded = !isExpanded },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(28.dp)
+                    .padding(4.dp)
+                    .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+            ) {
+                Icon(Icons.Default.Info, null, tint = Color.White, modifier = Modifier.size(14.dp))
             }
 
-            // Merged Icon (Local + Cloud) - Top Right
-            if (track.gDriveId != null && track.localPath != null) {
+            if (isSelected) Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Check, null, tint = Color.White) }
+            
+            // Merged Icon (Local + Cloud) - Top Left
+            if (track.gDriveId != null) {
                 Surface(
                     color = Color.White.copy(alpha = 0.9f),
                     shape = CircleShape,
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
+                        .align(Alignment.TopStart)
                         .padding(4.dp)
                         .size(18.dp)
                 ) {
@@ -866,9 +1271,27 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
                 }
             }
             
-            if (track.isFavorite) Icon(Icons.Default.Favorite, null, tint = Color.Red, modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(16.dp))
+            if (track.isFavorite) Icon(Icons.Default.Favorite, null, tint = Color.Red, modifier = Modifier.align(Alignment.TopEnd).padding(32.dp, 6.dp, 6.dp, 32.dp).size(16.dp))
         }
         Spacer(Modifier.height(6.dp))
+        
+        if (isExpanded) {
+            Surface(
+                color = Color.White.copy(alpha = 0.08f),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+            ) {
+                Column(Modifier.padding(8.dp)) {
+                    Text("Technical Info", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    Text("BPS: ${track.bitrate ?: "320k"}", fontSize = 8.sp, color = Color.White)
+                    Text("Len: ${formatDuration(track.duration)}", fontSize = 8.sp, color = Color.White)
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+        
         Text(text = track.displayName, color = primaryTextColor, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Text(text = track.displayArtist, color = secondaryTextColor, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) 
     }

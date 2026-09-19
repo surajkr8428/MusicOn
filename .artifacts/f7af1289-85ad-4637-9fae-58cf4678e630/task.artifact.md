@@ -1,7 +1,12 @@
-- `[/]` Final Aesthetic Branding & Functional UX
-    - `[ ]` Refactor `ic_nirvaana_logo.xml` for maximum aesthetic appeal
-    - `[ ]` Implement `MultiSelectSongDialog` in `LibraryScreen.kt` for adding songs to playlists
-    - `[ ]` Fix visibility of progress bars in `LibraryScreen.kt` and `MiniPlayer.kt`
-    - `[ ]` Correct image rotation logic in `PlayerScreen.kt`
-- `[ ]` Verify all functional flows
+- `[/]` Nirvaana UX Mastery & Aesthetic Iconography Polish
+    - `[ ]` Redesign `ic_nirvaana_logo.xml` (Minimalist 2.0)
+    - `[ ]` Refactor `MainActivity.kt` for adaptive sidebar widths
+    - `[ ]` Update `CircularSyncProgressBar.kt` (Large size & dynamic color)
+    - `[ ]` Reorder tabs and set default in `LibraryScreen.kt`
+    - `[ ]` Standardize song item layout (Cloud Top-Left, Menu Top-Right, Info Bottom-Right)
+    - `[ ]` Implement inline expansion & view toggles for Categories
+    - `[ ]` Update `MainViewModel.kt` for Session History & Metadata
+    - `[ ]` Harden `PlaybackService.kt` longevity
+    - `[ ]` Polish `PlayerScreen.kt` rotating note
+- `[ ]` Verify all functional and visual changes
 - `[ ]` Create final walkthrough

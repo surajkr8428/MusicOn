@@ -61,26 +61,19 @@ class MusicRepository(
 
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
-                val name = cursor.getString(nameColumn)
                 val path = cursor.getString(dataColumn)
                 
-                // Duplicate Protection: Check by Path first (fastest)
                 if (existingPaths.contains(path.lowercase())) continue
-
-                // Check for potential recordings or duplicates by metadata
-                if (path.lowercase().contains("call") || 
-                    path.lowercase().contains("recordings") || 
-                    path.lowercase().contains("recorder")) {
-                    continue
-                }
 
                 val contentUri = android.content.ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
                 val track = MediaMetadataUtils.extractMetadata(context, contentUri, id.toString())
                 
                 if (track != null) {
-                    val fingerprint = "${track.displayName.lowercase().trim()}_${track.displayArtist.lowercase().trim()}"
+                    fun String.normalizeFingerprint() = this.lowercase().removeSuffix(".mp3").trim().replace(" ", "")
+                    val fingerprint = "${track.displayName.normalizeFingerprint()}_${track.displayArtist.normalizeFingerprint()}"
+                    
                     if (existingFingerprints.contains(fingerprint)) {
-                        android.util.Log.d("MusicRepository", "Skipping duplicate by metadata: ${track.displayName}")
+                        android.util.Log.d("MusicRepository", "Skipping duplicate local: ${track.displayName}")
                         continue
                     }
                     trackDao.insertTrack(track)
@@ -101,12 +94,12 @@ class MusicRepository(
             val allLocalTracks = trackDao.getAllTracks().first()
             
             cloudFiles.forEach { file ->
-                fun String.normalize() = this.lowercase().removeSuffix(".mp3").trim()
-                val cleanCloudName = file.name.normalize()
+                fun String.normalizeFingerprint() = this.lowercase().removeSuffix(".mp3").trim().replace(" ", "")
+                val cleanCloudName = file.name.normalizeFingerprint()
                 
                 val local = allLocalTracks.find { 
-                    it.displayName.normalize() == cleanCloudName ||
-                    it.title.normalize() == cleanCloudName ||
+                    it.displayName.normalizeFingerprint() == cleanCloudName ||
+                    it.title.normalizeFingerprint() == cleanCloudName ||
                     it.gDriveId == file.id
                 }
                 

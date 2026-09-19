@@ -105,7 +105,10 @@ fun MiniPlayer(
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxSize().padding(8.dp)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+                    .padding(bottom = 4.dp) // Leave space for progress indicator
             ) {
                 AsyncImage(
                     model = currentMediaItem?.mediaMetadata?.artworkUri,
@@ -155,16 +158,16 @@ fun MiniPlayer(
                 }
             }
             
-            // Progress Line - Reactive fix
+            // Elongated Progress Line
             val progress = if (player.duration > 0) position.toFloat() / player.duration else 0f
             LinearProgressIndicator(
                 progress = { progress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomCenter)
-                    .height(4.dp),
+                    .height(6.dp), // Increased height for visibility
                 color = Color.Red,
-                trackColor = Color.White.copy(alpha = 0.1f)
+                trackColor = Color.White.copy(alpha = 0.2f)
             )
         }
     }

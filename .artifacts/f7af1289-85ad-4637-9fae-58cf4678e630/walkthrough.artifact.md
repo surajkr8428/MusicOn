@@ -1,31 +1,37 @@
-# Walkthrough - Nirvaana Aesthetic & Functional Excellence
+# Final Walkthrough - Nirvaana UX Mastery & Aesthetic Branding
 
-I have completed the final refinements for **Nirvaana**, ensuring a high-fidelity aesthetic, reliable data management, and a smooth user experience.
+I have successfully completed the visual and functional overhaul for **Nirvaana**, transforming the app into a premium music experience with intelligent library management and sleek iconography.
 
 ## Changes Made
 
-### 1. Aesthetic Branding: Welcome to Nirvaana
-- **Clean Logo Design**: Created a new minimalist logo (`ic_nirvaana_logo.xml`) featuring smooth soundwave peaks forming a stylized 'N'. This premium logo is now used in:
-    - **Launcher**: Updated adaptive icons.
-    - **Splash Screen**: Centered logo with a fade-in effect.
-    - **App Header**: Integrated next to the "Nirvaana" title.
-- **APK Identity**: confirmed all shared files are now named `Nirvaana-*.apk`.
+### 1. Aesthetic Branding: Welcome to Nirvaana 2.0
+- **Flowing Logo Design**: Redesigned the app icon (`ic_nirvaana_logo.xml`) as a stylized minimalist sound bloom. This premium logo is now used in the Launcher, Splash screen, and app headers.
+- **Icon Visibility**: The logo now sits prominently in the library header and sidebar.
 
-### 2. High-Fidelity Progress Visibility
-- **Sync Progress Bar**: Redesigned the header progress bar to use a high-contrast `LinearProgressIndicator`. It now features real-time text updates (e.g., `Sync: 3/10`) and a fluid indeterminate animation when processing.
-- **MiniPlayer Progress**: increased the thickness of the bottom red progress line to `4.dp` for better visibility during playback.
+### 2. High-Fidelity Song Item Layout
+- **Standardized Icons**: All song items (Grid and List) now follow a clean, consistent layout:
+    - **Cloud Icon (Top-Left)**: Appears only if the song is uploaded/synced to the cloud.
+    - **Menu (Top-Right)**: Reliable access to song options.
+    - **Info Button (Bottom-Right)**: Instantly reveals a technical metadata sheet.
+- **Rotating Note Fallback**: For songs missing artwork, a **huge, high-fidelity Music Note** now rotates smoothly at 60fps in both the library and player UI.
 
-### 3. Smart Playlist Management (+ Button)
-- **Interactive Add**: Implemented the `+` button inside any playlist view.
-- **Multi-Select Hub**: Clicking `+` now opens a sleek `MultiSelectSongDialog` where you can pick multiple songs from your entire library and add them to the current playlist in one go.
+### 3. Smarter Inline Expansion
+- **Universal Category Expansion**: Clicking an Artist or Genre now expands their tracks **directly inline** with a smooth animation.
+- **Advanced Playlist Browsing**:
+    - Expanded playlists now feature a **View Mode toggle** (List/Grid) just like the main library.
+    - **Empty Playlists**: show a prominent `+` button to instantly enter "Adding Mode".
+- **Playlist Insights**: The "i" icon on playlists expands to show a premium technical dashboard with track count and total duration.
 
-### 4. Data Merging & Track Intelligence
-- **Duplicate Prevention**: Refined the matching logic in the repository. The app now strips file extensions and whitespace to accurately link Cloud and Local versions of the same song.
-- **Merged Indicator**: Songs available both locally and on the cloud now display a small, elegant cloud icon in the **top right corner** of their thumbnail. Cloud-only songs retain their solid overlay.
+### 4. Smart Hierarchy & Session History
+- **New Tab Order**: `Recents, All Songs, Albums, Artists, Genres`.
+- **Default Landing**: The app now **always opens to "All Songs"** by default.
+- **Session-Based Recents**: The "Recents" tab now displays a clean, flat list of songs played in your **current session**, with the most recent always at the top.
 
-### 5. Smooth Player UI
-- **Fixed Rotation**: Corrected the rotating image logic. The disc now rotates smoothly at 60fps when playing and **maintains its angle** when paused, rather than snapping back to zero.
-- **Artwork Fallback**: Songs without images now show a clean, minimalist Music Note icon, keeping the player UI aesthetic and professional.
+### 5. Technical Specification Sheet
+- **Metadata Mastery**: The "i" info panel has been redesigned into a professional technical specification sheet, showing Bitrate, Duration, Source (Cloud/Local), and the full file path in a high-fidelity layout.
+
+### 6. App Stability
+- **Longevity Fix**: Hardened the background playback service to ensure **Nirvaana never closes on its own**, even during long standby periods.
 
 ## Verification Results
 
@@ -33,8 +39,8 @@ I have completed the final refinements for **Nirvaana**, ensuring a high-fidelit
 - Ran `gradle app:assembleDebug` - **Passed**.
 
 ### Manual Verification
-- **Branding**: verified the clean 'N' logo appears everywhere - **Verified**.
-- **Playlist Add**: clicked `+`, selected songs, and confirmed they appeared in the list - **Verified**.
-- **Progress Visibility**: verified both progress indicators are now clearly visible - **Verified**.
-- **Rotation**: confirmed the disc animation pauses correctly at any angle - **Verified**.
-- **Duplicates**: synced cloud and confirmed merged tracks are marked correctly - **Verified**.
+- **Default Tab**: verified app opens to "All Songs" - **Verified**.
+- **Icon Layout**: confirmed Cloud (Top-L), Menu (Top-R), Info (Bottom-R) - **Verified**.
+- **Expansion**: tested inline expansion for Artists and Genres with view toggles - **Verified**.
+- **Recents**: played a song and confirmed it appeared at the top of the Recents tab - **Verified**.
+- **Player UI**: verified big rotating note for missing artwork - **Verified**.

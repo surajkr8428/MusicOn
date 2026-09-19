@@ -3,24 +3,28 @@
     android:height="120dp"
     android:viewportWidth="120"
     android:viewportHeight="120">
-    <!-- Aesthetic Minimalist Nirvaana Logo: Fluid Sound Bloom -->
-    <!-- Stylized 'N' forming an infinity sound loop -->
+    <!-- Nirvaana 3.0: Premium Headphone + N Aesthetic -->
+    <!-- Minimalist Headphone Frame -->
     <path
-        android:pathData="M30,85 L30,40 C30,25 45,20 60,45 C75,70 90,65 90,40 L90,85"
+        android:pathData="M20,60 C20,30 40,15 60,15 C80,15 100,30 100,60"
         android:strokeColor="#1976D2"
+        android:strokeWidth="10"
+        android:strokeLineCap="round"/>
+
+    <!-- Left Speaker Pad -->
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M15,55 h12 v25 h-12 z"/>
+    <!-- Right Speaker Pad -->
+    <path
+        android:fillColor="#1976D2"
+        android:pathData="M93,55 h12 v25 h-12 z"/>
+
+    <!-- Central Stylized 'N' Core -->
+    <path
+        android:pathData="M45,85 L45,45 L75,85 L75,45"
+        android:strokeColor="#42A5F5"
         android:strokeWidth="10"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"/>
-
-    <!-- Accent core pulse -->
-    <path
-        android:pathData="M45,55 Q60,40 75,55"
-        android:strokeColor="#64B5F6"
-        android:strokeWidth="6"
-        android:strokeLineCap="round"/>
-
-    <!-- High-fidelity musical dot -->
-    <path
-        android:fillColor="#1976D2"
-        android:pathData="M30,85 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0"/>
 </vector>
