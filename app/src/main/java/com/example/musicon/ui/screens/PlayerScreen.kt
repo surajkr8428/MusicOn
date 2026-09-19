@@ -511,19 +511,19 @@ fun PlayerLayoutPortrait(
                                 .build(), 
                             contentDescription = null,
                             modifier = Modifier
-                                .fillMaxSize(0.85f)
+                                .fillMaxSize(0.95f) // Increased from 0.85f
                                 .aspectRatio(1f)
-                                .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
+                                .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(32.dp))
                                 .rotate(if (imageMode == PlayerImageMode.ROTATION) rotationAngle else 0f),
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        // Big Rotating Music Note Fallback
+                        // Giant Rotating Music Note Fallback
                         Icon(
                             imageVector = Icons.Default.MusicNote,
                             contentDescription = null,
-                            tint = fallbackColor.copy(alpha = 0.4f),
-                            modifier = Modifier.size(200.dp).rotate(rotationAngle)
+                            tint = fallbackColor.copy(alpha = 0.5f),
+                            modifier = Modifier.size(280.dp).rotate(rotationAngle) // Giant 280dp note
                         )
                     }
                     
@@ -647,9 +647,9 @@ fun PlayerLayoutLandscape(
                                     .build(),
                                 contentDescription = null,
                                 modifier = Modifier
-                                    .fillMaxHeight(0.9f)
+                                    .fillMaxHeight(0.95f) // Increased
                                     .aspectRatio(1f)
-                                    .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(24.dp))
+                                    .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(32.dp))
                                     .rotate(if (imageMode == PlayerImageMode.ROTATION) rotationAngle else 0f),
                                 contentScale = ContentScale.Crop
                             )
@@ -657,8 +657,8 @@ fun PlayerLayoutLandscape(
                             Icon(
                                 imageVector = Icons.Default.MusicNote,
                                 contentDescription = null,
-                                tint = fallbackColor.copy(alpha = 0.4f),
-                                modifier = Modifier.size(140.dp).rotate(rotationAngle)
+                                tint = fallbackColor.copy(alpha = 0.5f),
+                                modifier = Modifier.size(220.dp).rotate(rotationAngle) // Giant for landscape too
                             )
                         }
                     }

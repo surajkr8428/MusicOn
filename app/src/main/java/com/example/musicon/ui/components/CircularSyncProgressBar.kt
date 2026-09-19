@@ -40,7 +40,7 @@ fun CircularSyncProgressBar(
         label = "rotation"
     )
 
-    val primaryColor = MaterialTheme.colorScheme.primary
+    val accentColor = MaterialTheme.colorScheme.primary
     val trackColor = Color.White.copy(alpha = 0.05f)
 
     Column(
@@ -48,12 +48,13 @@ fun CircularSyncProgressBar(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(220.dp)) { // Giant 240dp (slightly smaller for padding)
-            Canvas(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+        // Double the circle size: 240dp
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(240.dp)) {
+            Canvas(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                 // Background Track
                 drawCircle(
                     color = trackColor,
-                    style = Stroke(width = 16.dp.toPx(), cap = StrokeCap.Round)
+                    style = Stroke(width = 20.dp.toPx(), cap = StrokeCap.Round)
                 )
 
                 // Progress Arc
@@ -61,58 +62,58 @@ fun CircularSyncProgressBar(
                 val startAngle = if (isIndeterminate) rotation else -90f
                 
                 drawArc(
-                    color = primaryColor,
+                    color = accentColor,
                     startAngle = startAngle,
                     sweepAngle = sweep,
                     useCenter = false,
-                    style = Stroke(width = 16.dp.toPx(), cap = StrokeCap.Round)
+                    style = Stroke(width = 20.dp.toPx(), cap = StrokeCap.Round)
                 )
             }
 
-            // Percentage Text
+            // Percentage Text - Dynamic & Big
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 if (!isIndeterminate && syncStatus !is SyncStatus.Idle) {
                     Text(
                         text = "${(progress * 100).toInt()}%",
-                        style = MaterialTheme.typography.displayMedium.copy(
+                        style = MaterialTheme.typography.displayLarge.copy(
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 42.sp
+                            fontSize = 48.sp
                         ),
-                        color = Color.White
+                        color = accentColor
                     )
                 } else if (syncStatus is SyncStatus.Idle) {
                      Text(
-                        text = "Ready",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.Gray
+                        text = "READY",
+                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+                        color = accentColor.copy(alpha = 0.6f)
                     )
                 } else {
                     Text(
                         text = "...",
-                        style = MaterialTheme.typography.displayMedium,
-                        color = Color.White
+                        style = MaterialTheme.typography.displayLarge,
+                        color = accentColor
                     )
                 }
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
 
-        // Song Count Text - Hero Status
+        // Song Count Text - Always visible status
         val statusText = when (syncStatus) {
             is SyncStatus.Loading -> {
                 if (syncStatus.total > 0) "Uploading: ${syncStatus.current} / ${syncStatus.total}" else "Connecting..."
             }
-            is SyncStatus.Success -> "${syncStatus.uploaded} Songs Uploaded"
+            is SyncStatus.Success -> "Success: ${syncStatus.uploaded} Uploaded"
             is SyncStatus.Error -> "Sync Paused"
-            is SyncStatus.Idle -> "All Songs Up to Date"
+            is SyncStatus.Idle -> "Library is Synchronized"
         }
 
         Text(
-            text = statusText,
-            style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
+            text = statusText.uppercase(),
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.5.sp
             ),
             color = if (syncStatus is SyncStatus.Error) Color.Red else Color.Gray
         )

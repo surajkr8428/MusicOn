@@ -29,6 +29,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -139,7 +140,7 @@ fun LibraryScreen(
     var showBulkPlaylistDialog by remember { mutableStateOf(false) }
     var addingToPlaylistId by remember { mutableStateOf<String?>(null) }
 
-    val baseTabs = listOf("Recent", "All Songs", "Albums", "Artists", "Genres")
+    val baseTabs = listOf("Recents", "All Songs", "Playlists", "Albums", "Artists", "Genres")
     val tabs = baseTabs + customFolders.map { it.substringAfterLast("/").ifBlank { "Folder" } }
     val pagerState = rememberPagerState(initialPage = 1) { tabs.size }
 
@@ -290,21 +291,17 @@ fun LibraryScreen(
                         }
                         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                             when (page) {
-                                0 -> SongsTab(tracks, selectedIds, viewMode, isLandscape, songListState, songGridState, { if (isSelectionMode) selectedIds = if (it.id in selectedIds) selectedIds - it.id else selectedIds + it.id else viewModel.playTrackList(tracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(tracks.shuffled()) }, { viewModel.playSelected(tracks) }, { viewModel.toggleFavorite(it) })
-                                1 -> PlaylistsTab(playlists, viewMode, playlistListState, playlistGridState, { currentPlaylistDetail = it }, { showCreatePlaylistDialog = true }, { selectedPlaylistOptions = it }, { viewModel.getTracksForPlaylist(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } })
-                                2 -> GroupedTab(allTracks, "Album", viewMode, groupedListStates.getOrPut("Album"){rememberLazyListState()}, groupedGridStates.getOrPut("Album"){rememberLazyGridState()}, { viewModel.playSelected(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) })
-                                3 -> GroupedTab(allTracks, "Artist", viewMode, groupedListStates.getOrPut("Artist"){rememberLazyListState()}, groupedGridStates.getOrPut("Artist"){rememberLazyGridState()}, { viewModel.playSelected(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) })
-                                4 -> GroupedTab(allTracks, "Genre", viewMode, groupedListStates.getOrPut("Genre"){rememberLazyListState()}, groupedGridStates.getOrPut("Genre"){rememberLazyGridState()}, { viewModel.playSelected(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) })
-                                5 -> { 
-                                    val recent by viewModel.recentlyPlayed.collectAsState()
-                                    GroupedTab(recent, "Recently Played", viewMode, rememberLazyListState(), rememberLazyGridState(), { viewModel.playSelected(it) }, { viewModel.playTrackList(recent, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }) 
+                                0 -> { 
+                                    val sessionRecent by viewModel.sessionRecentlyPlayed.collectAsState()
+                                    SongsTab(sessionRecent, selectedIds, viewMode, isLandscape, rememberLazyListState(), rememberLazyGridState(), { viewModel.playTrackList(sessionRecent, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(sessionRecent.shuffled()) }, { viewModel.playSelected(sessionRecent) }, { viewModel.toggleFavorite(it) })
                                 }
-                                6 -> { 
-                                    val popular by viewModel.mostPlayed.collectAsState()
-                                    GroupedTab(popular, "Popular Songs", viewMode, rememberLazyListState(), rememberLazyGridState(), { viewModel.playSelected(it) }, { viewModel.playTrackList(popular, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }) 
-                                }
+                                1 -> SongsTab(tracks, selectedIds, viewMode, isLandscape, songListState, songGridState, { if (isSelectionMode) selectedIds = if (it.id in selectedIds) selectedIds - it.id else selectedIds + it.id else viewModel.playTrackList(tracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(tracks.shuffled()) }, { viewModel.playSelected(tracks) }, { viewModel.toggleFavorite(it) })
+                                2 -> PlaylistsTab(playlists, viewMode, playlistListState, playlistGridState, { currentPlaylistDetail = it }, { showCreatePlaylistDialog = true }, { selectedPlaylistOptions = it }, { viewModel.getTracksForPlaylist(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } })
+                                3 -> GroupedTab(allTracks, "Album", viewMode, groupedListStates.getOrPut("Album"){rememberLazyListState()}, groupedGridStates.getOrPut("Album"){rememberLazyGridState()}, { viewModel.playSelected(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) })
+                                4 -> GroupedTab(allTracks, "Artist", viewMode, groupedListStates.getOrPut("Artist"){rememberLazyListState()}, groupedGridStates.getOrPut("Artist"){rememberLazyGridState()}, { viewModel.playSelected(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) })
+                                5 -> GroupedTab(allTracks, "Genre", viewMode, groupedListStates.getOrPut("Genre"){rememberLazyListState()}, groupedGridStates.getOrPut("Genre"){rememberLazyGridState()}, { viewModel.playSelected(it) }, { viewModel.playTrackList(allTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) })
                                 else -> {
-                                    val path = customFolders[page - 7]
+                                    val path = customFolders[page - 6]
                                     val fTracks = allTracks.filter { it.localPath?.startsWith(path) == true }
                                     SongsTab(fTracks, selectedIds, viewMode, isLandscape, folderListStates.getOrPut(path){rememberLazyListState()}, folderGridStates.getOrPut(path){rememberLazyGridState()}, { viewModel.playTrackList(fTracks, it) }, { selectedIds = selectedIds + it.id }, { selectedTrackOptions = it }, { viewModel.playSelected(fTracks.shuffled()) }, { viewModel.playSelected(fTracks) }, { viewModel.toggleFavorite(it) })
                                 }
@@ -408,6 +405,7 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
     var showTrackInfoDialog by remember { mutableStateOf<TrackEntity?>(null) }
     var showBulkPlaylistDialog by remember { mutableStateOf(false) }
     val playlists by viewModel.allPlaylists.collectAsState()
+    var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.LIST) }
     
     val isSelectionMode = selectedIds.isNotEmpty()
     val scope = rememberCoroutineScope()
@@ -417,7 +415,6 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
     }
 
     val allTracks by viewModel.allTracks.collectAsState()
-    var showMultiSelectDialog by remember { mutableStateOf(false) }
 
     StellarBackground {
         Scaffold(
@@ -437,6 +434,9 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
                         title = { Text(playlist.name, color = Color.White, fontFamily = FontFamily.Cursive, fontSize = if (isLandscape) 18.sp else 24.sp) }, 
                         navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } }, 
                         actions = { 
+                            IconButton(onClick = { subViewMode = if (subViewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) {
+                                Icon(if (subViewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.White)
+                            }
                             IconButton(onClick = onAddSongs) { Icon(Icons.Default.Add, null, tint = Color.White) }
                         }, 
                         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
@@ -448,12 +448,9 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
                     SelectionBottomBar(
                         onPlay = { viewModel.playSelected(tracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
                         onNext = { viewModel.addToQueueNext(tracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
-                        onPlaylist = { 
-                            // Open dialog to choose destination playlist
-                            showBulkPlaylistDialog = true 
-                        },
+                        onPlaylist = { showBulkPlaylistDialog = true },
                         onShare = { viewModel.shareTracks(tracks.filter { it.id in selectedIds }); selectedIds = emptySet() },
-                        onUpload = { /* Upload logic */ },
+                        onUpload = { /* logic */ },
                         onRemove = { 
                             scope.launch {
                                 selectedIds.forEach { trackId ->
@@ -471,6 +468,48 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
             }
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
+                if (tracks.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Playlist is empty", color = Color.Gray)
+                            Spacer(Modifier.height(16.dp))
+                            Button(onClick = onAddSongs) {
+                                Icon(Icons.Default.Add, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Add Songs")
+                            }
+                        }
+                    }
+                } else {
+                    if (subViewMode == LibraryViewMode.GRID) {
+                        LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 100.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) { 
+                            items(tracks) { track ->
+                                StellarGridItem(
+                                    track = track, 
+                                    isSelected = track.id in selectedIds, 
+                                    onPlay = { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track) }, 
+                                    onLongClick = { if (!isSelectionMode) selectedIds = setOf(track.id) }, 
+                                    onOptions = { selectedTrackOptions = track },
+                                    onToggleFavorite = { viewModel.toggleFavorite(track) }
+                                ) 
+                            } 
+                        }
+                    } else {
+                        LazyColumn(Modifier.fillMaxSize()) { 
+                            items(tracks) { track ->
+                                StellarTrackItem(
+                                    track = track, 
+                                    isSelected = track.id in selectedIds, 
+                                    onPlay = { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track) }, 
+                                    onLongClick = { if (!isSelectionMode) selectedIds = setOf(track.id) }, 
+                                    onOptions = { selectedTrackOptions = track }, 
+                                    onToggleFavorite = { viewModel.toggleFavorite(track) }
+                                ) 
+                            } 
+                        }
+                    }
+                }
+                
                 if (selectedTrackOptions != null) {
                     TrackOptionsBottomSheet(track = selectedTrackOptions!!, onDismiss = { selectedTrackOptions = null }, onAction = { action ->
                         when (action) {
@@ -478,25 +517,18 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
                             "play" -> { viewModel.playTrack(selectedTrackOptions!!) }
                             "play_next" -> viewModel.addToQueueNext(listOf(selectedTrackOptions!!))
                             "download" -> viewModel.downloadTrack(selectedTrackOptions!!)
+                            "add_to_playlist" -> { showBulkPlaylistDialog = false; selectedIds = setOf(selectedTrackOptions!!.id); showBulkPlaylistDialog = true }
                             "edit" -> trackToEdit = selectedTrackOptions
-                            "location" -> viewModel.openFileLocation(selectedTrackOptions!!)
-                            "remove" -> { 
-                                scope.launch {
-                                    viewModel.removeTrackFromPlaylist(playlist.id, selectedTrackOptions!!.id)
-                                }
-                            }
-                            "upload" -> { viewModel.uploadTrack(selectedTrackOptions!!) }
+                            "remove" -> { scope.launch { viewModel.removeTrackFromPlaylist(playlist.id, selectedTrackOptions!!.id) } }
                             "info" -> { showTrackInfoDialog = selectedTrackOptions }
                             "share" -> { viewModel.shareTrack(selectedTrackOptions!!) }
-                            "delete" -> { trackToDeleteConfirm = selectedTrackOptions }
+                            "delete" -> { tracksToBulkDeleteConfirm = listOf(selectedTrackOptions!!) }
                         }
                         selectedTrackOptions = null
                     })
                 }
 
                 if (trackToEdit != null) com.example.musicon.ui.components.EditTrackDialog(track = trackToEdit!!, onDismiss = { trackToEdit = null }, onConfirm = { t, ar, al, c, l -> viewModel.updateTrackMetadata(trackToEdit!!.id, t, ar, al, c, l); trackToEdit = null })
-                if (trackToDeleteConfirm != null) AlertDialog(onDismissRequest = { trackToDeleteConfirm = null }, title = { Text("Remove Song?") }, text = { Text("Remove '${trackToDeleteConfirm!!.displayName}' from library?") }, confirmButton = { Button(onClick = { viewModel.removeFromLibrary(listOf(trackToDeleteConfirm!!)); trackToDeleteConfirm = null }) { Text("Remove") } }, dismissButton = { TextButton(onClick = { trackToDeleteConfirm = null }) { Text("Cancel") } })
-                
                 if (showTrackInfoDialog != null) {
                     val t = showTrackInfoDialog!!
                     AlertDialog(
@@ -517,46 +549,6 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
 
                 if (showBulkPlaylistDialog) com.example.musicon.ui.components.AddToPlaylistDialog(playlists = playlists, onDismiss = { showBulkPlaylistDialog = false }, onPlaylistSelected = { viewModel.bulkAddTracksToPlaylist(it, selectedIds.toList()); showBulkPlaylistDialog = false; selectedIds = emptySet() }, onCreateNew = { showBulkPlaylistDialog = false; viewModel.createPlaylist("New Playlist", selectedIds.toList()); selectedIds = emptySet() })
                 if (tracksToBulkDeleteConfirm != null) AlertDialog(onDismissRequest = { tracksToBulkDeleteConfirm = null }, title = { Text("Delete Songs?", color = Color.White) }, text = { Text("Are you sure you want to delete ${tracksToBulkDeleteConfirm!!.size} songs? This cannot be undone.", color = Color.Gray) }, confirmButton = { Button(onClick = { viewModel.bulkDelete(tracksToBulkDeleteConfirm!!); tracksToBulkDeleteConfirm = null; selectedIds = emptySet() }, colors = ButtonDefaults.buttonColors(containerColor = Color.Red)) { Text("Delete") } }, dismissButton = { TextButton(onClick = { tracksToBulkDeleteConfirm = null }) { Text("Cancel") } })
-
-                if (showMultiSelectDialog) {
-                    com.example.musicon.ui.components.MultiSelectSongDialog(
-                        allTracks = allTracks,
-                        existingTrackIds = tracks.map { it.id }.toSet(),
-                        onDismiss = { showMultiSelectDialog = false },
-                        onConfirm = { selectedSongs ->
-                            viewModel.bulkAddTracksToPlaylist(playlist.id, selectedSongs)
-                            showMultiSelectDialog = false
-                        }
-                    )
-                }
-
-                if (viewMode == LibraryViewMode.GRID) {
-                    LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 100.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) { 
-                        items(tracks) { track ->
-                            StellarGridItem(
-                                track = track, 
-                                isSelected = track.id in selectedIds, 
-                                onPlay = { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track) }, 
-                                onLongClick = { if (!isSelectionMode) selectedIds = setOf(track.id) }, 
-                                onOptions = { selectedTrackOptions = track },
-                                onToggleFavorite = { viewModel.toggleFavorite(track) }
-                            ) 
-                        } 
-                    }
-                } else {
-                    LazyColumn(Modifier.fillMaxSize()) { 
-                        items(tracks) { track ->
-                            StellarTrackItem(
-                                track = track, 
-                                isSelected = track.id in selectedIds, 
-                                onPlay = { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track) }, 
-                                onLongClick = { if (!isSelectionMode) selectedIds = setOf(track.id) }, 
-                                onOptions = { selectedTrackOptions = track }, 
-                                onToggleFavorite = { viewModel.toggleFavorite(track) }
-                            ) 
-                        } 
-                    }
-                }
             }
         }
     }

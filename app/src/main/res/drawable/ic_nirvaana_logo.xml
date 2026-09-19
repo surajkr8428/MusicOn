@@ -3,28 +3,29 @@
     android:height="120dp"
     android:viewportWidth="120"
     android:viewportHeight="120">
-    <!-- Nirvaana 3.0: Premium Headphone + N Aesthetic -->
-    <!-- Minimalist Headphone Frame -->
+    <!-- Nirvaana 3.5: Premium Headphone Silhouette with 'N' Core -->
+    <!-- Headphone Arch -->
     <path
-        android:pathData="M20,60 C20,30 40,15 60,15 C80,15 100,30 100,60"
-        android:strokeColor="#1976D2"
-        android:strokeWidth="10"
+        android:pathData="M25,60 C25,25 45,15 60,15 C75,15 95,25 95,60"
+        android:strokeColor="#2196F3"
+        android:strokeWidth="12"
         android:strokeLineCap="round"/>
 
-    <!-- Left Speaker Pad -->
+    <!-- Left Earpiece (Speaker) -->
     <path
         android:fillColor="#1976D2"
-        android:pathData="M15,55 h12 v25 h-12 z"/>
-    <!-- Right Speaker Pad -->
+        android:pathData="M15,55 Q15,50 20,50 L30,50 L30,85 L20,85 Q15,85 15,80 Z"/>
+
+    <!-- Right Earpiece (Speaker) -->
     <path
         android:fillColor="#1976D2"
-        android:pathData="M93,55 h12 v25 h-12 z"/>
+        android:pathData="M105,55 Q105,50 100,50 L90,50 L90,85 L100,85 Q105,85 105,80 Z"/>
 
     <!-- Central Stylized 'N' Core -->
     <path
         android:pathData="M45,85 L45,45 L75,85 L75,45"
-        android:strokeColor="#42A5F5"
-        android:strokeWidth="10"
+        android:strokeColor="#BBDEFB"
+        android:strokeWidth="12"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"/>
 </vector>
