@@ -82,7 +82,12 @@ private val playlistIcons = listOf(
     Icons.Default.GraphicEq,
     Icons.Default.Radio,
     Icons.Default.Brush,
-    Icons.Default.Favorite
+    Icons.Default.Favorite,
+    Icons.Default.MusicNote,
+    Icons.Default.LibraryMusic,
+    Icons.Default.SurroundSound,
+    Icons.Default.Album,
+    Icons.Default.AutoAwesome
 )
 
 private fun getPlaylistIcon(playlistName: String): ImageVector {
@@ -576,7 +581,7 @@ fun LibraryTopBar(
     TopAppBar(
         modifier = if (isLandscape) Modifier.height(IntrinsicSize.Min) else Modifier, windowInsets = WindowInsets(0),
         title = {
-            if (isSearchActive) TextField(value = searchQuery, onValueChange = onSearchQueryChange, placeholder = { Text("Search songs...", color = Color.Gray, fontSize = 14.sp) }, modifier = Modifier.fillMaxWidth().padding(end = 8.dp).then(if (isLandscape) Modifier.height(40.dp) else Modifier), colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedTextColor = Color.White, unfocusedTextColor = Color.White), singleLine = true, trailingIcon = { IconButton(onClick = onSearchToggle) { Icon(Icons.Default.Close, null, tint = Color.Gray) } })
+            if (isSearchActive) TextField(value = searchQuery, onValueChange = onSearchQueryChange, placeholder = { Text("Search title, artist, or album...", color = Color.Gray, fontSize = 14.sp) }, modifier = Modifier.fillMaxWidth().padding(end = 8.dp).then(if (isLandscape) Modifier.height(40.dp) else Modifier), colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedTextColor = Color.White, unfocusedTextColor = Color.White), singleLine = true, trailingIcon = { IconButton(onClick = onSearchToggle) { Icon(Icons.Default.Close, null, tint = Color.Gray) } })
             else Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = if (isLandscape) 0.dp else 4.dp)) {
                 val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
                 val headerTextColor = if (isBright) Color.Black else Color.White
@@ -1182,7 +1187,7 @@ fun InfoLabelValue(label: String, value: String) {
     val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
     val primaryTextColor = if (isBright) Color.Black else LavenderTitle
     val secondaryTextColor = if (isBright) Color.DarkGray else Color.Gray
-    var isExpanded by remember { mutableStateOf(false) }
+    var showInfoPopup by remember { mutableStateOf(false) }
 
     val infiniteTransition = rememberInfiniteTransition(label = "note_rotation")
     val rotation by infiniteTransition.animateFloat(
@@ -1195,7 +1200,7 @@ fun InfoLabelValue(label: String, value: String) {
         label = "rotation"
     )
 
-    Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).combinedClickable(onClick = { onPlay(track) }, onLongClick = { onLongClick(track) }, onDoubleClick = onToggleFavorite).padding(4.dp).animateContentSize(), horizontalAlignment = Alignment.CenterHorizontally) { 
+    Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).combinedClickable(onClick = { onPlay(track) }, onLongClick = { onLongClick(track) }, onDoubleClick = onToggleFavorite).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) { 
         Box { 
             val imagePath = track.customCoverPath ?: track.localPath
             val hasImage = imagePath != null && !imagePath.startsWith("http") && (if (imagePath.startsWith("content://")) true else File(imagePath).exists())
@@ -1230,9 +1235,9 @@ fun InfoLabelValue(label: String, value: String) {
                 Icon(Icons.Default.MoreVert, null, tint = Color.White, modifier = Modifier.size(16.dp))
             }
 
-            // Info button for Grid - Bottom Right
+            // Info button for Grid - Bottom Right (Trigger Pop-up)
             IconButton(
-                onClick = { isExpanded = !isExpanded },
+                onClick = { showInfoPopup = true },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .size(28.dp)
@@ -1267,26 +1272,36 @@ fun InfoLabelValue(label: String, value: String) {
         }
         Spacer(Modifier.height(6.dp))
         
-        if (isExpanded) {
-            Surface(
-                color = Color.White.copy(alpha = 0.08f),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-            ) {
-                Column(Modifier.padding(8.dp)) {
-                    Text("Technical Info", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(4.dp))
-                    Text("BPS: ${track.bitrate ?: "320k"}", fontSize = 8.sp, color = Color.White)
-                    Text("Len: ${formatDuration(track.duration)}", fontSize = 8.sp, color = Color.White)
-                }
-            }
-            Spacer(Modifier.height(4.dp))
-        }
-        
         Text(text = track.displayName, color = primaryTextColor, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Text(text = track.displayArtist, color = secondaryTextColor, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center) 
     }
+
+    if (showInfoPopup) {
+        TechnicalInfoPopup(track = track, onDismiss = { showInfoPopup = false })
+    }
+}
+
+@Composable
+fun TechnicalInfoPopup(track: TrackEntity, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { Button(onClick = onDismiss) { Text("Done") } },
+        title = { Text("Song Specification", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary) },
+        containerColor = Color(0xFF1E1B36),
+        shape = RoundedCornerShape(16.dp),
+        text = {
+            Column(Modifier.fillMaxWidth()) {
+                InfoLabelValue("Artist", track.displayArtist)
+                InfoLabelValue("Album", track.displayAlbum)
+                InfoLabelValue("Quality", track.bitrate ?: "320 kbps")
+                InfoLabelValue("Duration", formatDuration(track.duration))
+                InfoLabelValue("Source", if (track.gDriveId != null) "Cloud Synced" else "Local Storage")
+                Spacer(Modifier.height(8.dp))
+                Text("File Path:", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Text(track.localPath ?: "Remote Google Drive", style = MaterialTheme.typography.bodySmall, color = Color.LightGray, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    )
 }
 
 @Composable fun GroupGridItem(name: String, tracks: List<TrackEntity>, onClick: (List<TrackEntity>) -> Unit) { Column(modifier = Modifier.padding(6.dp).clickable { onClick(tracks) }, horizontalAlignment = Alignment.CenterHorizontally) { Box(Modifier.size(70.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(0.05f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Album, null, tint = Color.Gray, modifier = Modifier.size(32.dp)) }; Spacer(Modifier.height(8.dp)); Text(name, color = Color.White, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center); Text("${tracks.size} songs", color = Color.Gray, fontSize = 9.sp, textAlign = TextAlign.Center) } }

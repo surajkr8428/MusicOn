@@ -1,48 +1,52 @@
-# Implementation Plan - Nirvaana UX Mastery & Storage Insights
+# Implementation Plan - Nirvaana UX Mastery & Massive Scale-Up
 
-This plan focuses on high-fidelity branding, granular storage insights in the sidebar, a professional "Pop-up" metadata experience for the Grid view, and a robust search experience.
+This plan delivers a comprehensive visual and functional scale-up for **Nirvaana**, focusing on universal grid accessibility, massive storage stats, and a smarter cloud-integrated library.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Storage Dashboard**: I am adding a live storage dashboard to your sidebar.
-> - **Phone Icon**: Displays the count of local songs.
-> - **Cloud Icon**: Displays the count of synced/cloud songs, with a **Sync button** next to it.
-> - **Sidebar Behavior**: The sidebar will **no longer close automatically** when you click sync.
-> **Grid Info Mastery**: In Grid View, clicking the "i" icon will now show a clean, rectangular technical pop-up instead of expanding the card.
-> **Search Precision**: The search bar placeholder will be updated to "Search title, artist, or album", and the logic will be verified to ensure instant matches across all three fields.
-> **Logo 3.0**: Redesigning the logo to a premium "N-Headphone" silhouette with no background colors.
+> **Massive Typography**: I am scaling up the "Nirvaana Storage" title by **5x** and the Local/Cloud counts by **3x**. This will make the storage dashboard the dominant feature of the sidebar.
+> **Universal Grid & Matrix**: All tabs (Recents, All Songs, etc.) will now respect the global List/Grid toggle. Expanded categories will use a "Flexible Matrix" (Staggered/Adaptive Grid) to display tracks inline.
+> **Cloud Deletion**: I am adding a **"Delete from Cloud"** option to the song menu. This will allow you to permanently remove files from your Google Drive directly from the app.
+> **Smart Playlist Building**: Clicking the `+` button in a playlist will now intelligently switch you to the "All Songs" tab and **activate Multi-Select mode** automatically, allowing for bulk additions.
+> **Aesthetic Fallbacks**: Songs without artwork will now feature a high-fidelity Music Note image in the **Song Info Popup** and the **Player UI**.
 
 ## Proposed Changes
 
-### 1. Brand Identity (Nirvaana 3.0)
-
-#### [MODIFY] [ic_nirvaana_logo.xml](file:///D:/MusicOn/app/src/main/res/drawable/ic_nirvaana_logo.xml)
-- Redesign with an aesthetic headphone silhouette and a modern 'N' between the earcups.
-
-### 2. Sidebar Storage Dashboard
+### 1. Adaptive Sidebar & Giant Dashboard
 
 #### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
-- **Dashboard Section**: Remove the sync button from the title row.
-- **Local Row**: Phone Icon + Local Song Count.
-- **Cloud Row**: Cloud Icon + Cloud Song Count + **Sync Button**.
-- **Interaction**: remove `leftDrawerState.close()` from the sync button logic.
+- Scale typography in the Sidebar Storage section:
+    - Title: `fontSize = 64.sp` (~5x increase).
+    - Counts: `fontSize = 36.sp` (~3x increase).
+- Ensure the layout remains balanced with these massive sizes.
+
+#### [MODIFY] [CircularSyncProgressBar.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/components/CircularSyncProgressBar.kt)
+- Add a **secondary Sync Button** at the center of the giant progress circle. This button will be clickable even when sync is idle.
+
+### 2. Universal Library Mastery
+
+#### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
+- **Universal Grid**: Refactor `SongsTab` and `GroupedTab` to use `LazyVerticalGrid` whenever `viewMode` is set to `GRID`, across all tabs (including Recents).
+- **Flexible Matrix**: Refactor expanded Category views (inside Artists, Albums, etc.) to use an adaptive flow layout/grid instead of a vertical list.
+- **Multi-Select Trigger**: Update `onAddSongs` to navigate to index `1` and set a flag in `MainViewModel` to force-activate selection mode.
+
+### 3. Cloud Song Management
 
 #### [MODIFY] [MainViewModel.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/viewmodel/MainViewModel.kt)
-- **Cloud Count**: Implement a state flow `cloudTracksCount` to track songs available in Google Drive.
-- **Optimized Sync**: Refine `syncAllLocalToCloud` to skip any track with a non-null `gDriveId`.
+- **Delete from Cloud**: Implement `deleteTrackFromCloud(trackId)` which calls `CloudStorageManager.deleteFile` and updates the local entity to remove the `gDriveId`.
+- **Selection State**: Add a `isForceSelectionMode` state to control the "Add Songs" workflow.
 
-### 3. Grid View Pop-up Info
+#### [MODIFY] [TrackOptionsBottomSheet.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/components/TrackOptionsBottomSheet.kt)
+- Add "Delete from GDrive" option (only visible if `gDriveId` is not null).
+
+### 4. High-Fidelity Artwork Fallbacks
+
+#### [MODIFY] [PlayerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/PlayerScreen.kt)
+- Ensure the `MusicNote` fallback is aesthetically integrated into the "hero" artwork area.
 
 #### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
-- **StellarGridItem**: Update the info icon logic to trigger a `Dialog` (Rectangular Pop-up).
-- **Metadata Sheet**: The pop-up will display structured technical specification.
-
-### 4. Search & UI Polish
-
-#### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
-- **Search Placeholder**: Update `LibraryTopBar` search field placeholder to "Search title, artist, or album...".
-- **Playlist Icons**: Expand the curated set of aesthetic music icons.
+- Update `TechnicalInfoPopup` to include a beautiful large Music Note image for songs missing album art.
 
 ## Verification Plan
 
@@ -50,8 +54,8 @@ This plan focuses on high-fidelity branding, granular storage insights in the si
 - Build verification: `gradle app:assembleDebug`.
 
 ### Manual Verification
-- **Search Check**: Type an album name in the search bar and verify matching songs appear instantly.
-- **Drawer Stats**: Open the sidebar and verify "Local" and "Cloud" counts are accurate.
-- **Grid Info**: Click "i" in Grid view and verify the rectangular pop-up appears.
-- **Smart Sync**: Confirm that clicking Sync only triggers uploads for unsynced songs.
-- **Logo**: check the new launcher and header logo design.
+- **Sidebar Stats**: verify the massive font sizes look professional and readable.
+- **Central Sync**: click the center of the 240dp progress circle to trigger a sync.
+- **Matrix Expansion**: expand an Artist and verify tracks appear in a flexible grid/matrix form.
+- **Cloud Delete**: verify a synced song can be removed from Drive via the song options menu.
+- **Bulk Add**: verify clicking `+` in a playlist takes you to All Songs with selection mode already active.

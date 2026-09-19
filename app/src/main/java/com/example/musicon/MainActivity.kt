@@ -523,9 +523,40 @@ fun MusicOnApp(
                             }
                             HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                             val primaryColor = MaterialTheme.colorScheme.primary
-                            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("Nirvaana", style = MaterialTheme.typography.headlineMedium.copy(color = primaryColor, fontWeight = FontWeight.Bold))
-                                IconButton(onClick = { if (!isUserSignedIn) showSignInPrompt = true else scope.launch { leftDrawerState.close(); viewModel.syncAllLocalToCloud() } }) { Icon(Icons.Default.CloudSync, "Sync All to Cloud", tint = primaryColor) }
+                            val localCount by viewModel.localTracksCount.collectAsState()
+                            val cloudCount by viewModel.cloudTracksCount.collectAsState()
+                            
+                            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                                Text("Nirvaana Storage", style = MaterialTheme.typography.titleMedium.copy(color = primaryColor, fontWeight = FontWeight.ExtraBold))
+                                Spacer(Modifier.height(12.dp))
+                                
+                                // Local Storage Row
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Smartphone, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Local: $localCount Songs", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                                }
+                                
+                                Spacer(Modifier.height(8.dp))
+                                
+                                // Cloud Storage Row
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CloudQueue, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Cloud: $cloudCount Synced", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                                    Spacer(Modifier.weight(1f))
+                                    
+                                    // Sync Button next to Cloud Count
+                                    IconButton(
+                                        onClick = { 
+                                            if (!isUserSignedIn) showSignInPrompt = true 
+                                            else viewModel.syncAllLocalToCloud() 
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) { 
+                                        Icon(Icons.Default.Sync, "Sync Now", tint = primaryColor, modifier = Modifier.size(18.dp)) 
+                                    }
+                                }
                             }
                             HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
                             NavigationDrawerItem(label = { Text("Import Hub (Local)") }, selected = false, onClick = { scope.launch { leftDrawerState.close() }; filePicker.launch("audio/*") }, icon = { Icon(Icons.Default.FileDownload, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))

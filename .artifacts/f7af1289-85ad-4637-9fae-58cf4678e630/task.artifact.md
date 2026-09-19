@@ -1,12 +1,10 @@
-- `[/]` Nirvaana UX Mastery & Aesthetic Iconography Polish
-    - `[ ]` Redesign `ic_nirvaana_logo.xml` (Minimalist 2.0)
-    - `[ ]` Refactor `MainActivity.kt` for adaptive sidebar widths
-    - `[ ]` Update `CircularSyncProgressBar.kt` (Large size & dynamic color)
-    - `[ ]` Reorder tabs and set default in `LibraryScreen.kt`
-    - `[ ]` Standardize song item layout (Cloud Top-Left, Menu Top-Right, Info Bottom-Right)
-    - `[ ]` Implement inline expansion & view toggles for Categories
-    - `[ ]` Update `MainViewModel.kt` for Session History & Metadata
-    - `[ ]` Harden `PlaybackService.kt` longevity
-    - `[ ]` Polish `PlayerScreen.kt` rotating note
+- `[/]` Nirvaana UX Mastery & Storage Insights
+    - `[ ]` Redesign `ic_nirvaana_logo.xml` (Headphone + N 3.0)
+    - `[ ]` Update `MainViewModel.kt`: `cloudTracksCount` and optimized sync
+    - `[ ]` Update `MainActivity.kt`: Sidebar Storage Dashboard (Phone/Cloud rows)
+    - `[ ]` Update `LibraryScreen.kt`:
+        - `[ ]` Professional Grid Pop-up Info
+        - `[ ]` Search Placeholder update
+        - `[ ]` Curated Playlist Icons expansion
 - `[ ]` Verify all functional and visual changes
 - `[ ]` Create final walkthrough

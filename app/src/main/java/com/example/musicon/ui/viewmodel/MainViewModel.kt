@@ -73,6 +73,13 @@ class MainViewModel(
     val allPlaylists: StateFlow<List<Playlist>> = musicRepository.allPlaylists
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val localTracksCount: StateFlow<Int> = allTracks.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val cloudTracksCount: StateFlow<Int> = musicRepository.allTracks
+        .map { tracks -> tracks.count { it.gDriveId != null } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
     // Preferences
     val pauseOnDetach: StateFlow<Boolean> = settingsRepository.pauseOnDetachFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
@@ -539,19 +546,20 @@ class MainViewModel(
 
     fun syncAllLocalToCloud() {
         viewModelScope.launch {
-            // 1. Sync Cloud to Local first to get latest GDrive state (IDs, etc.)
-            syncCloudTracks()
+            // 1. Refresh cloud state first to ensure we have latest GDrive IDs
+            try { musicRepository.syncCloudTracks() } catch (e: Exception) {}
             
-            // 2. Fetch latest local list
+            // 2. Fetch latest local tracks
             val allLocal = musicRepository.allTracks.first()
-            // 3. Upload anything that doesn't have a GDrive ID
-            val tracksToUpload = allLocal.filter { it.localPath != null && it.gDriveId == null }
             
-            if (tracksToUpload.isNotEmpty()) {
-                android.util.Log.d("MainViewModel", "Sync All: Starting bulk upload of ${tracksToUpload.size} tracks")
-                bulkUpload(tracksToUpload)
+            // 3. Optimized Sync: Only upload tracks that DON'T have a GDrive ID yet
+            val unsyncedTracks = allLocal.filter { it.localPath != null && it.gDriveId == null }
+            
+            if (unsyncedTracks.isNotEmpty()) {
+                android.util.Log.d("MainViewModel", "Smart Sync: Uploading ${unsyncedTracks.size} new tracks")
+                bulkUpload(unsyncedTracks)
             } else {
-                android.util.Log.d("MainViewModel", "Sync All: All songs already synced or no local files found.")
+                android.util.Log.d("MainViewModel", "Smart Sync: All tracks are already synchronized.")
             }
         }
     }
