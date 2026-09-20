@@ -124,9 +124,7 @@ class MainActivity : ComponentActivity() {
 
             LaunchedEffect(Unit) {
                 if (account != null) viewModel.updateSignInStatus(true)
-                // Startup refresh: Scan for new local music
                 viewModel.scanLocalStorage()
-                // Handle initial intent for "Open With"
                 intent?.let { handleIntent(it, viewModel) }
             }
 
@@ -183,16 +181,13 @@ class MainActivity : ComponentActivity() {
                     override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
                         val id = mediaItem?.mediaId
                         if (id != null) {
-                            android.util.Log.d("MusicOn", "Transitioned to track: $id")
                             viewModel.updateCurrentTrackById(id)
                         }
                     }
                 })
 
-                // Auto-populate player if empty on startup
                 if (controller.mediaItemCount == 0) {
                     launch {
-                        // Wait for both queue and lastPosition to be initialized from DataStore
                         val startupData = combine(
                             viewModel.playbackQueue,
                             viewModel.lastPosition,
@@ -206,10 +201,8 @@ class MainActivity : ComponentActivity() {
                         val currentTrack = startupData.third
                         
                         val mediaItems = initialTracks.map { it.toMediaItem() }
-                        // Match currentPlayingTrack or default to first
                         val startIndex = initialTracks.indexOfFirst { it.id == currentTrack?.id }.coerceAtLeast(0)
                         
-                        android.util.Log.d("MusicOn", "Startup: Auto-loading ${mediaItems.size} items. Start index: $startIndex, position: $lastPos")
                         controller.setMediaItems(mediaItems)
                         controller.seekTo(startIndex, lastPos)
                         controller.prepare()
@@ -221,7 +214,6 @@ class MainActivity : ComponentActivity() {
                         when (event) {
                             is PlaybackEvent.PlayTrackList -> {
                                 val mediaItems = event.tracks.map { it.toMediaItem() }
-                                android.util.Log.d("MusicOn", "Playing track list, size: ${mediaItems.size}, start index: ${event.startIndex}")
                                 controller.setMediaItems(mediaItems)
                                 controller.seekTo(event.startIndex, 0L)
                                 controller.prepare()
@@ -250,7 +242,7 @@ class MainActivity : ComponentActivity() {
                                     BitmapFactory.decodeStream(it)
                                 }
                             } else if (path.startsWith("http")) {
-                                null // Don't palette extract from remote URLs for now
+                                null
                             } else {
                                 BitmapFactory.decodeFile(path)
                             }
@@ -334,7 +326,6 @@ class MainActivity : ComponentActivity() {
                         }
                     } else {
                         Box(Modifier.fillMaxSize().background(Color(0xFF0D0B1F)), contentAlignment = Alignment.Center) {
-                            // Using the new high-fidelity Nirvaana logo
                             Icon(
                                 painter = androidx.compose.ui.res.painterResource(R.drawable.ic_nirvaana_logo),
                                 contentDescription = null,
@@ -405,7 +396,6 @@ private fun TrackEntity.toMediaItem(): androidx.media3.common.MediaItem {
         if (localPath.startsWith("content://")) android.net.Uri.parse(localPath)
         else android.net.Uri.fromFile(java.io.File(localPath))
     } else if (gDriveId != null) {
-        // Correct direct link for GDrive media
         android.net.Uri.parse("https://www.googleapis.com/drive/v3/files/$gDriveId?alt=media")
     } else null
 
@@ -443,7 +433,6 @@ fun MusicOnApp(
             viewModel.importLocalTracks(uris)
         }
 
-        // APK Share Logic
         fun shareAppApk() {
             scope.launch(Dispatchers.IO) {
                 try {
@@ -485,15 +474,10 @@ fun MusicOnApp(
         } else if (cutterTrack != null) {
             Mp3CutterScreen(track = cutterTrack!!, viewModel = viewModel, onBack = { cutterTrack = null })
         } else {
-            // Adaptive Sidebar Widths
             val configuration = androidx.compose.ui.platform.LocalConfiguration.current
             val screenWidth = configuration.screenWidthDp.dp
-            val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            
-            // Adaptive Sidebar Width: 85% for phones, max 400dp for tablets
             val adaptiveWidth = if (screenWidth > 600.dp) 400.dp else screenWidth * 0.85f
 
-            // Dual Drawer Implementation
             val leftDrawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
             val rightDrawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
@@ -521,7 +505,7 @@ fun MusicOnApp(
                                             color = emailColor, 
                                             style = MaterialTheme.typography.bodyMedium.copy(
                                                 fontWeight = FontWeight.Bold, 
-                                                fontSize = 14.sp // Flexible size
+                                                fontSize = 14.sp
                                             ), 
                                             maxLines = 1, 
                                             overflow = TextOverflow.Ellipsis
@@ -542,13 +526,12 @@ fun MusicOnApp(
                                     style = MaterialTheme.typography.titleLarge.copy(
                                         color = primaryColor, 
                                         fontWeight = FontWeight.Black,
-                                        fontSize = 26.sp // Reduced to fit better
+                                        fontSize = 26.sp
                                     ),
                                     lineHeight = 30.sp
                                 )
                                 Spacer(Modifier.height(12.dp))
                                 
-                                // Local Storage Row
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Smartphone, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
                                     Spacer(Modifier.width(10.dp))
@@ -557,27 +540,28 @@ fun MusicOnApp(
                                 
                                 Spacer(Modifier.height(8.dp))
                                 
-                                // Cloud Storage Row
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.CloudQueue, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
                                     Spacer(Modifier.width(10.dp))
                                     Text("Cloud: $cloudCount Synced", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp), color = Color.White)
                                     Spacer(Modifier.weight(1f))
                                     
-                                    // Dynamic Sync Toggle Button
                                     val isSyncing = syncStatus is com.example.musicon.data.remote.SyncStatus.Loading
+                                    val isPaused = syncStatus is com.example.musicon.data.remote.SyncStatus.Paused
+                                    
                                     IconButton(
                                         onClick = { 
                                             if (!isUserSignedIn) showSignInPrompt = true 
-                                            else if (isSyncing) viewModel.cancelSync()
+                                            else if (isSyncing) viewModel.pauseSync()
+                                            else if (isPaused) viewModel.resumeSync()
                                             else viewModel.syncAllLocalToCloud() 
                                         },
                                         modifier = Modifier.size(32.dp).background(primaryColor.copy(alpha = 0.1f), CircleShape)
                                     ) { 
                                         Icon(
-                                            imageVector = if (isSyncing) Icons.Default.Stop else Icons.Default.Sync, 
-                                            contentDescription = if (isSyncing) "Stop Sync" else "Sync Now", 
-                                            tint = if (isSyncing) Color.Red else primaryColor, 
+                                            imageVector = if (isSyncing) Icons.Default.Pause else if (isPaused) Icons.Default.PlayArrow else Icons.Default.Sync, 
+                                            contentDescription = "Sync Toggle", 
+                                            tint = primaryColor, 
                                             modifier = Modifier.size(18.dp)
                                         ) 
                                     }
@@ -591,65 +575,70 @@ fun MusicOnApp(
                             
                             Spacer(Modifier.weight(1f))
                             
-                            // Giant Aesthetic Circular Progress in Sidebar
                             com.example.musicon.ui.components.CircularSyncProgressBar(
                                 syncStatus = syncStatus,
                                 modifier = Modifier.padding(16.dp).fillMaxWidth(),
                                 onSyncClick = {
+                                    val isSyncingNow = syncStatus is com.example.musicon.data.remote.SyncStatus.Loading
+                                    val isPausedNow = syncStatus is com.example.musicon.data.remote.SyncStatus.Paused
+                                    
                                     if (!isUserSignedIn) showSignInPrompt = true 
+                                    else if (isSyncingNow) viewModel.pauseSync()
+                                    else if (isPausedNow) viewModel.resumeSync()
                                     else viewModel.syncAllLocalToCloud() 
                                 }
                             )
-                            
                             Spacer(Modifier.weight(1f))
                         }
                     }
-                }
-            ) {
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                    ModalNavigationDrawer(
-                        drawerState = rightDrawerState,
-                        drawerContent = {
-                            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                                ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), modifier = Modifier.width(adaptiveWidth).fillMaxHeight()) {
-                                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        IconButton(onClick = { scope.launch { rightDrawerState.close() } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }
-                                        Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                },
+                content = {
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                        ModalNavigationDrawer(
+                            drawerState = rightDrawerState,
+                            drawerContent = {
+                                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                                    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), modifier = Modifier.width(adaptiveWidth).fillMaxHeight()) {
+                                        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            IconButton(onClick = { scope.launch { rightDrawerState.close() } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = MaterialTheme.colorScheme.onSurface) }
+                                            Text("Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                        }
+                                        SettingsScreen(viewModel = viewModel, onSignInClick = onSignInClick, onScanClick = { viewModel.scanLocalStorage() }, onBack = { scope.launch { rightDrawerState.close() } })
                                     }
-                                    SettingsScreen(viewModel = viewModel, onSignInClick = onSignInClick, onScanClick = { viewModel.scanLocalStorage() }, onBack = { scope.launch { rightDrawerState.close() } })
+                                }
+                            },
+                            content = {
+                                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                                    Scaffold(
+                                        modifier = Modifier.fillMaxSize(),
+                                        containerColor = Color.Transparent,
+                                        contentWindowInsets = WindowInsets.statusBars,
+                                        bottomBar = { 
+                                            MiniPlayer(
+                                                onNavigateToPlayer = { isPlayerVisible = true }, 
+                                                player = mediaController, 
+                                                viewModel = viewModel,
+                                                isLeftMenuOpen = leftDrawerState.isOpen,
+                                                isRightSidebarOpen = rightDrawerState.isOpen
+                                            ) 
+                                        }
+                                    ) { innerPadding ->
+                                        Box(modifier = Modifier.padding(innerPadding)) {
+                                            LibraryScreen(
+                                                viewModel = viewModel,
+                                                onOpenSettings = { scope.launch { rightDrawerState.open() } },
+                                                onOpenDrawer = { scope.launch { leftDrawerState.open() } },
+                                                onOpenCutter = { cutterTrack = it },
+                                                onOpenPlayer = { isPlayerVisible = true }
+                                            )
+                                        }
+                                    }
                                 }
                             }
-                        }
-                    ) {
-                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                            Scaffold(
-                                modifier = Modifier.fillMaxSize(),
-                                containerColor = Color.Transparent,
-                                contentWindowInsets = WindowInsets.statusBars,
-                                bottomBar = { 
-                                    MiniPlayer(
-                                        onNavigateToPlayer = { isPlayerVisible = true }, 
-                                        player = mediaController, 
-                                        viewModel = viewModel,
-                                        isLeftMenuOpen = leftDrawerState.isOpen,
-                                        isRightSidebarOpen = rightDrawerState.isOpen
-                                    ) 
-                                }
-                            ) { innerPadding ->
-                                Box(modifier = Modifier.padding(innerPadding)) {
-                                    LibraryScreen(
-                                        viewModel = viewModel,
-                                        onOpenSettings = { scope.launch { rightDrawerState.open() } },
-                                        onOpenDrawer = { scope.launch { leftDrawerState.open() } },
-                                        onOpenCutter = { cutterTrack = it },
-                                        onOpenPlayer = { isPlayerVisible = true }
-                                    )
-                                }
-                            }
-                        }
+                        )
                     }
                 }
-            }
+            )
         }
         if (showSignInPrompt) AlertDialog(onDismissRequest = { showSignInPrompt = false }, title = { Text("Sign in Required") }, text = { Text("Please sign in with Google to use cloud features.") }, confirmButton = { Button(onClick = { showSignInPrompt = false; onSignInClick() }) { Text("Sign In") } }, dismissButton = { TextButton(onClick = { showSignInPrompt = false }) { Text("Cancel") } })
     }

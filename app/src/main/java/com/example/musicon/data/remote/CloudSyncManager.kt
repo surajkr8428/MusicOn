@@ -17,12 +17,16 @@ sealed class SyncStatus {
         val uploaded: Int = 0,
         val failed: Int = 0
     ) : SyncStatus()
+    data class Paused(val current: Int, val total: Int) : SyncStatus()
     data class Error(val message: String) : SyncStatus()
 }
 
 object CloudSyncManager {
     private val _status = MutableStateFlow<SyncStatus>(SyncStatus.Idle)
     val status = _status.asStateFlow()
+
+    private val _isPaused = MutableStateFlow(false)
+    val isPaused = _isPaused.asStateFlow()
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var clearJob: Job? = null
@@ -36,6 +40,16 @@ object CloudSyncManager {
                 delay(4000) // Show for 4 seconds
                 _status.value = SyncStatus.Idle
             }
+        }
+    }
+
+    fun setPaused(paused: Boolean) {
+        _isPaused.value = paused
+        val current = _status.value
+        if (paused && current is SyncStatus.Loading) {
+            _status.value = SyncStatus.Paused(current.current, current.total)
+        } else if (!paused && current is SyncStatus.Paused) {
+            _status.value = SyncStatus.Loading("Resuming sync...", current.current.toFloat() / current.total, current.current, current.total)
         }
     }
 

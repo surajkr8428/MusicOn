@@ -130,7 +130,6 @@ fun PlayerScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Full Screen Background
         if (imageMode == PlayerImageMode.FULL_SCREEN && currentTrack != null) {
             val trackForBg = currentTrack!!
             val artworkUri = remember(trackForBg.id, trackForBg.customCoverPath) {
@@ -142,10 +141,7 @@ fun PlayerScreen(
             
             if (artworkUri != null) {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(artworkUri)
-                        .crossfade(true)
-                        .build(),
+                    model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).build(),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
@@ -160,21 +156,15 @@ fun PlayerScreen(
             backgroundMode = backgroundMode
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.statusBars),
+                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
                 val contentColor = if (isBright) Color.Black else Color.White
                 val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
 
-                // Header
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .height(64.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(64.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -341,7 +331,19 @@ fun PlayerLayoutPortrait(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
+            modifier = Modifier.weight(1f).fillMaxWidth()
+                .pointerInput(Unit) {
+                    detectHorizontalDragGestures { change, dragAmount ->
+                        change.consume()
+                        if (dragAmount > 50) {
+                            player.seekToPrevious()
+                            player.play()
+                        } else if (dragAmount < -50) {
+                            player.seekToNext()
+                            player.play()
+                        }
+                    }
+                },
             contentAlignment = Alignment.Center
         ) {
             if (imageMode != PlayerImageMode.FULL_SCREEN && currentTrack != null) {
@@ -395,10 +397,11 @@ fun PlayerLayoutPortrait(
             shuffleMode = shuffleMode,
             repeatMode = repeatMode,
             queue = queue,
+            isLandscape = false,
             sleepTimerRemaining = sleepTimerRemaining,
             onInfoClick = onInfoClick
         )
-        Spacer(Modifier.weight(0.1f))
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -573,7 +576,7 @@ fun PlayerControls(
             }
         }
 
-        // Restored Queue Icons at the Bottom
+        // Always show icons at the bottom in portrait
         if (!isLandscape) {
             Spacer(modifier = Modifier.height(24.dp))
             LazyRow(

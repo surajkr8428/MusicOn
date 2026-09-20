@@ -131,6 +131,16 @@ fun SettingsScreen(
                 }
             }
             StellarSettingsToggle(Icons.Default.ColorLens, "Auto Theme Color", "Extract theme color from song image", autoTheme) { viewModel.updateAutoTheme(it) }
+            
+            SettingsHeader("Cloud Backup")
+            StellarSettingsItem(Icons.Default.CloudDownload, "Restore Library", "Restore playlists and settings from GDrive") {
+                viewModel.restoreFromCloud()
+                android.widget.Toast.makeText(context, "Restoring from cloud...", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            StellarSettingsItem(Icons.Default.CloudUpload, "Manual Backup", "Force save library to cloud") {
+                viewModel.triggerBackup()
+                android.widget.Toast.makeText(context, "Uploading backup...", android.widget.Toast.LENGTH_SHORT).show()
+            }
             Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Manual Theme Color", color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp)

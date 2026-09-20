@@ -29,6 +29,7 @@ fun CircularSyncProgressBar(
     val progress = when (syncStatus) {
         is SyncStatus.Loading -> syncStatus.progress
         is SyncStatus.Success -> 1f
+        is SyncStatus.Paused -> if (syncStatus.total > 0) syncStatus.current.toFloat() / syncStatus.total else 0f
         else -> 0f
     }
 
@@ -113,7 +114,8 @@ fun CircularSyncProgressBar(
                 if (syncStatus.total > 0) "Uploading: ${syncStatus.current} / ${syncStatus.total}" else "Connecting..."
             }
             is SyncStatus.Success -> "Success: ${syncStatus.uploaded} Uploaded"
-            is SyncStatus.Error -> "Sync Paused"
+            is SyncStatus.Paused -> "Sync Paused (${syncStatus.current}/${syncStatus.total})"
+            is SyncStatus.Error -> "Sync Error"
             is SyncStatus.Idle -> "Library is Synchronized"
         }
 

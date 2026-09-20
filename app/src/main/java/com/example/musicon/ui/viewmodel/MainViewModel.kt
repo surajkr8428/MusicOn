@@ -20,10 +20,21 @@ import com.example.musicon.data.SettingsRepository
 import com.example.musicon.data.local.Playlist
 import com.example.musicon.data.local.TrackEntity
 import com.example.musicon.ui.theme.ThemeMode
+import com.google.gson.Gson
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+
+data class AppBackup(
+    val playlists: List<PlaylistBackup>,
+    val settings: Map<String, Any>
+)
+
+data class PlaylistBackup(
+    val name: String,
+    val trackTitles: List<String>
+)
 
 sealed class PlaybackEvent {
     data class PlayTrackList(val tracks: List<TrackEntity>, val startIndex: Int) : PlaybackEvent()
@@ -588,6 +599,90 @@ class MainViewModel(
     fun cancelSync() {
         WorkManager.getInstance(settingsRepository.context).cancelAllWorkByTag("sync_task")
         com.example.musicon.data.remote.CloudSyncManager.updateStatus(com.example.musicon.data.remote.SyncStatus.Idle)
+    }
+
+    fun triggerBackup() {
+        viewModelScope.launch {
+            try {
+                val playlists = musicRepository.allPlaylists.first()
+                val playlistBackups = playlists.map { p ->
+                    val tracks = musicRepository.getTracksForPlaylist(p.id).first()
+                    PlaylistBackup(p.name, tracks.map { it.title })
+                }
+                
+                // Backup Core Settings
+                val settingsMap = mutableMapOf<String, Any>()
+                settingsMap["theme"] = themeMode.value.name
+                settingsMap["viewMode"] = libraryViewMode.value.name
+                settingsMap["accent"] = accentColor.value
+                settingsMap["bgMode"] = backgroundMode.value
+                
+                val backup = AppBackup(
+                    playlists = playlistBackups,
+                    settings = settingsMap
+                )
+                
+                val json = Gson().toJson(backup)
+                val tempFile = java.io.File(settingsRepository.context.cacheDir, "nirvaana_backup.json")
+                tempFile.writeText(json)
+                
+                val cloudManager = musicRepository.cloudStorageManager
+                val existing = cloudManager.findFileByName("nirvaana_backup.json")
+                if (existing != null) cloudManager.deleteFile(existing.id)
+                
+                cloudManager.uploadFile(tempFile.absolutePath, "nirvaana_backup.json")
+                android.util.Log.d("MainViewModel", "Immortal Backup uploaded successfully")
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Backup failed", e)
+            }
+        }
+    }
+
+    fun restoreFromCloud() {
+        viewModelScope.launch {
+            try {
+                val cloudManager = musicRepository.cloudStorageManager
+                val existing = cloudManager.findFileByName("nirvaana_backup.json") ?: return@launch
+                
+                val tempFile = java.io.File(settingsRepository.context.cacheDir, "restore.json")
+                cloudManager.downloadFile(existing.id, tempFile.absolutePath)
+                
+                val json = tempFile.readText()
+                val backup = Gson().fromJson(json, AppBackup::class.java)
+                
+                // Restore Settings
+                backup.settings["theme"]?.let { updateThemeMode(ThemeMode.valueOf(it.toString())) }
+                backup.settings["viewMode"]?.let { updateLibraryViewMode(LibraryViewMode.valueOf(it.toString())) }
+                backup.settings["accent"]?.let { updateAccentColor((it as Double).toInt()) }
+                backup.settings["bgMode"]?.let { updateBackgroundMode(it.toString()) }
+                
+                val localTracks = musicRepository.allTracks.first()
+                
+                backup.playlists.forEach { pb ->
+                    // Avoid duplicate playlists
+                    val existingPlaylists = musicRepository.allPlaylists.first()
+                    val pid = existingPlaylists.find { it.name == pb.name }?.id ?: musicRepository.createPlaylist(pb.name)
+                    
+                    pb.trackTitles.forEach { title ->
+                        val match = localTracks.find { it.title == title }
+                        if (match != null) {
+                            musicRepository.addTrackToPlaylist(pid, match.id)
+                        }
+                    }
+                }
+                android.util.Log.d("MainViewModel", "Immortal Restore complete")
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Restore failed", e)
+            }
+        }
+    }
+
+    fun pauseSync() {
+        com.example.musicon.data.remote.CloudSyncManager.setPaused(true)
+    }
+
+    fun resumeSync() {
+        com.example.musicon.data.remote.CloudSyncManager.setPaused(false)
     }
 
     fun bulkDownload(tracks: List<TrackEntity>) {

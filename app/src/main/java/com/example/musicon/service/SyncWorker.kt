@@ -8,6 +8,7 @@ import com.example.musicon.data.remote.CloudStorageManager
 import com.example.musicon.data.remote.CloudSyncManager
 import com.example.musicon.data.remote.SyncStatus
 import java.io.File
+import kotlinx.coroutines.delay
 
 class SyncWorker(
     context: Context,
@@ -85,6 +86,11 @@ class SyncWorker(
                 var failed = 0
                 
                 trackIds.forEachIndexed { index, trackId ->
+                    // Pause Logic: Wait while isPaused is true
+                    while (CloudSyncManager.isPaused.value) {
+                        delay(1000)
+                    }
+
                     val track = database.trackDao().getTrackById(trackId)
                     if (track?.localPath != null) {
                         try {
