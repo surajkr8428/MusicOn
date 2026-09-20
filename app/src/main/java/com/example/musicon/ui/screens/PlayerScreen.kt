@@ -62,6 +62,7 @@ import com.example.musicon.logic.LyricLine
 import com.example.musicon.logic.formatSleepTime
 import com.example.musicon.logic.formatDuration
 import com.example.musicon.data.local.TrackEntity
+import com.example.musicon.ui.components.TechnicalInfoPopup
 import java.io.File
 import kotlinx.coroutines.delay
 
@@ -78,7 +79,7 @@ fun PlayerScreen(
         return
     }
 
-    val playerTrack by viewModel.currentPlayingTrack.collectAsState()
+    val currentTrack by viewModel.currentPlayingTrack.collectAsState()
     val queue by viewModel.playbackQueue.collectAsState()
     val imageMode by viewModel.playerImageMode.collectAsState()
     
@@ -130,8 +131,8 @@ fun PlayerScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Full Screen Background
-        if (imageMode == PlayerImageMode.FULL_SCREEN && playerTrack != null) {
-            val trackForBg = playerTrack!!
+        if (imageMode == PlayerImageMode.FULL_SCREEN && currentTrack != null) {
+            val trackForBg = currentTrack!!
             val artworkUri = remember(trackForBg.id, trackForBg.customCoverPath) {
                 val path = trackForBg.customCoverPath ?: trackForBg.localPath
                 if (path != null) {
@@ -224,7 +225,7 @@ fun PlayerScreen(
                             Icon(Icons.Default.MoreVert, null, tint = contentColor)
                             DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
                                 DropdownMenuItem(text = { Text("Sleep Timer") }, leadingIcon = { Icon(Icons.Default.Timer, null) }, onClick = { showSleepTimerDialog = true; showMoreMenu = false })
-                                DropdownMenuItem(text = { Text("Delete Device", color = Color.Red) }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, onClick = { playerTrack?.let { viewModel.bulkDelete(listOf(it)) }; showMoreMenu = false })
+                                DropdownMenuItem(text = { Text("Delete Device", color = Color.Red) }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, onClick = { currentTrack?.let { viewModel.bulkDelete(listOf(it)) }; showMoreMenu = false })
                             }
                         }
                     }
@@ -236,7 +237,7 @@ fun PlayerScreen(
                             PlayerLayoutLandscape(
                                 player = player,
                                 viewModel = viewModel,
-                                currentTrack = playerTrack,
+                                currentTrack = currentTrack,
                                 queue = queue,
                                 imageMode = imageMode,
                                 primaryColor = primaryColor,
@@ -257,7 +258,7 @@ fun PlayerScreen(
                             PlayerLayoutPortrait(
                                 player = player,
                                 viewModel = viewModel,
-                                currentTrack = playerTrack,
+                                currentTrack = currentTrack,
                                 queue = queue,
                                 imageMode = imageMode,
                                 primaryColor = primaryColor,
@@ -279,7 +280,7 @@ fun PlayerScreen(
                         LyricsView(
                             modifier = Modifier.fillMaxSize(),
                             currentPosition = if (isDragging) dragPosition else position,
-                            lyrics = playerTrack?.lyrics,
+                            lyrics = currentTrack?.lyrics,
                             primaryColor = primaryColor
                         )
                     }
@@ -288,8 +289,8 @@ fun PlayerScreen(
         }
     }
 
-    if (showInfoPopup && playerTrack != null) {
-        TechnicalInfoPopup(track = playerTrack!!, onDismiss = { showInfoPopup = false })
+    if (showInfoPopup && currentTrack != null) {
+        TechnicalInfoPopup(track = currentTrack!!, onDismiss = { showInfoPopup = false })
     }
 
     if (showSleepTimerDialog) {

@@ -516,10 +516,19 @@ fun MusicOnApp(
                                     val emailColor = if (isBright) Color.Black else Color.White
 
                                     Column(Modifier.weight(1f)) {
-                                        Text(account?.email ?: "Signed in", color = emailColor, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            account?.email ?: "Signed in", 
+                                            color = emailColor, 
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                fontWeight = FontWeight.Bold, 
+                                                fontSize = 14.sp // Flexible size
+                                            ), 
+                                            maxLines = 1, 
+                                            overflow = TextOverflow.Ellipsis
+                                        )
                                         Text("Cloud Sync Enabled", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
                                     }
-                                    IconButton(onClick = onSignOutClick) { Icon(Icons.AutoMirrored.Filled.Logout, "Sign Out", tint = Color.Red) }
+                                    IconButton(onClick = onSignOutClick) { Icon(Icons.AutoMirrored.Filled.Logout, "Sign Out", tint = Color.Red, modifier = Modifier.size(20.dp)) }
                                 }
                             }
                             HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
@@ -555,15 +564,22 @@ fun MusicOnApp(
                                     Text("Cloud: $cloudCount Synced", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp), color = Color.White)
                                     Spacer(Modifier.weight(1f))
                                     
-                                    // Sync Button next to Cloud Count
+                                    // Dynamic Sync Toggle Button
+                                    val isSyncing = syncStatus is com.example.musicon.data.remote.SyncStatus.Loading
                                     IconButton(
                                         onClick = { 
                                             if (!isUserSignedIn) showSignInPrompt = true 
+                                            else if (isSyncing) viewModel.cancelSync()
                                             else viewModel.syncAllLocalToCloud() 
                                         },
                                         modifier = Modifier.size(32.dp).background(primaryColor.copy(alpha = 0.1f), CircleShape)
                                     ) { 
-                                        Icon(Icons.Default.Sync, "Sync Now", tint = primaryColor, modifier = Modifier.size(18.dp)) 
+                                        Icon(
+                                            imageVector = if (isSyncing) Icons.Default.Stop else Icons.Default.Sync, 
+                                            contentDescription = if (isSyncing) "Stop Sync" else "Sync Now", 
+                                            tint = if (isSyncing) Color.Red else primaryColor, 
+                                            modifier = Modifier.size(18.dp)
+                                        ) 
                                     }
                                 }
                             }
@@ -706,6 +722,7 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                         title = { Row(verticalAlignment = Alignment.CenterVertically) { Text("Cloud Browser", color = Color.White, fontWeight = FontWeight.Bold); Spacer(Modifier.width(12.dp)); HeaderStatusPill(isOnline, isWifi); SyncProgressBar(syncStatus, Modifier.weight(1f)) } },
                         navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } },
                         actions = {
+                            IconButton(onClick = { viewModel.deleteAllCloudTracks() }) { Icon(Icons.Default.DeleteSweep, "Delete All", tint = Color.Red) }
                             IconButton(onClick = { viewMode = if (viewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) { Icon(if (viewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.White) }
                             var showSort by remember { mutableStateOf(false) }
                             IconButton(onClick = { showSort = true }) {

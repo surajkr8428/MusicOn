@@ -453,7 +453,7 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
                     )
                 } else {
                     CenterAlignedTopAppBar(
-                        title = { Text(playlist.name, color = Color.White, fontFamily = FontFamily.Cursive, fontSize = if (isLandscape) 18.sp else 24.sp) }, 
+                        title = { Text(playlist.name, color = Color.White, fontSize = if (isLandscape) 18.sp else 24.sp) }, 
                         navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White) } }, 
                         actions = { 
                             IconButton(onClick = { subViewMode = if (subViewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) {
@@ -591,7 +591,7 @@ fun LibraryTopBar(
                 val headerTextColor = if (isBright) Color.Black else Color.White
 
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text("Nirvaana", color = headerTextColor, fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp)
+                    Text("Nirvaana", color = headerTextColor, fontWeight = FontWeight.Bold, fontSize = if (isLandscape) 18.sp else 22.sp)
                     Spacer(Modifier.width(8.dp))
                     Icon(
                         painter = androidx.compose.ui.res.painterResource(R.drawable.ic_nirvaana_logo),
@@ -827,8 +827,8 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
                                 } else {
                                     FlowRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         pTracks.forEach { track -> 
-                                            Box(Modifier.width(100.dp)) { 
-                                                StellarGridItem(track, false, { onTrackClick(track) }, { onTrackLongClick(track) }, { onTrackOptions(track) }, { onToggleFavorite(track) }) 
+                                            Box(Modifier.width(110.dp)) { 
+                                                StellarGridItem(track, false, onTrackClick, onTrackLongClick, { onTrackOptions(track) }, { onToggleFavorite(track) }) 
                                             } 
                                         }
                                     }
@@ -841,13 +841,14 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
             }
             item { 
                 Column(modifier = Modifier.padding(12.dp).clickable { onCreatePlaylist() }, horizontalAlignment = Alignment.CenterHorizontally) { 
-                    Box(Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(0.1f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, null, tint = Color.Gray, modifier = Modifier.size(36.dp)) }; 
-                    Spacer(Modifier.height(8.dp)); 
+                    Box(Modifier.size(80.dp).clip(RoundedCornerShape(16.dp)).background(Color.White.copy(0.1f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Add, null, tint = Color.Gray, modifier = Modifier.size(36.dp)) }
+                    Spacer(Modifier.height(8.dp))
                     Text("Add Playlist", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) 
                 } 
             } 
         }
-    } else {
+    }
+else {
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { 
             items(playlists) { playlist ->
                 val isExpanded = expandedPlaylistId == playlist.id
@@ -1020,7 +1021,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
 ) {
     val grouped = remember(tracks, groupType) { 
         when (groupType) { 
-            "Album" -> tracks.groupBy { it.displayAlbum }
+            "Album" -> tracks.groupBy { "${it.displayAlbum} • ${it.displayArtist}" }
             "Artist" -> tracks.groupBy { it.displayArtist }
             "Genre" -> tracks.groupBy { it.genre ?: "Unknown" }
             "Recently Played" -> mapOf("Recent" to tracks)
@@ -1197,7 +1198,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
             }
             Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) { 
                 Row(verticalAlignment = Alignment.CenterVertically) { 
-                    Text(text = track.displayName, style = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Cursive, color = primaryTextColor, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    Text(text = track.displayName, style = MaterialTheme.typography.titleMedium.copy(color = primaryTextColor, fontSize = 18.sp), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                     IconButton(onClick = onToggleFavorite, modifier = Modifier.size(24.dp)) { Icon(if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, modifier = Modifier.size(16.dp), tint = if (track.isFavorite) Color.Red else secondaryTextColor) } 
                 }
                 Text(text = "${track.displayArtist} | ${formatDuration(track.duration)}", style = MaterialTheme.typography.labelSmall, color = secondaryTextColor, maxLines = 1) 

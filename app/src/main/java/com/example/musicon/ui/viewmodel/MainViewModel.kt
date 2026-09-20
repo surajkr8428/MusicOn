@@ -535,6 +535,7 @@ class MainViewModel(
         WorkManager.getInstance(settingsRepository.context).enqueue(
             OneTimeWorkRequestBuilder<com.example.musicon.service.SyncWorker>()
                 .setInputData(data)
+                .addTag("sync_task")
                 .build()
         )
     }
@@ -564,11 +565,29 @@ class MainViewModel(
             
             if (unsyncedTracks.isNotEmpty()) {
                 android.util.Log.d("MainViewModel", "Smart Sync: Uploading ${unsyncedTracks.size} new tracks")
-                bulkUpload(unsyncedTracks)
+                val trackIds = unsyncedTracks.map { it.id }.toTypedArray()
+                val data = Data.Builder()
+                    .putString("sync_type", "bulk_upload")
+                    .putStringArray("track_ids", trackIds as Array<String?>)
+                    .build()
+                
+                WorkManager.getInstance(settingsRepository.context).enqueueUniqueWork(
+                    "sync_all",
+                    androidx.work.ExistingWorkPolicy.REPLACE,
+                    OneTimeWorkRequestBuilder<com.example.musicon.service.SyncWorker>()
+                        .setInputData(data)
+                        .addTag("sync_task")
+                        .build()
+                )
             } else {
                 android.util.Log.d("MainViewModel", "Smart Sync: All tracks are already synchronized.")
             }
         }
+    }
+
+    fun cancelSync() {
+        WorkManager.getInstance(settingsRepository.context).cancelAllWorkByTag("sync_task")
+        com.example.musicon.data.remote.CloudSyncManager.updateStatus(com.example.musicon.data.remote.SyncStatus.Idle)
     }
 
     fun bulkDownload(tracks: List<TrackEntity>) {
@@ -595,6 +614,34 @@ class MainViewModel(
                 refreshStats()
             } catch (e: Exception) {
                 android.util.Log.e("MainViewModel", "Cloud delete failed", e)
+            }
+        }
+    }
+
+    fun deleteAllCloudTracks() {
+        viewModelScope.launch {
+            try {
+                val folderId = musicRepository.cloudStorageManager.getOrCreateAppFolder()
+                val files = musicRepository.cloudStorageManager.listAudioFiles(folderId)
+                files.forEach { file ->
+                    musicRepository.cloudStorageManager.deleteFile(file.id)
+                }
+                
+                // Deep Cleanup: Remove cloud-only tracks or clear cloud links
+                val allDbTracks = musicRepository.allTracks.first() 
+                allDbTracks.forEach { track ->
+                    if (track.gDriveId != null) {
+                        if (track.localPath == null) {
+                            musicRepository.removeTrack(track) 
+                        } else {
+                            musicRepository.updateTrackMetadata(trackId = track.id, title = null, artist = null, album = null, coverPath = null, lyrics = null, cloudId = "")
+                        }
+                    }
+                }
+                syncCloudTracks()
+                refreshStats()
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Bulk cloud delete failed", e)
             }
         }
     }

@@ -53,8 +53,13 @@ class MusicRepository(
                 if (existingTrack.localPath != null && !existingTrack.localPath.startsWith("content://")) {
                     val file = java.io.File(existingTrack.localPath)
                     if (!file.exists()) {
-                        android.util.Log.d("MusicRepository", "Removing missing track: ${existingTrack.displayName}")
-                        trackDao.deleteTrack(existingTrack)
+                        // Persistence Polish: Never delete synced tracks even if local file is missing
+                        if (existingTrack.gDriveId == null) {
+                            android.util.Log.d("MusicRepository", "Removing missing track: ${existingTrack.displayName}")
+                            trackDao.deleteTrack(existingTrack)
+                        } else {
+                            android.util.Log.d("MusicRepository", "Preserving synced track with missing local file: ${existingTrack.displayName}")
+                        }
                     }
                 }
             }
