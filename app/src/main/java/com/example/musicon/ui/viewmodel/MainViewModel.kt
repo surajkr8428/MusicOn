@@ -43,6 +43,13 @@ class MainViewModel(
     private val _isWifi = MutableStateFlow(false)
     val isWifi = _isWifi.asStateFlow()
 
+    private val _isForceSelectionMode = MutableStateFlow(false)
+    val isForceSelectionMode: StateFlow<Boolean> = _isForceSelectionMode.asStateFlow()
+
+    fun setForceSelectionMode(enabled: Boolean) {
+        _isForceSelectionMode.value = enabled
+    }
+
     fun updateOnlineStatus(online: Boolean, isWifi: Boolean = false) {
         _isOnline.value = online
         _isWifi.value = isWifi
@@ -576,6 +583,20 @@ class MainViewModel(
             .putString("file_name", "${track.title}.mp3")
             .build()
         WorkManager.getInstance(settingsRepository.context).enqueue(OneTimeWorkRequestBuilder<com.example.musicon.service.SyncWorker>().setInputData(data).build())
+    }
+
+    fun deleteTrackFromCloud(track: TrackEntity) {
+        val fileId = track.gDriveId ?: return
+        viewModelScope.launch {
+            try {
+                musicRepository.cloudStorageManager.deleteFile(fileId)
+                // Update local DB to reflect it's no longer synced
+                musicRepository.updateTrackMetadata(trackId = track.id, title = null, artist = null, album = null, coverPath = null, lyrics = null, cloudId = "")
+                refreshStats()
+            } catch (e: Exception) {
+                android.util.Log.e("MainViewModel", "Cloud delete failed", e)
+            }
+        }
     }
 
     fun uploadTrack(track: TrackEntity) {

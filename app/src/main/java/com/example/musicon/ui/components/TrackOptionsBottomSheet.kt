@@ -96,22 +96,32 @@ fun TrackOptionsBottomSheet(
 
             // High-fidelity Action Grid
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                val gridActions = listOf(
+                val gridActions = mutableListOf(
                     Triple(Icons.Default.Edit, "Edit Info", "edit"),
                     Triple(Icons.Default.ContentCut, "MP3 Cutter", "cut"),
                     Triple(Icons.Default.Favorite, "Toggle Favorite", "favorite"),
-                    Triple(Icons.Default.Image, "Change cover", "edit"), // Map to edit for now
-                    Triple(Icons.Default.Lyrics, "Edit lyrics", "edit"), // Map to edit for now
-                    Triple(Icons.Default.DeleteOutline, "Delete from device", "delete")
+                    Triple(Icons.Default.Image, "Change cover", "edit"),
+                    Triple(Icons.Default.Lyrics, "Edit lyrics", "edit"),
+                    Triple(Icons.Default.DeleteOutline, "Delete device", "delete")
                 )
+                
+                // Add Cloud Delete if synced
+                if (track.gDriveId != null) {
+                    gridActions.add(Triple(Icons.Default.CloudOff, "Cloud Delete", "cloud_delete"))
+                }
 
-                for (i in 0 until 3) {
+                val rowCount = (gridActions.size + 1) / 2
+                for (i in 0 until rowCount) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         ActionBlock(gridActions[i*2], Modifier.weight(1f)) { onAction(it) }
-                        ActionBlock(gridActions[i*2+1], Modifier.weight(1f)) { onAction(it) }
+                        if (i*2 + 1 < gridActions.size) {
+                            ActionBlock(gridActions[i*2+1], Modifier.weight(1f)) { onAction(it) }
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                 }

@@ -250,15 +250,17 @@ class MusicRepository(
         artist: String?,
         album: String?,
         coverPath: String?,
-        lyrics: String?
+        lyrics: String?,
+        cloudId: String? = null
     ) {
         val track = trackDao.getTrackById(trackId) ?: return
         val updatedTrack = track.copy(
-            customTitle = title,
-            customArtist = artist,
-            customAlbum = album,
-            customCoverPath = coverPath,
-            lyrics = lyrics
+            customTitle = title ?: track.customTitle,
+            customArtist = artist ?: track.customArtist,
+            customAlbum = album ?: track.customAlbum,
+            customCoverPath = coverPath ?: track.customCoverPath,
+            lyrics = lyrics ?: track.lyrics,
+            gDriveId = if (cloudId != null) (if (cloudId.isEmpty()) null else cloudId) else track.gDriveId
         )
         trackDao.updateTrack(updatedTrack)
     }

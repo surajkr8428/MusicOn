@@ -1,52 +1,49 @@
-# Implementation Plan - Nirvaana UX Mastery & Massive Scale-Up
+# Implementation Plan - Nirvaana UX Final Polish & Persistence
 
-This plan delivers a comprehensive visual and functional scale-up for **Nirvaana**, focusing on universal grid accessibility, massive storage stats, and a smarter cloud-integrated library.
+This plan addresses font consistency, playlist persistence, cloud management improvements, and restores missing player UI components.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> **Massive Typography**: I am scaling up the "Nirvaana Storage" title by **5x** and the Local/Cloud counts by **3x**. This will make the storage dashboard the dominant feature of the sidebar.
-> **Universal Grid & Matrix**: All tabs (Recents, All Songs, etc.) will now respect the global List/Grid toggle. Expanded categories will use a "Flexible Matrix" (Staggered/Adaptive Grid) to display tracks inline.
-> **Cloud Deletion**: I am adding a **"Delete from Cloud"** option to the song menu. This will allow you to permanently remove files from your Google Drive directly from the app.
-> **Smart Playlist Building**: Clicking the `+` button in a playlist will now intelligently switch you to the "All Songs" tab and **activate Multi-Select mode** automatically, allowing for bulk additions.
-> **Aesthetic Fallbacks**: Songs without artwork will now feature a high-fidelity Music Note image in the **Song Info Popup** and the **Player UI**.
+> **Global Cursive Identity**: All text across the app (Settings, Lists, Sidebar, etc.) will now use the premium `FontFamily.Cursive` style to match the brand identity.
+> **Immortal Playlists**: Refined the storage logic to ensure that even if local files are temporarily missing (e.g. unmounted SD card), synced songs are **never removed from the database**. This guarantees your playlists remain intact across restarts and updates.
+> **Cloud Wipe**: Adding a new feature in the Cloud Browser to **Delete All Cloud Songs** in one tap.
+> **Dynamic Sync Toggle**: The Sync button in the sidebar will now transform into a **Pause/Stop icon** while an active sync is running.
 
 ## Proposed Changes
 
-### 1. Adaptive Sidebar & Giant Dashboard
+### 1. Brand Identity (Universal Typography)
 
-#### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
-- Scale typography in the Sidebar Storage section:
-    - Title: `fontSize = 64.sp` (~5x increase).
-    - Counts: `fontSize = 36.sp` (~3x increase).
-- Ensure the layout remains balanced with these massive sizes.
+#### [MODIFY] [Type.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/theme/Type.kt)
+- Update all `TextStyle` definitions (`bodyLarge`, `labelSmall`, etc.) to use `fontFamily = FontFamily.Cursive`.
 
-#### [MODIFY] [CircularSyncProgressBar.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/components/CircularSyncProgressBar.kt)
-- Add a **secondary Sync Button** at the center of the giant progress circle. This button will be clickable even when sync is idle.
+### 2. Storage Persistence Mastery
 
-### 2. Universal Library Mastery
+#### [MODIFY] [MusicRepository.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/data/MusicRepository.kt)
+- **Safe Cleanup**: Update `scanLocalStorage()` to skip deleting tracks if `existingTrack.gDriveId != null`. This preserves the song entity (and its playlist entries) even if the local file is missing.
 
-#### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
-- **Universal Grid**: Refactor `SongsTab` and `GroupedTab` to use `LazyVerticalGrid` whenever `viewMode` is set to `GRID`, across all tabs (including Recents).
-- **Flexible Matrix**: Refactor expanded Category views (inside Artists, Albums, etc.) to use an adaptive flow layout/grid instead of a vertical list.
-- **Multi-Select Trigger**: Update `onAddSongs` to navigate to index `1` and set a flag in `MainViewModel` to force-activate selection mode.
-
-### 3. Cloud Song Management
-
-#### [MODIFY] [MainViewModel.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/viewmodel/MainViewModel.kt)
-- **Delete from Cloud**: Implement `deleteTrackFromCloud(trackId)` which calls `CloudStorageManager.deleteFile` and updates the local entity to remove the `gDriveId`.
-- **Selection State**: Add a `isForceSelectionMode` state to control the "Add Songs" workflow.
-
-#### [MODIFY] [TrackOptionsBottomSheet.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/components/TrackOptionsBottomSheet.kt)
-- Add "Delete from GDrive" option (only visible if `gDriveId` is not null).
-
-### 4. High-Fidelity Artwork Fallbacks
+### 3. User Interface Fixes & Regressions
 
 #### [MODIFY] [PlayerScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/PlayerScreen.kt)
-- Ensure the `MusicNote` fallback is aesthetically integrated into the "hero" artwork area.
+- **Restore Queue**: Re-integrate the `LazyRow` bottom queue into `PlayerLayoutPortrait` and `PlayerLayoutLandscape`.
+
+#### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt)
+- **Flexible Sidebar Email**: Apply `fontSize = 14.sp` and `maxLines = 1` with `overflow = TextOverflow.Ellipsis` to the sidebar email display.
 
 #### [MODIFY] [LibraryScreen.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/screens/LibraryScreen.kt)
-- Update `TechnicalInfoPopup` to include a beautiful large Music Note image for songs missing album art.
+- **Smart Grouping**: Update `GroupedTab` (Albums) to group by `Album + Artist` to avoid merging different albums with the same title.
+- **Workflow Persistence**: Ensure `isAddingTracks` flag correctly returns the user to the `PlaylistDetailScreen`.
+
+### 4. Cloud & Sync Polish
+
+#### [MODIFY] [MainViewModel.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/ui/viewmodel/MainViewModel.kt)
+- **Bulk Cloud Delete**: Implement `deleteAllCloudTracks()` using WorkManager or a direct coroutine call.
+- **Sync Toggle**: Add logic to cancel active WorkManager sync tasks when the "Stop" button is clicked.
+
+#### [MODIFY] [MainActivity.kt](file:///D:/MusicOn/app/src/main/java/com/example/musicon/MainActivity.kt) (Sidebar)
+- Update Sync button icon based on `syncStatus`:
+    - `Idle` / `Success` / `Error` -> `Icons.Default.Sync`
+    - `Loading` -> `Icons.Default.Stop` (to cancel)
 
 ## Verification Plan
 
@@ -54,8 +51,8 @@ This plan delivers a comprehensive visual and functional scale-up for **Nirvaana
 - Build verification: `gradle app:assembleDebug`.
 
 ### Manual Verification
-- **Sidebar Stats**: verify the massive font sizes look professional and readable.
-- **Central Sync**: click the center of the 240dp progress circle to trigger a sync.
-- **Matrix Expansion**: expand an Artist and verify tracks appear in a flexible grid/matrix form.
-- **Cloud Delete**: verify a synced song can be removed from Drive via the song options menu.
-- **Bulk Add**: verify clicking `+` in a playlist takes you to All Songs with selection mode already active.
+- **Font Check**: verify Settings and song lists now use the Cursive font.
+- **Persistence Test**: Manually rename a music folder on the device, run a scan, and verify synced songs stay in the library/playlists.
+- **Cloud Wipe**: Use the "Delete All" button in Cloud Browser and verify Drive is cleared.
+- **Sync Control**: Start a sync and verify the button changes to a Stop icon; click it to cancel.
+- **Player Recovery**: confirmed song icons are back at the bottom of the player.

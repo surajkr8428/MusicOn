@@ -490,7 +490,8 @@ fun MusicOnApp(
             val screenWidth = configuration.screenWidthDp.dp
             val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
             
-            val adaptiveWidth = if (isLandscape) 360.dp else screenWidth * 0.85f
+            // Adaptive Sidebar Width: 85% for phones, max 400dp for tablets
+            val adaptiveWidth = if (screenWidth > 600.dp) 400.dp else screenWidth * 0.85f
 
             // Dual Drawer Implementation
             val leftDrawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -526,24 +527,32 @@ fun MusicOnApp(
                             val localCount by viewModel.localTracksCount.collectAsState()
                             val cloudCount by viewModel.cloudTracksCount.collectAsState()
                             
-                            Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                                Text("Nirvaana Storage", style = MaterialTheme.typography.titleMedium.copy(color = primaryColor, fontWeight = FontWeight.ExtraBold))
+                            Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 24.dp)) {
+                                Text(
+                                    "NIRVAANA STORAGE", 
+                                    style = MaterialTheme.typography.titleLarge.copy(
+                                        color = primaryColor, 
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 26.sp // Reduced to fit better
+                                    ),
+                                    lineHeight = 30.sp
+                                )
                                 Spacer(Modifier.height(12.dp))
                                 
                                 // Local Storage Row
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Smartphone, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Local: $localCount Songs", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                                    Icon(Icons.Default.Smartphone, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(10.dp))
+                                    Text("Local: $localCount Songs", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp), color = Color.White)
                                 }
                                 
                                 Spacer(Modifier.height(8.dp))
                                 
                                 // Cloud Storage Row
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.CloudQueue, null, tint = Color.Gray, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Cloud: $cloudCount Synced", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                                    Icon(Icons.Default.CloudQueue, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(10.dp))
+                                    Text("Cloud: $cloudCount Synced", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp), color = Color.White)
                                     Spacer(Modifier.weight(1f))
                                     
                                     // Sync Button next to Cloud Count
@@ -552,7 +561,7 @@ fun MusicOnApp(
                                             if (!isUserSignedIn) showSignInPrompt = true 
                                             else viewModel.syncAllLocalToCloud() 
                                         },
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(32.dp).background(primaryColor.copy(alpha = 0.1f), CircleShape)
                                     ) { 
                                         Icon(Icons.Default.Sync, "Sync Now", tint = primaryColor, modifier = Modifier.size(18.dp)) 
                                     }
@@ -569,7 +578,11 @@ fun MusicOnApp(
                             // Giant Aesthetic Circular Progress in Sidebar
                             com.example.musicon.ui.components.CircularSyncProgressBar(
                                 syncStatus = syncStatus,
-                                modifier = Modifier.padding(16.dp).fillMaxWidth()
+                                modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                onSyncClick = {
+                                    if (!isUserSignedIn) showSignInPrompt = true 
+                                    else viewModel.syncAllLocalToCloud() 
+                                }
                             )
                             
                             Spacer(Modifier.weight(1f))

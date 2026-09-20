@@ -2,7 +2,11 @@ package com.example.musicon.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -19,7 +23,8 @@ import com.example.musicon.data.remote.SyncStatus
 @Composable
 fun CircularSyncProgressBar(
     syncStatus: SyncStatus,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onSyncClick: () -> Unit = {}
 ) {
     val progress = when (syncStatus) {
         is SyncStatus.Loading -> syncStatus.progress
@@ -48,13 +53,13 @@ fun CircularSyncProgressBar(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Double the circle size: 240dp
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(240.dp)) {
-            Canvas(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        // Immersive circle size: 320dp
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(320.dp)) {
+            Canvas(modifier = Modifier.fillMaxSize().padding(28.dp)) {
                 // Background Track
                 drawCircle(
                     color = trackColor,
-                    style = Stroke(width = 20.dp.toPx(), cap = StrokeCap.Round)
+                    style = Stroke(width = 28.dp.toPx(), cap = StrokeCap.Round)
                 )
 
                 // Progress Arc
@@ -66,7 +71,7 @@ fun CircularSyncProgressBar(
                     startAngle = startAngle,
                     sweepAngle = sweep,
                     useCenter = false,
-                    style = Stroke(width = 20.dp.toPx(), cap = StrokeCap.Round)
+                    style = Stroke(width = 28.dp.toPx(), cap = StrokeCap.Round)
                 )
             }
 
@@ -77,22 +82,25 @@ fun CircularSyncProgressBar(
                         text = "${(progress * 100).toInt()}%",
                         style = MaterialTheme.typography.displayLarge.copy(
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 48.sp
+                            fontSize = 56.sp
                         ),
                         color = accentColor
                     )
-                } else if (syncStatus is SyncStatus.Idle) {
-                     Text(
-                        text = "READY",
-                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
-                        color = accentColor.copy(alpha = 0.6f)
-                    )
                 } else {
-                    Text(
-                        text = "...",
-                        style = MaterialTheme.typography.displayLarge,
-                        color = accentColor
-                    )
+                     // 2nd Sync Button at the center of the circle
+                     androidx.compose.material3.IconButton(
+                        onClick = onSyncClick,
+                        modifier = Modifier
+                            .size(100.dp)
+                            .background(accentColor.copy(alpha = 0.12f), CircleShape)
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = "Sync",
+                            tint = accentColor,
+                            modifier = Modifier.size(56.dp)
+                        )
+                    }
                 }
             }
         }
