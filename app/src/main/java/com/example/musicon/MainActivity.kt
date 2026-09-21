@@ -1,14 +1,19 @@
 package com.example.musicon
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -36,14 +41,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -53,19 +62,32 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
 import coil.ImageLoader
 import coil.request.ImageRequest
 import com.example.musicon.data.remote.CloudStorageManager
 import com.example.musicon.ui.viewmodel.PlaybackEvent
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
 import androidx.palette.graphics.Palette
+import coil.compose.LocalImageLoader
 import com.example.musicon.data.LibraryViewMode
+import com.example.musicon.data.MusicRepository
 import com.example.musicon.data.SettingsRepository
+import com.example.musicon.data.local.MusicDatabase
 import com.example.musicon.data.local.TrackEntity
 import com.example.musicon.ui.theme.ThemeMode
 import com.example.musicon.data.remote.CloudSyncManager
+import com.example.musicon.data.remote.SyncStatus
+import com.example.musicon.service.PlaybackService
+import com.example.musicon.ui.components.CircularSyncProgressBar
 import com.example.musicon.ui.components.MiniPlayer
 import com.example.musicon.ui.components.RenameDialog
 import com.example.musicon.ui.screens.*
@@ -83,9 +105,17 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import com.example.musicon.ui.components.HeaderStatusPill
+import com.example.musicon.ui.components.LocalCustomBackground
+import com.example.musicon.ui.components.LocalIsBackgroundBright
+import com.example.musicon.ui.components.StellarBackground
+import com.example.musicon.ui.components.SyncProgressBar
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.Scope
+import com.google.common.util.concurrent.ListenableFuture
 
 class MainActivity : ComponentActivity() {
-    private var controllerFuture: com.google.common.util.concurrent.ListenableFuture<MediaController>? = null
+    private var controllerFuture: ListenableFuture<MediaController>? = null
     private var mediaController: MediaController? by mutableStateOf(null)
     
     private var onSignInResult: ((Boolean) -> Unit)? = null
@@ -93,10 +123,10 @@ class MainActivity : ComponentActivity() {
     private val signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
         try {
-            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+            val account = task.getResult(ApiException::class.java)
             onSignInResult?.invoke(account != null)
         } catch (e: Exception) {
-            android.util.Log.e("MusicOn", "Sign-in failed", e)
+            Log.e("MusicOn", "Sign-in failed", e)
             onSignInResult?.invoke(false)
         }
     }
@@ -106,16 +136,16 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         val settingsRepository = SettingsRepository(applicationContext)
-        val database = com.example.musicon.data.local.MusicDatabase.getDatabase(applicationContext)
-        val cloudManager = com.example.musicon.data.remote.CloudStorageManager(applicationContext)
-        val musicRepository = com.example.musicon.data.MusicRepository(applicationContext, database.trackDao(), database.playlistDao(), cloudManager)
+        val database = MusicDatabase.getDatabase(applicationContext)
+        val cloudManager = CloudStorageManager(applicationContext)
+        val musicRepository = MusicRepository(applicationContext, database.trackDao(), database.playlistDao(), cloudManager)
         
         val account = GoogleSignIn.getLastSignedInAccount(this)
 
         setContent {
             val viewModel: MainViewModel = viewModel(
-                factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-                    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                factory = object : ViewModelProvider.Factory {
+                    override fun <T : ViewModel> create(modelClass: Class<T>): T {
                         @Suppress("UNCHECKED_CAST")
                         return MainViewModel(settingsRepository, musicRepository) as T
                     }
@@ -141,11 +171,11 @@ class MainActivity : ComponentActivity() {
             val isOnline by viewModel.isOnline.collectAsState()
 
             DisposableEffect(Unit) {
-                val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+                val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
                 val callback = object : ConnectivityManager.NetworkCallback() {
                     override fun onAvailable(network: Network) {
                         val capabilities = cm.getNetworkCapabilities(network)
-                        val isWifi = capabilities?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) == true
+                        val isWifi = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
                         viewModel.updateOnlineStatus(true, isWifi)
                     }
                     override fun onLost(network: Network) { viewModel.updateOnlineStatus(false) }
@@ -174,11 +204,11 @@ class MainActivity : ComponentActivity() {
                 val controller = mediaController ?: return@LaunchedEffect
                 
                 controller.addListener(object : Player.Listener {
-                    override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                        android.util.Log.e("MusicOn", "Player Error: ${error.errorCodeName}", error)
+                    override fun onPlayerError(error: PlaybackException) {
+                        Log.e("MusicOn", "Player Error: ${error.errorCodeName}", error)
                     }
 
-                    override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                         val id = mediaItem?.mediaId
                         if (id != null) {
                             viewModel.updateCurrentTrackById(id)
@@ -193,7 +223,7 @@ class MainActivity : ComponentActivity() {
                             viewModel.lastPosition,
                             viewModel.currentPlayingTrack
                         ) { queue, pos, track ->
-                            if (queue.isNotEmpty() && pos != -1L) Triple(queue, pos, track) else null
+                            if (queue.isNotEmpty() && track != null) Triple(queue, pos, track) else null
                         }.filterNotNull().first()
                         
                         val initialTracks = startupData.first
@@ -201,7 +231,7 @@ class MainActivity : ComponentActivity() {
                         val currentTrack = startupData.third
                         
                         val mediaItems = initialTracks.map { it.toMediaItem() }
-                        val startIndex = initialTracks.indexOfFirst { it.id == currentTrack?.id }.coerceAtLeast(0)
+                        val startIndex = initialTracks.indexOfFirst { it.id == currentTrack.id }.coerceAtLeast(0)
                         
                         controller.setMediaItems(mediaItems)
                         controller.seekTo(startIndex, lastPos)
@@ -221,7 +251,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     } catch (e: Exception) {
-                        android.util.Log.e("MusicOn", "Playback failed", e)
+                        Log.e("MusicOn", "Playback failed", e)
                     }
                 }
             }
@@ -238,7 +268,7 @@ class MainActivity : ComponentActivity() {
                     withContext(Dispatchers.IO) {
                         try {
                             val bitmap = if (path.startsWith("content://")) {
-                                context.contentResolver.openInputStream(android.net.Uri.parse(path))?.use {
+                                context.contentResolver.openInputStream(Uri.parse(path))?.use {
                                     BitmapFactory.decodeStream(it)
                                 }
                             } else if (path.startsWith("http")) {
@@ -252,7 +282,7 @@ class MainActivity : ComponentActivity() {
                                 viewModel.updateExtractedColor(color)
                             }
                         } catch (e: Exception) {
-                            android.util.Log.e("MusicOn", "Palette extraction failed", e)
+                            Log.e("MusicOn", "Palette extraction failed", e)
                         }
                     }
                 } else {
@@ -279,7 +309,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+            val lifecycleOwner = LocalLifecycleOwner.current
             DisposableEffect(lifecycleOwner) {
                 val lifecycle = lifecycleOwner.lifecycle
                 val observer = LifecycleEventObserver { _, event ->
@@ -296,9 +326,9 @@ class MainActivity : ComponentActivity() {
             }
 
             CompositionLocalProvider(
-                com.example.musicon.ui.components.LocalCustomBackground provides customBgUri,
-                com.example.musicon.ui.components.LocalIsBackgroundBright provides (themeMode == ThemeMode.LIGHT),
-                coil.compose.LocalImageLoader provides imageLoader
+                LocalCustomBackground provides customBgUri,
+                LocalIsBackgroundBright provides (themeMode == ThemeMode.LIGHT),
+                LocalImageLoader provides imageLoader
             ) {
                 MusicOnTheme(themeMode = themeMode, accentColor = accentColor) {
                     var isFirstLaunch by rememberSaveable { mutableStateOf(true) }
@@ -327,7 +357,7 @@ class MainActivity : ComponentActivity() {
                     } else {
                         Box(Modifier.fillMaxSize().background(Color(0xFF0D0B1F)), contentAlignment = Alignment.Center) {
                             Icon(
-                                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_nirvaana_logo),
+                                painter = painterResource(R.drawable.ic_nirvaana_logo),
                                 contentDescription = null,
                                 modifier = Modifier.size(140.dp),
                                 tint = Color.Unspecified
@@ -339,14 +369,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onNewIntent(intent: android.content.Intent) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
     }
 
-    private fun handleIntent(intent: android.content.Intent, viewModel: MainViewModel) {
-        if (intent.action == android.content.Intent.ACTION_VIEW) {
-            intent.data?.let { uri ->
+    private fun handleIntent(intent: Intent, viewModel: MainViewModel) {
+        if (intent.action == Intent.ACTION_VIEW) {
+            intent.data?.let { uri: Uri ->
                 viewModel.playExternalFile(uri)
             }
         }
@@ -356,8 +386,8 @@ class MainActivity : ComponentActivity() {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
             .requestScopes(
-                com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file"),
-                com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.readonly")
+                Scope("https://www.googleapis.com/auth/drive.file"),
+                Scope("https://www.googleapis.com/auth/drive.readonly")
             )
             .build()
         val client = GoogleSignIn.getClient(this, gso)
@@ -371,7 +401,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        val sessionToken = androidx.media3.session.SessionToken(this, android.content.ComponentName(this, com.example.musicon.service.PlaybackService::class.java))
+        val sessionToken = SessionToken(this, ComponentName(this, PlaybackService::class.java))
         controllerFuture = MediaController.Builder(this, sessionToken).buildAsync()
         controllerFuture?.addListener({
             mediaController = controllerFuture?.get()
@@ -384,22 +414,22 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private fun TrackEntity.toMediaItem(): androidx.media3.common.MediaItem {
-    val metadata = androidx.media3.common.MediaMetadata.Builder()
+private fun TrackEntity.toMediaItem(): MediaItem {
+    val metadata = MediaMetadata.Builder()
         .setTitle(displayName)
         .setArtist(displayArtist)
         .setAlbumTitle(displayAlbum)
-        .setArtworkUri(customCoverPath?.let { android.net.Uri.parse(it) } ?: localPath?.let { android.net.Uri.parse(it) })
+        .setArtworkUri(customCoverPath?.let { Uri.parse(it) } ?: localPath?.let { Uri.parse(it) })
         .build()
 
     val uri = if (localPath != null) {
-        if (localPath.startsWith("content://")) android.net.Uri.parse(localPath)
-        else android.net.Uri.fromFile(java.io.File(localPath))
+        if (localPath.startsWith("content://")) Uri.parse(localPath)
+        else Uri.fromFile(File(localPath))
     } else if (gDriveId != null) {
-        android.net.Uri.parse("https://www.googleapis.com/drive/v3/files/$gDriveId?alt=media")
+        Uri.parse("https://www.googleapis.com/drive/v3/files/$gDriveId?alt=media")
     } else null
 
-    return androidx.media3.common.MediaItem.Builder()
+    return MediaItem.Builder()
         .setMediaId(id)
         .setUri(uri)
         .setMediaMetadata(metadata)
@@ -417,11 +447,11 @@ fun MusicOnApp(
     val themeMode by viewModel.themeMode.collectAsState()
     val backgroundMode by viewModel.backgroundMode.collectAsState()
 
-    com.example.musicon.ui.components.StellarBackground(themeMode = themeMode, backgroundMode = backgroundMode) {
+    StellarBackground(themeMode = themeMode, backgroundMode = backgroundMode) {
         val scope = rememberCoroutineScope()
         val isUserSignedIn by viewModel.isUserSignedIn
         val context = LocalContext.current
-        val syncStatus by com.example.musicon.data.remote.CloudSyncManager.status.collectAsState()
+        val syncStatus by CloudSyncManager.status.collectAsState()
         
         var isPlayerVisible by rememberSaveable { mutableStateOf(false) }
         var isEqualizerVisible by rememberSaveable { mutableStateOf(false) }
@@ -442,7 +472,7 @@ fun MusicOnApp(
         } else if (cutterTrack != null) {
             Mp3CutterScreen(track = cutterTrack!!, viewModel = viewModel, onBack = { cutterTrack = null })
         } else {
-            val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+            val configuration = LocalConfiguration.current
             val screenWidth = configuration.screenWidthDp.dp
             val adaptiveWidth = if (screenWidth > 600.dp) 400.dp else screenWidth * 0.85f
 
@@ -464,7 +494,7 @@ fun MusicOnApp(
                             } else {
                                 val account = GoogleSignIn.getLastSignedInAccount(context)
                                 Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                                    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+                                    val isBright = LocalIsBackgroundBright.current
                                     val emailColor = if (isBright) Color.Black else Color.White
 
                                     Column(Modifier.weight(1f)) {
@@ -514,8 +544,8 @@ fun MusicOnApp(
                                     Text("Cloud: $cloudCount Synced", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp), color = Color.White)
                                     Spacer(Modifier.weight(1f))
                                     
-                                    val isSyncing = syncStatus is com.example.musicon.data.remote.SyncStatus.Loading
-                                    val isPaused = syncStatus is com.example.musicon.data.remote.SyncStatus.Paused
+                                    val isSyncing = syncStatus is SyncStatus.Loading
+                                    val isPaused = syncStatus is SyncStatus.Paused
                                     
                                     IconButton(
                                         onClick = { 
@@ -542,13 +572,13 @@ fun MusicOnApp(
                             NavigationDrawerItem(label = { Text("Share App (APK)") }, selected = false, onClick = { scope.launch { leftDrawerState.close() }; viewModel.shareAppApk() }, icon = { Icon(Icons.Default.Share, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
                             
                             Spacer(Modifier.weight(1f))
-                            
-                            com.example.musicon.ui.components.CircularSyncProgressBar(
+
+                            CircularSyncProgressBar(
                                 syncStatus = syncStatus,
                                 modifier = Modifier.padding(16.dp).fillMaxWidth(),
                                 onSyncClick = {
-                                    val isSyncingNow = syncStatus is com.example.musicon.data.remote.SyncStatus.Loading
-                                    val isPausedNow = syncStatus is com.example.musicon.data.remote.SyncStatus.Paused
+                                    val isSyncingNow = syncStatus is SyncStatus.Loading
+                                    val isPausedNow = syncStatus is SyncStatus.Paused
                                     
                                     if (!isUserSignedIn) showSignInPrompt = true 
                                     else if (isSyncingNow) viewModel.pauseSync()
@@ -622,7 +652,7 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
     val syncStatus by CloudSyncManager.status.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
     val backgroundMode by viewModel.backgroundMode.collectAsState()
-    val cloudManager = remember { com.example.musicon.data.remote.CloudStorageManager(context) }
+    val cloudManager = remember { CloudStorageManager(context) }
     
     var cloudFiles by remember { mutableStateOf<List<com.google.api.services.drive.model.File>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -659,7 +689,7 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
         }
     }
 
-    com.example.musicon.ui.components.StellarBackground(themeMode = themeMode, backgroundMode = backgroundMode) {
+    StellarBackground(themeMode = themeMode, backgroundMode = backgroundMode) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
@@ -704,7 +734,7 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                     }
                 }
             } else {
-                androidx.compose.material3.pulltorefresh.PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { refresh() }, modifier = Modifier.padding(padding).fillMaxSize()) {
+                PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { refresh() }, modifier = Modifier.padding(padding).fillMaxSize()) {
                     if (isLoading && !isRefreshing) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) } }
                     else if (viewMode == LibraryViewMode.GRID) {
                         LazyVerticalGrid(columns = GridCells.Adaptive(110.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
@@ -716,7 +746,7 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                                         contentDescription = null,
                                         modifier = Modifier.size(64.dp).clip(RoundedCornerShape(8.dp)),
                                         contentScale = ContentScale.Crop,
-                                        error = androidx.compose.ui.graphics.painter.ColorPainter(Color.White.copy(alpha = 0.1f))
+                                        error = ColorPainter(Color.White.copy(alpha = 0.1f))
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Text(file.name ?: "Unknown", color = Color.White, maxLines = 1, style = MaterialTheme.typography.labelSmall)

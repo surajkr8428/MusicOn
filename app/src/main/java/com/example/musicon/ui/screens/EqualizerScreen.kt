@@ -1,5 +1,6 @@
 package com.example.musicon.ui.screens
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,11 +16,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.musicon.data.remote.CloudSyncManager
 import com.example.musicon.ui.components.StellarBackground
 import com.example.musicon.ui.viewmodel.MainViewModel
+import com.example.musicon.ui.components.HeaderStatusPill
+import com.example.musicon.ui.components.LocalIsBackgroundBright
+import com.example.musicon.ui.components.SyncProgressBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,17 +39,17 @@ fun EqualizerScreen(
     val virtualizer by viewModel.virtualizer.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
     val isWifi by viewModel.isWifi.collectAsState()
-    val syncStatus by com.example.musicon.data.remote.CloudSyncManager.status.collectAsState()
+    val syncStatus by CloudSyncManager.status.collectAsState()
     
-    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+    val isBright = LocalIsBackgroundBright.current
     val contentColor = if (isBright) Color.Black else Color.White
     val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
 
     val bands = remember(eqBandsStr) { eqBandsStr.split(",").map { it.toInt() } }
     val primaryColor = MaterialTheme.colorScheme.primary
 
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     StellarBackground {
         Scaffold(

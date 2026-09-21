@@ -77,16 +77,16 @@ fun TechnicalInfoPopup(track: TrackEntity, onDismiss: () -> Unit) {
                 // Detailed Grid
                 Column(Modifier.fillMaxWidth()) {
                     HorizontalDivider(color = Color.White.copy(alpha = 0.05f))
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(12.dp))
                     
                     Row(Modifier.fillMaxWidth()) {
-                        InfoItem("Artist", track.displayArtist, Modifier.weight(1f))
-                        InfoItem("Album", track.displayAlbum, Modifier.weight(1f))
+                        InfoItem("Song Artist", track.displayArtist, Modifier.weight(1f))
+                        InfoItem("Song Album", track.displayAlbum, Modifier.weight(1f))
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(12.dp))
                     Row(Modifier.fillMaxWidth()) {
-                        InfoItem("Bitrate", track.bitrate ?: "320 kbps", Modifier.weight(1f))
-                        InfoItem("Duration", formatDuration(track.duration), Modifier.weight(1f))
+                        InfoItem("Audio Quality", track.bitrate ?: "320 kbps", Modifier.weight(1f))
+                        InfoItem("Total Duration", formatDuration(track.duration), Modifier.weight(1f))
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth()) {

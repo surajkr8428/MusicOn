@@ -50,6 +50,7 @@ class SettingsRepository(val context: Context) {
         // Last Playback State
         val LAST_TRACK_ID = stringPreferencesKey("last_track_id")
         val LAST_POSITION = longPreferencesKey("last_position")
+        val LAST_PLAYLIST_ID = stringPreferencesKey("last_playlist_id")
     }
 
     val themeModeFlow: Flow<ThemeMode> = context.dataStore.data.map { preferences ->
@@ -88,6 +89,7 @@ class SettingsRepository(val context: Context) {
 
     val lastTrackIdFlow: Flow<String?> = context.dataStore.data.map { it[PreferencesKeys.LAST_TRACK_ID] }
     val lastPositionFlow: Flow<Long> = context.dataStore.data.map { it[PreferencesKeys.LAST_POSITION] ?: 0L }
+    val lastPlaylistIdFlow: Flow<String?> = context.dataStore.data.map { it[PreferencesKeys.LAST_PLAYLIST_ID] }
 
     suspend fun updateThemeMode(themeMode: ThemeMode) { context.dataStore.edit { it[PreferencesKeys.THEME_MODE] = themeMode.name } }
     suspend fun updateLibraryViewMode(mode: LibraryViewMode) { context.dataStore.edit { it[PreferencesKeys.LIBRARY_VIEW_MODE] = mode.name } }
@@ -110,10 +112,11 @@ class SettingsRepository(val context: Context) {
     suspend fun updateBackgroundMode(mode: String) { context.dataStore.edit { it[PreferencesKeys.BACKGROUND_MODE] = mode } }
     suspend fun updateSongSortOrder(order: String) { context.dataStore.edit { it[PreferencesKeys.SONG_SORT_ORDER] = order } }
     
-    suspend fun updateLastPlaybackState(trackId: String?, position: Long) {
+    suspend fun updateLastPlaybackState(trackId: String?, position: Long, playlistId: String? = null) {
         context.dataStore.edit {
             if (trackId == null) it.remove(PreferencesKeys.LAST_TRACK_ID) else it[PreferencesKeys.LAST_TRACK_ID] = trackId
             it[PreferencesKeys.LAST_POSITION] = position
+            if (playlistId == null) it.remove(PreferencesKeys.LAST_PLAYLIST_ID) else it[PreferencesKeys.LAST_PLAYLIST_ID] = playlistId
         }
     }
 }

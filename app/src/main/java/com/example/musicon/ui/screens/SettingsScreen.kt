@@ -2,6 +2,7 @@ package com.example.musicon.ui.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,13 +24,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.musicon.ui.components.ColorWheel
+import com.example.musicon.ui.components.LocalIsBackgroundBright
 import com.example.musicon.ui.theme.CategoryPurple
+import com.example.musicon.ui.theme.ThemeMode
 import com.example.musicon.ui.viewmodel.MainViewModel
 
 @Composable
@@ -48,6 +52,7 @@ fun SettingsScreen(
     val customBgUri by viewModel.customBgUri.collectAsState()
     val accentColorInt by viewModel.accentColor.collectAsState()
     val primaryColor = Color(accentColorInt)
+    val shakeToSkip by viewModel.shakeToSkip.collectAsState()
     
     var hexInput by remember { mutableStateOf("") }
     var showColorWheel by remember { mutableStateOf(false) }
@@ -69,7 +74,6 @@ fun SettingsScreen(
                     "NARUTO_SASUKE", "TOM_JERRY", "THOR", "CAPTAIN_AMERICA", "BLACK_PANTHER"
                 )
                 
-                // Vertical Grid for Animation Modes (3 columns)
                 modes.chunked(3).forEach { rowModes ->
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -95,7 +99,6 @@ fun SettingsScreen(
                                 )
                             }
                         }
-                        // Fill empty slots in last row
                         repeat(3 - rowModes.size) {
                             Spacer(Modifier.weight(1f))
                         }
@@ -118,7 +121,7 @@ fun SettingsScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("Theme Mode", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    com.example.musicon.ui.theme.ThemeMode.entries.forEach { mode ->
+                    ThemeMode.entries.forEach { mode ->
                         val isSelected = themeMode == mode
                         Button(
                             onClick = { viewModel.updateThemeMode(mode) },
@@ -135,11 +138,11 @@ fun SettingsScreen(
             SettingsHeader("Cloud Backup")
             StellarSettingsItem(Icons.Default.CloudDownload, "Restore Library", "Restore playlists and settings from GDrive") {
                 viewModel.restoreFromCloud()
-                android.widget.Toast.makeText(context, "Restoring from cloud...", android.widget.Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Restoring from cloud...", Toast.LENGTH_SHORT).show()
             }
             StellarSettingsItem(Icons.Default.CloudUpload, "Manual Backup", "Force save library to cloud") {
                 viewModel.triggerBackup()
-                android.widget.Toast.makeText(context, "Uploading backup...", android.widget.Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Uploading backup...", Toast.LENGTH_SHORT).show()
             }
             Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -187,8 +190,7 @@ fun SettingsScreen(
             SettingsHeader("Preference")
             StellarSettingsToggle(Icons.Default.WbSunny, "Keep screen on", "Stay on while on the player screen", keepScreenOn) { viewModel.updateKeepScreenOn(it) }
             StellarSettingsToggle(Icons.Default.Notifications, "Notifications", "Show playback controls in notification", showNotifications) { viewModel.updateShowNotifications(it) }
-            val shakeState by viewModel.shakeToSkip.collectAsState()
-            StellarSettingsToggle(Icons.Default.PhoneAndroid, "Shake to skip", "Shake device to play next song", shakeState) { viewModel.updateShakeToSkip(it) }
+            StellarSettingsToggle(Icons.Default.PhoneAndroid, "Shake to skip", "Shake device to play next song", shakeToSkip) { viewModel.updateShakeToSkip(it) }
         }
 
         item {
@@ -204,19 +206,19 @@ fun SettingsScreen(
 
 @Composable
 fun SettingsHeader(title: String) {
-    Text(text = title, color = CategoryPurple, fontSize = 15.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 12.dp))
+    Text(text = title, color = CategoryPurple, fontSize = 15.sp, fontFamily = FontFamily.Cursive, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 16.dp, top = 24.dp, bottom = 12.dp))
 }
 
 @Composable
 fun StellarSettingsItem(icon: ImageVector, title: String, subtitle: String?, onClick: (() -> Unit)? = null) {
-    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+    val isBright = LocalIsBackgroundBright.current
     val contentColor = if (isBright) Color.Black else Color.White
     
     Surface(onClick = { onClick?.invoke() }, color = Color.Transparent, enabled = onClick != null) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = contentColor.copy(alpha = 0.8f), modifier = Modifier.size(24.dp))
             Column(modifier = Modifier.weight(1f).padding(start = 20.dp)) {
-                Text(text = title, color = contentColor, fontSize = 17.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive, fontWeight = FontWeight.SemiBold)
+                Text(text = title, color = contentColor, fontSize = 17.sp, fontFamily = FontFamily.Cursive, fontWeight = FontWeight.SemiBold)
                 if (subtitle != null) Text(subtitle, color = Color.Gray, fontSize = 12.sp)
             }
         }
@@ -225,14 +227,14 @@ fun StellarSettingsItem(icon: ImageVector, title: String, subtitle: String?, onC
 
 @Composable
 fun StellarSettingsToggle(icon: ImageVector, title: String, subtitle: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+    val isBright = LocalIsBackgroundBright.current
     val contentColor = if (isBright) Color.Black else Color.White
     val primaryColor = MaterialTheme.colorScheme.primary
     
     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = contentColor.copy(alpha = 0.8f), modifier = Modifier.size(24.dp))
         Column(modifier = Modifier.weight(1f).padding(start = 20.dp)) {
-            Text(text = title, color = contentColor, fontSize = 17.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive, fontWeight = FontWeight.SemiBold)
+            Text(text = title, color = contentColor, fontSize = 17.sp, fontFamily = FontFamily.Cursive, fontWeight = FontWeight.SemiBold)
             Text(subtitle, color = Color.Gray, fontSize = 12.sp)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedThumbColor = primaryColor, checkedTrackColor = primaryColor.copy(alpha = 0.3f), uncheckedThumbColor = Color.Gray, uncheckedTrackColor = Color.DarkGray))

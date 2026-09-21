@@ -1,5 +1,6 @@
 package com.example.musicon.ui.screens
 
+import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -10,32 +11,38 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.musicon.data.local.TrackEntity
+import com.example.musicon.data.remote.CloudSyncManager
 import com.example.musicon.ui.components.StellarBackground
+import com.example.musicon.ui.components.HeaderStatusPill
+import com.example.musicon.ui.components.LocalIsBackgroundBright
+import com.example.musicon.ui.components.SyncProgressBar
+import com.example.musicon.ui.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Mp3CutterScreen(
     track: TrackEntity,
-    viewModel: com.example.musicon.ui.viewmodel.MainViewModel,
+    viewModel: MainViewModel,
     onBack: () -> Unit
 ) {
-    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+    val isBright = LocalIsBackgroundBright.current
     val contentColor = if (isBright) Color.Black else Color.White
     val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
 
     val isOnline by viewModel.isOnline.collectAsState()
     val isWifi by viewModel.isWifi.collectAsState()
-    val syncStatus by com.example.musicon.data.remote.CloudSyncManager.status.collectAsState()
+    val syncStatus by CloudSyncManager.status.collectAsState()
 
     var startRange by remember { mutableFloatStateOf(0f) }
     var endRange by remember { mutableFloatStateOf(track.duration.toFloat()) }
 
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     BackHandler(onBack = onBack)
 
