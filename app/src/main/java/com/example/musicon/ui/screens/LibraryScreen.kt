@@ -27,7 +27,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -146,8 +145,17 @@ fun LibraryScreen(
     var addingToPlaylistId by remember { mutableStateOf<String?>(null) }
 
     val baseTabs = listOf("Recents", "All Songs", "Playlists", "Albums", "Artists", "Genres")
-    val tabs = baseTabs + customFolders.map { it.substringAfterLast("/").ifBlank { "Folder" } }
-    val pagerState = rememberPagerState(initialPage = 1) { tabs.size }
+    val tabs = remember(customFolders) { baseTabs + customFolders.map { it.substringAfterLast("/").ifBlank { "Folder" } } }
+    
+    // Static count for PagerState to prevent lambda resolution crash
+    val tabCount = tabs.size
+    val pagerState = rememberPagerState(initialPage = 1) { tabCount }
+    
+    LaunchedEffect(tabCount) {
+        if (pagerState.currentPage >= tabCount && tabCount > 0) {
+            pagerState.scrollToPage(0)
+        }
+    }
 
     val songListState = rememberLazyListState()
     val songGridState = rememberLazyGridState()
@@ -167,15 +175,6 @@ fun LibraryScreen(
             android.widget.Toast.makeText(context, currentStatus.message, android.widget.Toast.LENGTH_SHORT).show()
         } else if (currentStatus is com.example.musicon.data.remote.SyncStatus.Error) {
             android.widget.Toast.makeText(context, currentStatus.message, android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    LaunchedEffect(isForceSelectionMode) {
-        if (isForceSelectionMode && addingToPlaylistId != null) {
-            // Pre-select some songs if needed or just enter mode
-            if (selectedIds.isEmpty()) {
-                 // Force selection mode is active
-            }
         }
     }
 
@@ -427,7 +426,7 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
     var showTrackInfoDialog by remember { mutableStateOf<TrackEntity?>(null) }
     var showBulkPlaylistDialog by remember { mutableStateOf(false) }
     val playlists by viewModel.allPlaylists.collectAsState()
-    var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.LIST) }
+    var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.GRID) }
     
     val isSelectionMode = selectedIds.isNotEmpty()
     val scope = rememberCoroutineScope()
@@ -504,7 +503,7 @@ fun PlaylistDetailScreen(playlist: com.example.musicon.data.local.Playlist, view
                     }
                 } else {
                     if (subViewMode == LibraryViewMode.GRID) {
-                        LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 100.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) { 
+                        LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 130.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) { 
                             items(tracks) { track ->
                                 StellarGridItem(
                                     track = track, 
@@ -669,6 +668,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
     val barColor = when (syncStatus) {
         is com.example.musicon.data.remote.SyncStatus.Loading -> Color.Yellow
         is com.example.musicon.data.remote.SyncStatus.Success -> Color.Green
+        is com.example.musicon.data.remote.SyncStatus.Paused -> Color.Cyan
         is com.example.musicon.data.remote.SyncStatus.Error -> Color.Red
         else -> MaterialTheme.colorScheme.primary
     }
@@ -676,6 +676,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
     val progress = when (syncStatus) {
         is com.example.musicon.data.remote.SyncStatus.Loading -> syncStatus.progress
         is com.example.musicon.data.remote.SyncStatus.Success -> 1f
+        is com.example.musicon.data.remote.SyncStatus.Paused -> if (syncStatus.total > 0) syncStatus.current.toFloat() / syncStatus.total else 0f
         else -> -1f
     }
 
@@ -729,6 +730,13 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Black
             )
+        } else if (syncStatus is com.example.musicon.data.remote.SyncStatus.Paused) {
+            Text(
+                text = "Sync Paused (${syncStatus.current}/${syncStatus.total})",
+                color = Color.Black,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Black
+            )
         } else if (syncStatus is com.example.musicon.data.remote.SyncStatus.Error) {
             Text(
                 text = "Sync Error",
@@ -778,7 +786,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
 ) {
     var expandedPlaylistId by remember { mutableStateOf<String?>(null) }
     var infoPlaylistId by remember { mutableStateOf<String?>(null) }
-    var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.GRID) } // Default to Grid for Matrix feel
+    var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.GRID) }
 
     if (viewMode == LibraryViewMode.GRID) {
         LazyVerticalGrid(state = gridState, columns = GridCells.Adaptive(minSize = 130.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) { 
@@ -847,8 +855,7 @@ fun SyncProgressBar(syncStatus: com.example.musicon.data.remote.SyncStatus, modi
                 } 
             } 
         }
-    }
-else {
+    } else {
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { 
             items(playlists) { playlist ->
                 val isExpanded = expandedPlaylistId == playlist.id
@@ -1351,50 +1358,6 @@ fun InfoLabelValue(label: String, value: String) {
     if (showInfoPopup) {
         TechnicalInfoPopup(track = track, onDismiss = { showInfoPopup = false })
     }
-}
-
-@Composable
-fun TechnicalInfoPopup(track: TrackEntity, onDismiss: () -> Unit) {
-    val imagePath = track.customCoverPath ?: track.localPath
-    val hasImage = imagePath != null && !imagePath.startsWith("http") && (if (imagePath.startsWith("content://")) true else File(imagePath).exists())
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { Button(onClick = onDismiss) { Text("Done") } },
-        title = { Text("Song Specification", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary) },
-        containerColor = Color(0xFF1E1B36),
-        shape = RoundedCornerShape(16.dp),
-        text = {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                if (hasImage || track.customCoverPath?.startsWith("http") == true) {
-                    AsyncImage(
-                        model = track.customCoverPath ?: track.localPath,
-                        contentDescription = null,
-                        modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    // Big Music Note Image for Fallback in Popup
-                    Box(Modifier.size(120.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.MusicNote, null, tint = Color.Gray, modifier = Modifier.size(64.dp))
-                    }
-                }
-                
-                Spacer(Modifier.height(16.dp))
-                
-                Column(Modifier.fillMaxWidth()) {
-                    InfoLabelValue("Artist", track.displayArtist)
-                    InfoLabelValue("Album", track.displayAlbum)
-                    InfoLabelValue("Quality", track.bitrate ?: "320 kbps")
-                    InfoLabelValue("Duration", formatDuration(track.duration))
-                    InfoLabelValue("Source", if (track.gDriveId != null) "Cloud Synced" else "Local Storage")
-                    Spacer(Modifier.height(8.dp))
-                    Text("File Path:", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text(track.localPath ?: "Remote Google Drive", style = MaterialTheme.typography.bodySmall, color = Color.LightGray, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                }
-            }
-        }
-    )
 }
 
 @Composable fun GroupGridItem(name: String, tracks: List<TrackEntity>, onClick: (List<TrackEntity>) -> Unit) { Column(modifier = Modifier.padding(6.dp).clickable { onClick(tracks) }, horizontalAlignment = Alignment.CenterHorizontally) { Box(Modifier.size(70.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(0.05f)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Album, null, tint = Color.Gray, modifier = Modifier.size(32.dp)) }; Spacer(Modifier.height(8.dp)); Text(name, color = Color.White, fontSize = 11.sp, maxLines = 1, textAlign = TextAlign.Center); Text("${tracks.size} songs", color = Color.Gray, fontSize = 9.sp, textAlign = TextAlign.Center) } }

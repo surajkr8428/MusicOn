@@ -2,16 +2,12 @@ package com.example.musicon.ui.screens
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -23,8 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -58,9 +52,7 @@ import com.example.musicon.data.PlayerImageMode
 import com.example.musicon.ui.theme.LavenderTitle
 import com.example.musicon.ui.viewmodel.MainViewModel
 import com.example.musicon.logic.LrcParser
-import com.example.musicon.logic.LyricLine
 import com.example.musicon.logic.formatSleepTime
-import com.example.musicon.logic.formatDuration
 import com.example.musicon.data.local.TrackEntity
 import com.example.musicon.ui.components.TechnicalInfoPopup
 import java.io.File
@@ -87,8 +79,6 @@ fun PlayerScreen(
     val themeMode by viewModel.themeMode.collectAsState()
     val backgroundMode by viewModel.backgroundMode.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
-    val isWifi by viewModel.isWifi.collectAsState()
-    val syncStatus by com.example.musicon.data.remote.CloudSyncManager.status.collectAsState()
     val primaryColor = MaterialTheme.colorScheme.primary
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -155,73 +145,136 @@ fun PlayerScreen(
             themeMode = themeMode,
             backgroundMode = backgroundMode
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
-                val contentColor = if (isBright) Color.Black else Color.White
-                val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
+            Scaffold(
+                containerColor = Color.Transparent,
+                topBar = {
+                    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+                    val contentColor = if (isBright) Color.Black else Color.White
+                    val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
 
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(64.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) { 
-                        Icon(Icons.Default.KeyboardArrowDown, null, tint = contentColor, modifier = Modifier.size(32.dp)) 
-                    }
-
-                    TabRow(
-                        selectedTabIndex = selectedTab,
-                        containerColor = Color.Transparent,
-                        divider = {},
-                        indicator = { tabPositions ->
-                            TabRowDefaults.SecondaryIndicator(
-                                modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                                color = primaryColor
-                            )
-                        },
-                        modifier = Modifier.width(140.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(64.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Player", color = if (selectedTab == 0) contentColor else secondaryColor, fontSize = 12.sp) } )
-                        Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) contentColor else secondaryColor, fontSize = 12.sp) } )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { showBackgroundDialog = true }) { Icon(Icons.Default.Wallpaper, null, tint = contentColor) }
-
-                        IconButton(onClick = {
-                            val nextMode = when (imageMode) {
-                                PlayerImageMode.SQUARE -> PlayerImageMode.FULL_SCREEN
-                                PlayerImageMode.FULL_SCREEN -> PlayerImageMode.ROTATION
-                                PlayerImageMode.ROTATION -> PlayerImageMode.SQUARE
-                            }
-                            viewModel.updatePlayerImageMode(nextMode)
-                        }) {
-                            Icon(
-                                when(imageMode) {
-                                    PlayerImageMode.SQUARE -> Icons.Default.CropSquare
-                                    PlayerImageMode.FULL_SCREEN -> Icons.Default.Fullscreen
-                                    PlayerImageMode.ROTATION -> Icons.Default.Sync
-                                },
-                                contentDescription = "Change View Mode",
-                                tint = contentColor
-                            )
+                        IconButton(onClick = onBack) { 
+                            Icon(Icons.Default.KeyboardArrowDown, null, tint = contentColor, modifier = Modifier.size(32.dp)) 
                         }
 
-                        var showMoreMenu by remember { mutableStateOf(false) }
-                        IconButton(onClick = { showMoreMenu = true }) {
-                            Icon(Icons.Default.MoreVert, null, tint = contentColor)
-                            DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
-                                DropdownMenuItem(text = { Text("Sleep Timer") }, leadingIcon = { Icon(Icons.Default.Timer, null) }, onClick = { showSleepTimerDialog = true; showMoreMenu = false })
-                                DropdownMenuItem(text = { Text("Delete Device", color = Color.Red) }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, onClick = { currentTrack?.let { viewModel.bulkDelete(listOf(it)) }; showMoreMenu = false })
+                        TabRow(
+                            selectedTabIndex = selectedTab,
+                            containerColor = Color.Transparent,
+                            divider = {},
+                            indicator = { tabPositions ->
+                                TabRowDefaults.SecondaryIndicator(
+                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                    color = primaryColor
+                                )
+                            },
+                            modifier = Modifier.width(140.dp)
+                        ) {
+                            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Player", color = if (selectedTab == 0) contentColor else secondaryColor, fontSize = 12.sp) } )
+                            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) contentColor else secondaryColor, fontSize = 12.sp) } )
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { showBackgroundDialog = true }) { Icon(Icons.Default.Wallpaper, null, tint = contentColor) }
+
+                            IconButton(onClick = {
+                                val nextMode = when (imageMode) {
+                                    PlayerImageMode.SQUARE -> PlayerImageMode.FULL_SCREEN
+                                    PlayerImageMode.FULL_SCREEN -> PlayerImageMode.ROTATION
+                                    PlayerImageMode.ROTATION -> PlayerImageMode.SQUARE
+                                }
+                                viewModel.updatePlayerImageMode(nextMode)
+                            }) {
+                                Icon(
+                                    when(imageMode) {
+                                        PlayerImageMode.SQUARE -> Icons.Default.CropSquare
+                                        PlayerImageMode.FULL_SCREEN -> Icons.Default.Fullscreen
+                                        PlayerImageMode.ROTATION -> Icons.Default.Sync
+                                    },
+                                    contentDescription = "Change View Mode",
+                                    tint = contentColor
+                                )
+                            }
+
+                            var showMoreMenu by remember { mutableStateOf(false) }
+                            IconButton(onClick = { showMoreMenu = true }) {
+                                Icon(Icons.Default.MoreVert, null, tint = contentColor)
+                                DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("Share Nirvaana (APK)", fontFamily = FontFamily.Cursive) }, 
+                                        leadingIcon = { Icon(Icons.Default.Share, null) }, 
+                                        onClick = { viewModel.shareAppApk(); showMoreMenu = false }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Sleep Timer", fontFamily = FontFamily.Cursive) }, 
+                                        leadingIcon = { Icon(Icons.Default.Timer, null) }, 
+                                        onClick = { showSleepTimerDialog = true; showMoreMenu = false }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Song Info", fontFamily = FontFamily.Cursive) }, 
+                                        leadingIcon = { Icon(Icons.Default.Info, null) }, 
+                                        onClick = { showInfoPopup = true; showMoreMenu = false }
+                                    )
+                                    HorizontalDivider(color = contentColor.copy(alpha = 0.1f))
+                                    DropdownMenuItem(
+                                        text = { Text("Delete Device", color = Color.Red, fontFamily = FontFamily.Cursive) }, 
+                                        leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, 
+                                        onClick = { currentTrack?.let { viewModel.bulkDelete(listOf(it)) }; showMoreMenu = false }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                bottomBar = {
+                    if (!isLandscape && selectedTab == 0) {
+                        Column(modifier = Modifier.fillMaxWidth().background(Color.Transparent).padding(bottom = 24.dp)) {
+                            // Guaranteed Persistent Queue Icons
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth().height(80.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                contentPadding = PaddingValues(horizontal = 24.dp)
+                            ) {
+                                itemsIndexed(queue) { _, track ->
+                                    val isCurrent = currentTrack?.id == track.id
+                                    val artworkUri = remember(track.id) {
+                                        val path = track.customCoverPath ?: track.localPath
+                                        if (path != null) {
+                                            if (path.startsWith("content://") || path.startsWith("http")) Uri.parse(path) else File(path)
+                                        } else null
+                                    }
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .size(60.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(14.dp))
+                                            .background(if (isCurrent) primaryColor.copy(0.2f) else Color.White.copy(0.05f))
+                                            .clickable { viewModel.playTrack(track) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (artworkUri != null) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).build(),
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            Icon(Icons.Default.MusicNote, null, tint = Color.Gray, modifier = Modifier.size(32.dp))
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-
-                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            ) { innerPadding ->
+                Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
                     if (selectedTab == 0) {
                         if (isLandscape) {
                             PlayerLayoutLandscape(
@@ -249,7 +302,6 @@ fun PlayerScreen(
                                 player = player,
                                 viewModel = viewModel,
                                 currentTrack = currentTrack,
-                                queue = queue,
                                 imageMode = imageMode,
                                 primaryColor = primaryColor,
                                 isPlaying = isPlaying,
@@ -262,17 +314,28 @@ fun PlayerScreen(
                                 onPositionUpdate = { position = it },
                                 shuffleMode = shuffleMode,
                                 repeatMode = repeatMode,
-                                sleepTimerRemaining = sleepTimerRemaining,
                                 onInfoClick = { showInfoPopup = true }
                             )
                         }
                     } else {
+                        var showEditTrackDialog by remember { mutableStateOf(false) }
                         LyricsView(
                             modifier = Modifier.fillMaxSize(),
                             currentPosition = if (isDragging) dragPosition else position,
                             lyrics = currentTrack?.lyrics,
-                            primaryColor = primaryColor
+                            primaryColor = primaryColor,
+                            onEditLyrics = { showEditTrackDialog = true }
                         )
+                        if (showEditTrackDialog && currentTrack != null) {
+                            com.example.musicon.ui.components.EditTrackDialog(
+                                track = currentTrack!!,
+                                onDismiss = { showEditTrackDialog = false },
+                                onConfirm = { t, ar, al, c, l -> 
+                                    viewModel.updateTrackMetadata(currentTrack!!.id, t, ar, al, c, l)
+                                    showEditTrackDialog = false 
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -297,7 +360,6 @@ fun PlayerLayoutPortrait(
     player: Player,
     viewModel: MainViewModel,
     currentTrack: TrackEntity?,
-    queue: List<TrackEntity>,
     imageMode: PlayerImageMode,
     primaryColor: Color,
     isPlaying: Boolean,
@@ -310,7 +372,6 @@ fun PlayerLayoutPortrait(
     onPositionUpdate: (Long) -> Unit,
     shuffleMode: Boolean,
     repeatMode: Int,
-    sleepTimerRemaining: Long?,
     onInfoClick: () -> Unit
 ) {
     var rotationAngle by remember { mutableStateOf(0f) }
@@ -327,22 +388,30 @@ fun PlayerLayoutPortrait(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier.weight(1f).fillMaxWidth()
+            modifier = Modifier.size(300.dp) // Fixed size for artwork on mobile
+                .padding(vertical = 24.dp)
                 .pointerInput(Unit) {
-                    detectHorizontalDragGestures { change, dragAmount ->
-                        change.consume()
-                        if (dragAmount > 50) {
-                            player.seekToPrevious()
-                            player.play()
-                        } else if (dragAmount < -50) {
-                            player.seekToNext()
-                            player.play()
+                    var dragOffset = 0f
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            if (dragOffset > 80) {
+                                player.seekToPrevious()
+                                player.play()
+                            } else if (dragOffset < -80) {
+                                player.seekToNext()
+                                player.play()
+                            }
+                            dragOffset = 0f
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            dragOffset += dragAmount
                         }
-                    }
+                    )
                 },
             contentAlignment = Alignment.Center
         ) {
@@ -363,7 +432,7 @@ fun PlayerLayoutPortrait(
                             model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).build(),
                             contentDescription = null,
                             modifier = Modifier
-                                .fillMaxSize(0.95f)
+                                .fillMaxSize(0.9f)
                                 .aspectRatio(1f)
                                 .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(32.dp))
                                 .rotate(if (imageMode == PlayerImageMode.ROTATION) rotationAngle else 0f),
@@ -374,7 +443,7 @@ fun PlayerLayoutPortrait(
                             imageVector = Icons.Default.MusicNote,
                             contentDescription = null,
                             tint = fallbackColor.copy(alpha = 0.5f),
-                            modifier = Modifier.size(280.dp).rotate(rotationAngle)
+                            modifier = Modifier.size(240.dp).rotate(rotationAngle)
                         )
                     }
                 }
@@ -396,12 +465,10 @@ fun PlayerLayoutPortrait(
             onPositionUpdate = onPositionUpdate,
             shuffleMode = shuffleMode,
             repeatMode = repeatMode,
-            queue = queue,
             isLandscape = false,
-            sleepTimerRemaining = sleepTimerRemaining,
             onInfoClick = onInfoClick
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(32.dp))
     }
 }
 
@@ -440,7 +507,26 @@ fun PlayerLayoutLandscape(
     }
     
     Row(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.weight(1f).fillMaxHeight()
+            .pointerInput(Unit) {
+                var dragOffset = 0f
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (dragOffset > 100) {
+                            player.seekToPrevious()
+                            player.play()
+                        } else if (dragOffset < -100) {
+                            player.seekToNext()
+                            player.play()
+                        }
+                        dragOffset = 0f
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        dragOffset += dragAmount
+                    }
+                )
+            }, contentAlignment = Alignment.Center) {
             if (imageMode != PlayerImageMode.FULL_SCREEN && currentTrack != null) {
                 val artworkUri = remember(currentTrack.id) {
                     val path = currentTrack.customCoverPath ?: currentTrack.localPath
@@ -494,9 +580,7 @@ fun PlayerLayoutLandscape(
                 onPositionUpdate = onPositionUpdate,
                 shuffleMode = shuffleMode,
                 repeatMode = repeatMode,
-                queue = queue,
                 isLandscape = true,
-                sleepTimerRemaining = sleepTimerRemaining,
                 onInfoClick = onInfoClick
             )
         }
@@ -519,9 +603,7 @@ fun PlayerControls(
     onPositionUpdate: (Long) -> Unit,
     shuffleMode: Boolean,
     repeatMode: Int,
-    queue: List<TrackEntity>,
     isLandscape: Boolean = false,
-    sleepTimerRemaining: Long? = null,
     onInfoClick: () -> Unit = {}
 ) {
     val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
@@ -575,54 +657,12 @@ fun PlayerControls(
                 Icon(if (repeatMode == Player.REPEAT_MODE_ONE) Icons.Default.RepeatOne else Icons.Default.Repeat, null, tint = if (repeatMode != Player.REPEAT_MODE_OFF) primaryColor else contentColor.copy(alpha = 0.6f))
             }
         }
-
-        // Always show icons at the bottom in portrait
-        if (!isLandscape) {
-            Spacer(modifier = Modifier.height(24.dp))
-            LazyRow(
-                modifier = Modifier.fillMaxWidth().height(64.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                contentPadding = PaddingValues(horizontal = 16.dp)
-            ) {
-                itemsIndexed(queue) { _, track ->
-                    val isCurrent = currentTrack?.id == track.id
-                    val artworkUri = remember(track.id) {
-                        val path = track.customCoverPath ?: track.localPath
-                        if (path != null) {
-                            if (path.startsWith("content://") || path.startsWith("http")) Uri.parse(path) else File(path)
-                        } else null
-                    }
-                    
-                    Box(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(8.dp))
-                            .background(Color.White.copy(alpha = 0.05f))
-                            .clickable { viewModel.playTrack(track) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (artworkUri != null) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).build(),
-                                contentDescription = null,
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Icon(Icons.Default.MusicNote, null, tint = Color.Gray, modifier = Modifier.size(24.dp))
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
 @Composable
-fun LyricsView(modifier: Modifier = Modifier, currentPosition: Long, lyrics: String?, primaryColor: Color) {
-    val lyricsLines = remember(lyrics) { if (lyrics != null) LrcParser.parse(lyrics) else emptyList() }
+fun LyricsView(modifier: Modifier = Modifier, currentPosition: Long, lyrics: String?, primaryColor: Color, onEditLyrics: () -> Unit) {
+    val lyricsLines = remember(lyrics) { if (!lyrics.isNullOrBlank()) LrcParser.parse(lyrics) else emptyList() }
     val listState = rememberLazyListState()
     val currentLineIndex = remember(lyricsLines, currentPosition) {
         val index = lyricsLines.indexOfLast { it.timeMs <= currentPosition }
@@ -643,14 +683,29 @@ fun LyricsView(modifier: Modifier = Modifier, currentPosition: Long, lyrics: Str
                 Icon(Icons.Default.MusicNote, null, modifier = Modifier.size(48.dp), tint = primaryColor.copy(alpha = 0.3f))
                 Spacer(Modifier.height(16.dp))
                 Text(if (lyrics.isNullOrBlank()) "No lyrics found" else "Plain text lyrics", style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.7f), textAlign = TextAlign.Center)
+                Spacer(Modifier.height(24.dp))
+                Button(onClick = onEditLyrics, colors = ButtonDefaults.buttonColors(containerColor = primaryColor)) {
+                    Icon(if (lyrics.isNullOrBlank()) Icons.Default.Add else Icons.Default.Edit, null, tint = Color.Black)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (lyrics.isNullOrBlank()) "Add Lyrics" else "Edit Lyrics", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
             }
         } else {
-            LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(32.dp), contentPadding = PaddingValues(vertical = 300.dp)) {
-                itemsIndexed(lyricsLines) { index, line ->
-                    val isCurrent = index == currentLineIndex
-                    val color by animateColorAsState(targetValue = if (isCurrent) Color.White else Color.White.copy(alpha = 0.25f), animationSpec = tween(400))
-                    val scale by animateFloatAsState(targetValue = if (isCurrent) 1.35f else 1.0f, animationSpec = tween(400, easing = EaseOutBack))
-                    Text(text = line.text, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal, fontSize = 22.sp * scale, lineHeight = 36.sp), color = color, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = if (isCurrent) 1f else 0.4f })
+            Box(Modifier.fillMaxSize()) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(32.dp), contentPadding = PaddingValues(vertical = 300.dp)) {
+                    itemsIndexed(lyricsLines) { index, line ->
+                        val isCurrent = index == currentLineIndex
+                        val color by animateColorAsState(targetValue = if (isCurrent) Color.White else Color.White.copy(alpha = 0.25f), animationSpec = tween(400))
+                        val scale by animateFloatAsState(targetValue = if (isCurrent) 1.35f else 1.0f, animationSpec = tween(400, easing = EaseOutBack))
+                        Text(text = line.text, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal, fontSize = 22.sp * scale, lineHeight = 36.sp), color = color, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = if (isCurrent) 1f else 0.4f })
+                    }
+                }
+                
+                IconButton(
+                    onClick = onEditLyrics,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 80.dp).background(primaryColor.copy(alpha = 0.8f), CircleShape)
+                ) {
+                    Icon(Icons.Default.Edit, null, tint = Color.Black)
                 }
             }
         }

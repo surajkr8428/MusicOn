@@ -80,13 +80,18 @@ fun TechnicalInfoPopup(track: TrackEntity, onDismiss: () -> Unit) {
                     Spacer(Modifier.height(8.dp))
                     
                     Row(Modifier.fillMaxWidth()) {
+                        InfoItem("Artist", track.displayArtist, Modifier.weight(1f))
                         InfoItem("Album", track.displayAlbum, Modifier.weight(1f))
-                        InfoItem("Bitrate", track.bitrate ?: "320 kbps", Modifier.weight(1f))
                     }
                     Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth()) {
+                        InfoItem("Bitrate", track.bitrate ?: "320 kbps", Modifier.weight(1f))
                         InfoItem("Duration", formatDuration(track.duration), Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(Modifier.fillMaxWidth()) {
                         InfoItem("Source", if (track.gDriveId != null) "Cloud" else "Local", Modifier.weight(1f))
+                        InfoItem("File Type", "MPEG Audio", Modifier.weight(1f))
                     }
                     
                     Spacer(Modifier.height(12.dp))

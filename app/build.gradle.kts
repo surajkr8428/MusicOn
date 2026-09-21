@@ -85,6 +85,8 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.androidx.palette.ktx)
 
+    implementation("com.google.code.gson:gson:2.10.1")
+
     // Google Drive & Auth
     implementation(libs.play.services.auth)
     implementation(libs.google.api.services.drive)

@@ -433,38 +433,6 @@ fun MusicOnApp(
             viewModel.importLocalTracks(uris)
         }
 
-        fun shareAppApk() {
-            scope.launch(Dispatchers.IO) {
-                try {
-                    val sourceFile = File(context.applicationInfo.sourceDir)
-                    val shareDir = File(context.externalCacheDir, "shared_apk")
-                    if (shareDir.exists()) shareDir.deleteRecursively()
-                    shareDir.mkdirs()
-                    
-                    val destFile = File(shareDir, "Nirvaana.apk")
-                    sourceFile.copyTo(destFile, overwrite = true)
-                    destFile.setReadable(true, false)
-                    
-                    val uri = androidx.core.content.FileProvider.getUriForFile(
-                        context, "${context.packageName}.fileprovider", destFile
-                    )
-                    
-                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        type = "application/vnd.android.package-archive"
-                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        clipData = android.content.ClipData.newRawUri("Nirvaana APK", uri)
-                    }
-                    val chooser = android.content.Intent.createChooser(intent, "Share Nirvaana APK")
-                    chooser.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    chooser.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    context.startActivity(chooser)
-                } catch (e: Exception) {
-                    android.util.Log.e("MusicOn", "Failed to share APK", e)
-                }
-            }
-        }
-
         if (isPlayerVisible) {
             PlayerScreen(viewModel = viewModel, player = mediaController, onBack = { isPlayerVisible = false })
         } else if (isEqualizerVisible) {
@@ -571,7 +539,7 @@ fun MusicOnApp(
                             NavigationDrawerItem(label = { Text("Import Hub (Local)") }, selected = false, onClick = { scope.launch { leftDrawerState.close() }; filePicker.launch("audio/*") }, icon = { Icon(Icons.Default.FileDownload, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
                             NavigationDrawerItem(label = { Text("Cloud Browser") }, selected = false, onClick = { if (!isUserSignedIn) showSignInPrompt = true else { scope.launch { leftDrawerState.close() }; isCloudBrowserVisible = true } }, icon = { Icon(Icons.Default.CloudQueue, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
                             NavigationDrawerItem(label = { Text("Equalizer") }, selected = false, onClick = { scope.launch { leftDrawerState.close() }; isEqualizerVisible = true }, icon = { Icon(Icons.Default.Tune, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
-                            NavigationDrawerItem(label = { Text("Share App (APK)") }, selected = false, onClick = { scope.launch { leftDrawerState.close() }; shareAppApk() }, icon = { Icon(Icons.Default.Share, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
+                            NavigationDrawerItem(label = { Text("Share App (APK)") }, selected = false, onClick = { scope.launch { leftDrawerState.close() }; viewModel.shareAppApk() }, icon = { Icon(Icons.Default.Share, null) }, colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent, unselectedTextColor = MaterialTheme.colorScheme.onSurface))
                             
                             Spacer(Modifier.weight(1f))
                             

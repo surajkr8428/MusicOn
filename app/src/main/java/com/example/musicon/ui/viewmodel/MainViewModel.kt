@@ -21,6 +21,7 @@ import com.example.musicon.data.local.Playlist
 import com.example.musicon.data.local.TrackEntity
 import com.example.musicon.ui.theme.ThemeMode
 import com.google.gson.Gson
+import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -727,9 +728,11 @@ class MainViewModel(
                 allDbTracks.forEach { track ->
                     if (track.gDriveId != null) {
                         if (track.localPath == null) {
-                            musicRepository.removeTrack(track) 
+                            viewModelScope.launch { musicRepository.removeTrack(track) }
                         } else {
-                            musicRepository.updateTrackMetadata(trackId = track.id, title = null, artist = null, album = null, coverPath = null, lyrics = null, cloudId = "")
+                            viewModelScope.launch {
+                                musicRepository.updateTrackMetadata(trackId = track.id, title = null, artist = null, album = null, coverPath = null, lyrics = null, cloudId = "")
+                            }
                         }
                     }
                 }
@@ -750,6 +753,29 @@ class MainViewModel(
             .putString("track_id", track.id)
             .build()
         WorkManager.getInstance(settingsRepository.context).enqueue(OneTimeWorkRequestBuilder<com.example.musicon.service.SyncWorker>().setInputData(data).build())
+    }
+
+    fun shareAppApk() {
+        val context = settingsRepository.context
+        val sourceFile = java.io.File(context.applicationInfo.sourceDir)
+        val shareDir = java.io.File(context.externalCacheDir, "shared_apk")
+        if (shareDir.exists()) shareDir.deleteRecursively()
+        shareDir.mkdirs()
+        
+        val destFile = java.io.File(shareDir, "Nirvaana.apk")
+        try {
+            sourceFile.copyTo(destFile, overwrite = true)
+            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", destFile)
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "application/vnd.android.package-archive"
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(android.content.Intent.createChooser(intent, "Share Nirvaana APK").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            android.util.Log.e("MainViewModel", "Failed to share APK", e)
+        }
     }
 
     fun updateSignInStatus(signedIn: Boolean) {
@@ -836,6 +862,8 @@ class MainViewModel(
                     musicRepository.removeTrackFromPlaylist(favPlaylist.id, track.id)
                 }
             }
+            // Auto-backup on change
+            triggerBackup()
         }
     }
 
@@ -843,6 +871,8 @@ class MainViewModel(
         viewModelScope.launch {
             val id = musicRepository.createPlaylist(name)
             tracksToAdd.forEach { musicRepository.addTrackToPlaylist(id, it) }
+            // Auto-backup on change
+            triggerBackup()
         }
     }
 
@@ -894,16 +924,16 @@ class MainViewModel(
             }
         }
     }
-    fun updateThemeMode(themeMode: ThemeMode) = viewModelScope.launch { settingsRepository.updateThemeMode(themeMode) }
-    fun updateLibraryViewMode(mode: LibraryViewMode) = viewModelScope.launch { settingsRepository.updateLibraryViewMode(mode) }
-    fun updatePlayerImageMode(mode: com.example.musicon.data.PlayerImageMode) = viewModelScope.launch { settingsRepository.updatePlayerImageMode(mode) }
+    fun updateThemeMode(themeMode: ThemeMode) = viewModelScope.launch { settingsRepository.updateThemeMode(themeMode); triggerBackup() }
+    fun updateLibraryViewMode(mode: LibraryViewMode) = viewModelScope.launch { settingsRepository.updateLibraryViewMode(mode); triggerBackup() }
+    fun updatePlayerImageMode(mode: com.example.musicon.data.PlayerImageMode) = viewModelScope.launch { settingsRepository.updatePlayerImageMode(mode); triggerBackup() }
     fun updatePauseOnDetach(enabled: Boolean) = viewModelScope.launch { settingsRepository.updatePauseOnDetach(enabled) }
     fun updateKeepScreenOn(enabled: Boolean) = viewModelScope.launch { settingsRepository.updateKeepScreenOn(enabled) }
     fun updateShowNotifications(enabled: Boolean) = viewModelScope.launch { settingsRepository.updateShowNotifications(enabled) }
     fun updateCrossfade(enabled: Boolean) = viewModelScope.launch { settingsRepository.updateCrossfade(enabled) }
-    fun updateAccentColor(color: Int) = viewModelScope.launch { settingsRepository.updateAccentColor(color) }
+    fun updateAccentColor(color: Int) = viewModelScope.launch { settingsRepository.updateAccentColor(color); triggerBackup() }
     fun updateAutoTheme(enabled: Boolean) = viewModelScope.launch { settingsRepository.updateAutoTheme(enabled) }
-    fun updateBackgroundMode(mode: String) = viewModelScope.launch { settingsRepository.updateBackgroundMode(mode) }
+    fun updateBackgroundMode(mode: String) = viewModelScope.launch { settingsRepository.updateBackgroundMode(mode); triggerBackup() }
     fun updateShakeToSkip(enabled: Boolean) = viewModelScope.launch { settingsRepository.updateShakeToSkip(enabled) }
     fun updateCustomBackground(uri: String?) = viewModelScope.launch { settingsRepository.updateCustomBgUri(uri) }
 
