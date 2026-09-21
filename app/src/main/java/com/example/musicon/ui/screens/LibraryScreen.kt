@@ -41,7 +41,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.musicon.R
 import com.example.musicon.data.LibraryViewMode
 import com.example.musicon.data.local.Playlist
 import com.example.musicon.data.local.TrackEntity
@@ -101,8 +100,8 @@ fun LibraryScreen(
         customFolders.map { it.substringAfterLast("/").ifBlank { "Folder" } }
     }
     
-    // Simple PagerState
-    val pagerState = rememberPagerState(initialPage = 1) { tabs.size }
+    // Most stable PagerState
+    val pagerState = rememberPagerState(initialPage = 1, pageCount = { tabs.size })
     
     BackHandler(isSelectionMode || searchQuery.isNotEmpty() || currentPlaylistDetail != null || isSearchActive) {
         if (isSelectionMode) { selectedIds = emptySet(); addingToPlaylistId = null }
@@ -269,4 +268,9 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
 
 @Composable fun SleepTimerDialog(onDismiss: () -> Unit, onSet: (Int, Int, Int) -> Unit) {
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Sleep Timer") }, text = { Text("Set timer") }, confirmButton = { Button(onClick = { onSet(0, 30, 0) }) { Text("30m") } })
+}
+
+private fun getPlaylistIcon(playlistName: String): ImageVector {
+    if (playlistName == "Favorite") return Icons.Default.Favorite
+    return Icons.Default.QueueMusic
 }

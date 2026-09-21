@@ -54,6 +54,10 @@ import com.example.musicon.ui.viewmodel.MainViewModel
 import com.example.musicon.logic.LrcParser
 import com.example.musicon.logic.formatSleepTime
 import com.example.musicon.data.local.TrackEntity
+import com.example.musicon.ui.components.BackgroundGridDialog
+import com.example.musicon.ui.components.EditTrackDialog
+import com.example.musicon.ui.components.LocalIsBackgroundBright
+import com.example.musicon.ui.components.StellarBackground
 import com.example.musicon.ui.components.TechnicalInfoPopup
 import java.io.File
 import kotlinx.coroutines.delay
@@ -140,104 +144,152 @@ fun PlayerScreen(
             }
         }
 
-        com.example.musicon.ui.components.StellarBackground(
+        StellarBackground(
             showInternalBackground = imageMode != PlayerImageMode.FULL_SCREEN,
             themeMode = themeMode,
             backgroundMode = backgroundMode
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
-                val contentColor = if (isBright) Color.Black else Color.White
-                val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
+            Scaffold(
+                containerColor = Color.Transparent,
+                topBar = {
+                    val isBright = LocalIsBackgroundBright.current
+                    val contentColor = if (isBright) Color.Black else Color.White
+                    val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
 
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(64.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) { 
-                        Icon(Icons.Default.KeyboardArrowDown, null, tint = contentColor, modifier = Modifier.size(32.dp)) 
-                    }
-
-                    TabRow(
-                        selectedTabIndex = selectedTab,
-                        containerColor = Color.Transparent,
-                        divider = {},
-                        indicator = { tabPositions ->
-                            TabRowDefaults.SecondaryIndicator(
-                                modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                                color = primaryColor
-                            )
-                        },
-                        modifier = Modifier.width(140.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(64.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Player", color = if (selectedTab == 0) contentColor else secondaryColor, fontSize = 12.sp) } )
-                        Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) contentColor else secondaryColor, fontSize = 12.sp) } )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { showBackgroundDialog = true }) { Icon(Icons.Default.Wallpaper, null, tint = contentColor) }
-
-                        IconButton(onClick = {
-                            val nextMode = when (imageMode) {
-                                PlayerImageMode.SQUARE -> PlayerImageMode.FULL_SCREEN
-                                PlayerImageMode.FULL_SCREEN -> PlayerImageMode.ROTATION
-                                PlayerImageMode.ROTATION -> PlayerImageMode.SQUARE
-                            }
-                            viewModel.updatePlayerImageMode(nextMode)
-                        }) {
-                            Icon(
-                                when(imageMode) {
-                                    PlayerImageMode.SQUARE -> Icons.Default.CropSquare
-                                    PlayerImageMode.FULL_SCREEN -> Icons.Default.Fullscreen
-                                    PlayerImageMode.ROTATION -> Icons.Default.Sync
-                                },
-                                contentDescription = "Change View Mode",
-                                tint = contentColor
-                            )
+                        IconButton(onClick = onBack) { 
+                            Icon(Icons.Default.KeyboardArrowDown, null, tint = contentColor, modifier = Modifier.size(32.dp)) 
                         }
 
-                        var showMoreMenu by remember { mutableStateOf(false) }
-                        IconButton(onClick = { showMoreMenu = true }) {
-                            Icon(Icons.Default.MoreVert, null, tint = contentColor)
-                            DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("Share Nirvaana (APK)", fontFamily = FontFamily.Cursive) }, 
-                                    leadingIcon = { Icon(Icons.Default.Share, null) }, 
-                                    onClick = { viewModel.shareAppApk(); showMoreMenu = false }
+                        TabRow(
+                            selectedTabIndex = selectedTab,
+                            containerColor = Color.Transparent,
+                            divider = {},
+                            indicator = { tabPositions ->
+                                TabRowDefaults.SecondaryIndicator(
+                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                    color = primaryColor
                                 )
-                                DropdownMenuItem(
-                                    text = { Text("Sleep Timer", fontFamily = FontFamily.Cursive) }, 
-                                    leadingIcon = { Icon(Icons.Default.Timer, null) }, 
-                                    onClick = { showSleepTimerDialog = true; showMoreMenu = false }
+                            },
+                            modifier = Modifier.width(140.dp)
+                        ) {
+                            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Player", color = if (selectedTab == 0) contentColor else secondaryColor, fontSize = 12.sp) } )
+                            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) contentColor else secondaryColor, fontSize = 12.sp) } )
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { showBackgroundDialog = true }) { Icon(Icons.Default.Wallpaper, null, tint = contentColor) }
+
+                            IconButton(onClick = {
+                                val nextMode = when (imageMode) {
+                                    PlayerImageMode.SQUARE -> PlayerImageMode.FULL_SCREEN
+                                    PlayerImageMode.FULL_SCREEN -> PlayerImageMode.ROTATION
+                                    PlayerImageMode.ROTATION -> PlayerImageMode.SQUARE
+                                }
+                                viewModel.updatePlayerImageMode(nextMode)
+                            }) {
+                                Icon(
+                                    when(imageMode) {
+                                        PlayerImageMode.SQUARE -> Icons.Default.CropSquare
+                                        PlayerImageMode.FULL_SCREEN -> Icons.Default.Fullscreen
+                                        PlayerImageMode.ROTATION -> Icons.Default.Sync
+                                    },
+                                    contentDescription = "Change View Mode",
+                                    tint = contentColor
                                 )
-                                DropdownMenuItem(
-                                    text = { Text("Song Info", fontFamily = FontFamily.Cursive) }, 
-                                    leadingIcon = { Icon(Icons.Default.Info, null) }, 
-                                    onClick = { showInfoPopup = true; showMoreMenu = false }
-                                )
-                                HorizontalDivider(color = contentColor.copy(alpha = 0.1f))
-                                DropdownMenuItem(
-                                    text = { Text("Delete Device", color = Color.Red, fontFamily = FontFamily.Cursive) }, 
-                                    leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, 
-                                    onClick = { currentTrack?.let { viewModel.bulkDelete(listOf(it)) }; showMoreMenu = false }
-                                )
+                            }
+
+                            var showMoreMenu by remember { mutableStateOf(false) }
+                            IconButton(onClick = { showMoreMenu = true }) {
+                                Icon(Icons.Default.MoreVert, null, tint = contentColor)
+                                DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("Share Song", fontFamily = FontFamily.Cursive) }, 
+                                        leadingIcon = { Icon(Icons.Default.Share, null) }, 
+                                        onClick = { currentTrack?.let { viewModel.shareTrack(it) }; showMoreMenu = false }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Share Nirvaana (APK)", fontFamily = FontFamily.Cursive) }, 
+                                        leadingIcon = { Icon(Icons.Default.Android, null) }, 
+                                        onClick = { viewModel.shareAppApk(); showMoreMenu = false }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Sleep Timer", fontFamily = FontFamily.Cursive) }, 
+                                        leadingIcon = { Icon(Icons.Default.Timer, null) }, 
+                                        onClick = { showSleepTimerDialog = true; showMoreMenu = false }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("Song Info", fontFamily = FontFamily.Cursive) }, 
+                                        leadingIcon = { Icon(Icons.Default.Info, null) }, 
+                                        onClick = { showInfoPopup = true; showMoreMenu = false }
+                                    )
+                                    HorizontalDivider(color = contentColor.copy(alpha = 0.1f))
+                                    DropdownMenuItem(
+                                        text = { Text("Delete Device", color = Color.Red, fontFamily = FontFamily.Cursive) }, 
+                                        leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, 
+                                        onClick = { currentTrack?.let { viewModel.bulkDelete(listOf(it)) }; showMoreMenu = false }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                bottomBar = {
+                    if (selectedTab == 0) {
+                        Column(modifier = Modifier.fillMaxWidth().background(Color.Transparent).padding(bottom = if (isLandscape) 8.dp else 24.dp)) {
+                            // Guaranteed Persistent Queue Icons
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth().height(if (isLandscape) 64.dp else 80.dp),
+                                horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 12.dp else 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                contentPadding = PaddingValues(horizontal = 24.dp)
+                            ) {
+                                itemsIndexed(queue) { _, track ->
+                                    val isCurrent = currentTrack?.id == track.id
+                                    val artworkUri = remember(track.id) {
+                                        val path = track.customCoverPath ?: track.localPath
+                                        if (path != null) {
+                                            if (path.startsWith("content://") || path.startsWith("http")) Uri.parse(path) else File(path)
+                                        } else null
+                                    }
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .size(if (isLandscape) 52.dp else 60.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(14.dp))
+                                            .background(if (isCurrent) primaryColor.copy(0.2f) else Color.White.copy(0.05f))
+                                            .clickable { viewModel.playTrack(track) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (artworkUri != null) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).build(),
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            Icon(Icons.Default.MusicNote, null, tint = Color.Gray, modifier = Modifier.size(if (isLandscape) 24.dp else 32.dp))
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-
-                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            ) { innerPadding ->
+                Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
                     if (selectedTab == 0) {
                         if (isLandscape) {
                             PlayerLayoutLandscape(
                                 player = player,
                                 viewModel = viewModel,
                                 currentTrack = currentTrack,
-                                queue = queue,
                                 imageMode = imageMode,
                                 primaryColor = primaryColor,
                                 isPlaying = isPlaying,
@@ -250,11 +302,10 @@ fun PlayerScreen(
                                 onPositionUpdate = { position = it },
                                 shuffleMode = shuffleMode,
                                 repeatMode = repeatMode,
-                                sleepTimerRemaining = sleepTimerRemaining,
                                 onInfoClick = { showInfoPopup = true }
                             )
                         } else {
-                            Box(modifier = Modifier.weight(1f)) {
+                            Box(modifier = Modifier.fillMaxSize()) {
                                 PlayerLayoutPortrait(
                                     player = player,
                                     viewModel = viewModel,
@@ -274,47 +325,6 @@ fun PlayerScreen(
                                     onInfoClick = { showInfoPopup = true }
                                 )
                             }
-                            
-                            // Guaranteed Bottom Queue Icons - Fixed at the very bottom
-                            Column(modifier = Modifier.fillMaxWidth().background(Color.Transparent).padding(bottom = 24.dp)) {
-                                LazyRow(
-                                    modifier = Modifier.fillMaxWidth().height(80.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    contentPadding = PaddingValues(horizontal = 24.dp)
-                                ) {
-                                    itemsIndexed(queue) { _, track ->
-                                        val isCurrent = currentTrack?.id == track.id
-                                        val artworkUri = remember(track.id) {
-                                            val path = track.customCoverPath ?: track.localPath
-                                            if (path != null) {
-                                                if (path.startsWith("content://") || path.startsWith("http")) Uri.parse(path) else File(path)
-                                            } else null
-                                        }
-                                        
-                                        Box(
-                                            modifier = Modifier
-                                                .size(60.dp)
-                                                .clip(RoundedCornerShape(14.dp))
-                                                .border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(14.dp))
-                                                .background(if (isCurrent) primaryColor.copy(0.2f) else Color.White.copy(0.05f))
-                                                .clickable { viewModel.playTrack(track) },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (artworkUri != null) {
-                                                AsyncImage(
-                                                    model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).build(),
-                                                    contentDescription = null,
-                                                    modifier = Modifier.fillMaxSize(),
-                                                    contentScale = ContentScale.Crop
-                                                )
-                                            } else {
-                                                Icon(Icons.Default.MusicNote, null, tint = Color.Gray, modifier = Modifier.size(32.dp))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
                         }
                     } else {
                         var showEditTrackDialog by remember { mutableStateOf(false) }
@@ -326,7 +336,7 @@ fun PlayerScreen(
                             onEditLyrics = { showEditTrackDialog = true }
                         )
                         if (showEditTrackDialog && currentTrack != null) {
-                            com.example.musicon.ui.components.EditTrackDialog(
+                            EditTrackDialog(
                                 track = currentTrack!!,
                                 onDismiss = { showEditTrackDialog = false },
                                 onConfirm = { t, ar, al, c, l -> 
@@ -350,7 +360,7 @@ fun PlayerScreen(
     }
 
     if (showBackgroundDialog) {
-        com.example.musicon.ui.components.BackgroundGridDialog(currentMode = backgroundMode, onDismiss = { showBackgroundDialog = false }, onModeSelected = { viewModel.updateBackgroundMode(it) })
+        BackgroundGridDialog(currentMode = backgroundMode, onDismiss = { showBackgroundDialog = false }, onModeSelected = { viewModel.updateBackgroundMode(it) })
     }
 }
 
@@ -423,7 +433,7 @@ fun PlayerLayoutPortrait(
                 }
 
                 Box(contentAlignment = Alignment.Center) {
-                    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+                    val isBright = LocalIsBackgroundBright.current
                     val fallbackColor = if (isBright) Color.Black else Color.White
                     
                     if (artworkUri != null) {
@@ -476,7 +486,6 @@ fun PlayerLayoutLandscape(
     player: Player,
     viewModel: MainViewModel,
     currentTrack: TrackEntity?,
-    queue: List<TrackEntity>,
     imageMode: PlayerImageMode,
     primaryColor: Color,
     isPlaying: Boolean,
@@ -489,7 +498,6 @@ fun PlayerLayoutLandscape(
     onPositionUpdate: (Long) -> Unit,
     shuffleMode: Boolean,
     repeatMode: Int,
-    sleepTimerRemaining: Long?,
     onInfoClick: () -> Unit
 ) {
     var rotationAngle by remember { mutableStateOf(0f) }
@@ -535,7 +543,7 @@ fun PlayerLayoutLandscape(
                 }
 
                 Box(contentAlignment = Alignment.Center) {
-                    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+                    val isBright = LocalIsBackgroundBright.current
                     val fallbackColor = if (isBright) Color.Black else Color.White
                     
                     if (artworkUri != null) {
@@ -605,7 +613,7 @@ fun PlayerControls(
     isLandscape: Boolean = false,
     onInfoClick: () -> Unit = {}
 ) {
-    val isBright = com.example.musicon.ui.components.LocalIsBackgroundBright.current
+    val isBright = LocalIsBackgroundBright.current
     val contentColor = if (isBright) Color.Black else Color.White
     val secondaryColor = if (isBright) Color.DarkGray else Color.White.copy(alpha = 0.7f)
 

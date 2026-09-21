@@ -79,11 +79,14 @@ class MainViewModel(
 
     val allTracks: StateFlow<List<TrackEntity>> = musicRepository.allTracks
         .map { tracks ->
-            tracks.distinctBy { 
-                val cleanTitle = (it.customTitle ?: it.title).lowercase().removeSuffix(".mp3").trim().replace(" ", "")
-                val cleanArtist = (it.customArtist ?: it.artist).lowercase().trim().replace(" ", "")
-                "${cleanTitle}_${cleanArtist}"
-            }
+            tracks.filter { it.localPath != null || it.gDriveId != null }
+                .sortedByDescending { it.localPath != null } // Prioritize local tracks
+                .distinctBy { 
+                    val cleanTitle = (it.customTitle ?: it.title).lowercase().removeSuffix(".mp3").trim().replace(" ", "")
+                    val cleanArtist = (it.customArtist ?: it.artist).lowercase().trim().replace(" ", "")
+                    "${cleanTitle}_${cleanArtist}"
+                }
+                .sortedBy { it.displayName.lowercase() }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
