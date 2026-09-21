@@ -88,9 +88,9 @@ fun TechnicalInfoPopup(track: TrackEntity, onDismiss: () -> Unit) {
                         InfoItem("Audio Quality", track.bitrate ?: "320 kbps", Modifier.weight(1f))
                         InfoItem("Total Duration", formatDuration(track.duration), Modifier.weight(1f))
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(12.dp))
                     Row(Modifier.fillMaxWidth()) {
-                        InfoItem("Source", if (track.gDriveId != null) "Cloud" else "Local", Modifier.weight(1f))
+                        InfoItem("Source", if (track.gDriveId != null) "Cloud Sync" else "Local Storage", Modifier.weight(1f))
                         InfoItem("File Type", "MPEG Audio", Modifier.weight(1f))
                     }
                     

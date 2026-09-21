@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.util.Log
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
@@ -80,11 +81,12 @@ class MainViewModel(
     val allTracks: StateFlow<List<TrackEntity>> = musicRepository.allTracks
         .map { tracks ->
             tracks.filter { it.localPath != null || it.gDriveId != null }
-                .sortedByDescending { it.localPath != null } // Prioritize local tracks
+                .sortedByDescending { it.localPath != null } // Prefer local entries
                 .distinctBy { 
-                    val cleanTitle = (it.customTitle ?: it.title).lowercase().removeSuffix(".mp3").trim().replace(" ", "")
+                    val cleanTitle = (it.customTitle ?: it.title).lowercase().trim().replace(" ", "")
                     val cleanArtist = (it.customArtist ?: it.artist).lowercase().trim().replace(" ", "")
-                    "${cleanTitle}_${cleanArtist}"
+                    // Include duration to distinguish same name songs
+                    "${cleanTitle}_${cleanArtist}_${it.duration / 1000}"
                 }
                 .sortedBy { it.displayName.lowercase() }
         }
@@ -274,7 +276,21 @@ class MainViewModel(
     fun renamePlaylist(pId: String, name: String) = viewModelScope.launch { val p = allPlaylists.value.find { it.id == pId } ?: return@launch; musicRepository.updatePlaylist(p.copy(name = name)) }
     fun deletePlaylist(p: Playlist) = viewModelScope.launch { musicRepository.deletePlaylist(p) }
 
-    fun playSelected(tracks: List<TrackEntity>) { if (tracks.isNotEmpty()) { _playbackQueue.value = tracks; _currentPlayingTrackId.value = tracks.first().id; viewModelScope.launch { _playbackEvents.emit(PlaybackEvent.PlayTrackList(tracks, 0)); musicRepository.recordTrackPlayed(tracks.first().id) } } }
+    fun bulkDeletePlaylists(playlists: List<Playlist>) = viewModelScope.launch {
+        playlists.forEach { musicRepository.deletePlaylist(it) }
+        triggerBackup()
+    }
+
+    fun playSelected(tracks: List<TrackEntity>) { 
+        if (tracks.isNotEmpty()) { 
+            _playbackQueue.value = tracks
+            _currentPlayingTrackId.value = tracks.first().id
+            viewModelScope.launch { 
+                _playbackEvents.emit(PlaybackEvent.PlayTrackList(tracks, 0))
+                musicRepository.recordTrackPlayed(tracks.first().id) 
+            } 
+        } 
+    }
     fun addToQueueNext(tracks: List<TrackEntity>) { val q = _playbackQueue.value.toMutableList(); val i = q.indexOfFirst { it.id == _currentPlayingTrackId.value }; if (i != -1) q.addAll(i + 1, tracks) else q.addAll(tracks); _playbackQueue.value = q }
 
     fun bulkAddTracksToPlaylist(pId: String, ids: List<String>) = viewModelScope.launch { ids.forEach { musicRepository.addTrackToPlaylist(pId, it) } }
@@ -352,6 +368,11 @@ class MainViewModel(
     fun updateBassBoost(l: Int) = viewModelScope.launch { settingsRepository.updateBassBoost(l) }
     fun updateVirtualizer(l: Int) = viewModelScope.launch { settingsRepository.updateVirtualizer(l) }
     fun setPreset(name: String) { val bands = when(name) { "Rock" -> "300,200,0,-100,200"; "Pop" -> "-100,100,300,100,-100"; "Jazz" -> "200,100,0,100,200"; "Classical" -> "300,200,0,0,0"; "Bass Boost" -> "500,300,0,0,0"; else -> "0,0,0,0,0" }; updateEqBands(bands) }
+
+    fun setAsRingtone(track: TrackEntity) {
+        // Placeholder for Ringtone logic
+        Log.d("MainViewModel", "Setting as ringtone: ${track.displayName}")
+    }
 
     fun triggerBackup() = viewModelScope.launch { /* logic */ }
     fun restoreFromCloud() = viewModelScope.launch { /* logic */ }

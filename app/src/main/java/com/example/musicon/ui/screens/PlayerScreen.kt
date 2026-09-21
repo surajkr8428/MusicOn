@@ -54,9 +54,12 @@ import com.example.musicon.ui.viewmodel.MainViewModel
 import com.example.musicon.logic.LrcParser
 import com.example.musicon.logic.formatSleepTime
 import com.example.musicon.data.local.TrackEntity
+import com.example.musicon.ui.components.AddToPlaylistDialog
 import com.example.musicon.ui.components.BackgroundGridDialog
+import com.example.musicon.ui.components.CreatePlaylistDialog
 import com.example.musicon.ui.components.EditTrackDialog
 import com.example.musicon.ui.components.LocalIsBackgroundBright
+import com.example.musicon.ui.components.RenameDialog
 import com.example.musicon.ui.components.StellarBackground
 import com.example.musicon.ui.components.TechnicalInfoPopup
 import java.io.File
@@ -99,6 +102,9 @@ fun PlayerScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
     var showBackgroundDialog by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var showAddToPlaylistDialog by remember { mutableStateOf(false) }
+    var showCreatePlaylistDialog by remember { mutableStateOf(false) }
 
     BackHandler(onBack = onBack)
 
@@ -149,164 +155,107 @@ fun PlayerScreen(
             themeMode = themeMode,
             backgroundMode = backgroundMode
         ) {
-            Scaffold(
-                containerColor = Color.Transparent,
-                topBar = {
-                    val isBright = LocalIsBackgroundBright.current
-                    val contentColor = if (isBright) Color.Black else Color.White
-                    val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
+            Column(
+                modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                val isBright = LocalIsBackgroundBright.current
+                val contentColor = if (isBright) Color.Black else Color.White
+                val secondaryColor = if (isBright) Color.DarkGray else Color.Gray
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(64.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = onBack) { 
-                            Icon(Icons.Default.KeyboardArrowDown, null, tint = contentColor, modifier = Modifier.size(32.dp)) 
-                        }
-
-                        TabRow(
-                            selectedTabIndex = selectedTab,
-                            containerColor = Color.Transparent,
-                            divider = {},
-                            indicator = { tabPositions ->
-                                TabRowDefaults.SecondaryIndicator(
-                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                                    color = primaryColor
-                                )
-                            },
-                            modifier = Modifier.width(140.dp)
-                        ) {
-                            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Player", color = if (selectedTab == 0) contentColor else secondaryColor, fontSize = 12.sp) } )
-                            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) contentColor else secondaryColor, fontSize = 12.sp) } )
-                        }
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = { showBackgroundDialog = true }) { Icon(Icons.Default.Wallpaper, null, tint = contentColor) }
-
-                            IconButton(onClick = {
-                                val nextMode = when (imageMode) {
-                                    PlayerImageMode.SQUARE -> PlayerImageMode.FULL_SCREEN
-                                    PlayerImageMode.FULL_SCREEN -> PlayerImageMode.ROTATION
-                                    PlayerImageMode.ROTATION -> PlayerImageMode.SQUARE
-                                }
-                                viewModel.updatePlayerImageMode(nextMode)
-                            }) {
-                                Icon(
-                                    when(imageMode) {
-                                        PlayerImageMode.SQUARE -> Icons.Default.CropSquare
-                                        PlayerImageMode.FULL_SCREEN -> Icons.Default.Fullscreen
-                                        PlayerImageMode.ROTATION -> Icons.Default.Sync
-                                    },
-                                    contentDescription = "Change View Mode",
-                                    tint = contentColor
-                                )
-                            }
-
-                            var showMoreMenu by remember { mutableStateOf(false) }
-                            IconButton(onClick = { showMoreMenu = true }) {
-                                Icon(Icons.Default.MoreVert, null, tint = contentColor)
-                                DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
-                                    DropdownMenuItem(
-                                        text = { Text("Share Song", fontFamily = FontFamily.Cursive) }, 
-                                        leadingIcon = { Icon(Icons.Default.Share, null) }, 
-                                        onClick = { currentTrack?.let { viewModel.shareTrack(it) }; showMoreMenu = false }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Share Nirvaana (APK)", fontFamily = FontFamily.Cursive) }, 
-                                        leadingIcon = { Icon(Icons.Default.Android, null) }, 
-                                        onClick = { viewModel.shareAppApk(); showMoreMenu = false }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Sleep Timer", fontFamily = FontFamily.Cursive) }, 
-                                        leadingIcon = { Icon(Icons.Default.Timer, null) }, 
-                                        onClick = { showSleepTimerDialog = true; showMoreMenu = false }
-                                    )
-                                    DropdownMenuItem(
-                                        text = { Text("Song Info", fontFamily = FontFamily.Cursive) }, 
-                                        leadingIcon = { Icon(Icons.Default.Info, null) }, 
-                                        onClick = { showInfoPopup = true; showMoreMenu = false }
-                                    )
-                                    HorizontalDivider(color = contentColor.copy(alpha = 0.1f))
-                                    DropdownMenuItem(
-                                        text = { Text("Delete Device", color = Color.Red, fontFamily = FontFamily.Cursive) }, 
-                                        leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, 
-                                        onClick = { currentTrack?.let { viewModel.bulkDelete(listOf(it)) }; showMoreMenu = false }
-                                    )
-                                }
-                            }
-                        }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(64.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBack) { 
+                        Icon(Icons.Default.KeyboardArrowDown, null, tint = contentColor, modifier = Modifier.size(32.dp)) 
                     }
-                },
-                bottomBar = {
-                    if (selectedTab == 0) {
-                        Column(modifier = Modifier.fillMaxWidth().background(Color.Transparent).padding(bottom = if (isLandscape) 8.dp else 24.dp)) {
-                            // Guaranteed Persistent Queue Icons
-                            LazyRow(
-                                modifier = Modifier.fillMaxWidth().height(if (isLandscape) 64.dp else 80.dp),
-                                horizontalArrangement = Arrangement.spacedBy(if (isLandscape) 12.dp else 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                contentPadding = PaddingValues(horizontal = 24.dp)
-                            ) {
-                                itemsIndexed(queue) { _, track ->
-                                    val isCurrent = currentTrack?.id == track.id
-                                    val artworkUri = remember(track.id) {
-                                        val path = track.customCoverPath ?: track.localPath
-                                        if (path != null) {
-                                            if (path.startsWith("content://") || path.startsWith("http")) Uri.parse(path) else File(path)
-                                        } else null
-                                    }
-                                    
-                                    Box(
-                                        modifier = Modifier
-                                            .size(if (isLandscape) 52.dp else 60.dp)
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(14.dp))
-                                            .background(if (isCurrent) primaryColor.copy(0.2f) else Color.White.copy(0.05f))
-                                            .clickable { viewModel.playTrack(track) },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (artworkUri != null) {
-                                            AsyncImage(
-                                                model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).build(),
-                                                contentDescription = null,
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
-                                            Icon(Icons.Default.MusicNote, null, tint = Color.Gray, modifier = Modifier.size(if (isLandscape) 24.dp else 32.dp))
-                                        }
-                                    }
-                                }
+
+                    TabRow(
+                        selectedTabIndex = selectedTab,
+                        containerColor = Color.Transparent,
+                        divider = {},
+                        indicator = { tabPositions ->
+                            TabRowDefaults.SecondaryIndicator(
+                                modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                color = primaryColor
+                            )
+                        },
+                        modifier = Modifier.width(140.dp)
+                    ) {
+                        Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Player", color = if (selectedTab == 0) contentColor else secondaryColor, fontSize = 12.sp) } )
+                        Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Lyrics", color = if (selectedTab == 1) contentColor else secondaryColor, fontSize = 12.sp) } )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { showBackgroundDialog = true }) { Icon(Icons.Default.Wallpaper, null, tint = contentColor) }
+
+                        IconButton(onClick = {
+                            val nextMode = when (imageMode) {
+                                PlayerImageMode.SQUARE -> PlayerImageMode.FULL_SCREEN
+                                PlayerImageMode.FULL_SCREEN -> PlayerImageMode.ROTATION
+                                PlayerImageMode.ROTATION -> PlayerImageMode.SQUARE
+                            }
+                            viewModel.updatePlayerImageMode(nextMode)
+                        }) {
+                            Icon(
+                                when(imageMode) {
+                                    PlayerImageMode.SQUARE -> Icons.Default.CropSquare
+                                    PlayerImageMode.FULL_SCREEN -> Icons.Default.Fullscreen
+                                    PlayerImageMode.ROTATION -> Icons.Default.Sync
+                                },
+                                contentDescription = "Change View Mode",
+                                tint = contentColor
+                            )
+                        }
+
+                        var showMoreMenu by remember { mutableStateOf(false) }
+                        IconButton(onClick = { showMoreMenu = true }) {
+                            Icon(Icons.Default.MoreVert, null, tint = contentColor)
+                            DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Share Song", fontFamily = FontFamily.Cursive) }, 
+                                    leadingIcon = { Icon(Icons.Default.Share, null) }, 
+                                    onClick = { currentTrack?.let { viewModel.shareTrack(it) }; showMoreMenu = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Rename Song", fontFamily = FontFamily.Cursive) }, 
+                                    leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, null) }, 
+                                    onClick = { showRenameDialog = true; showMoreMenu = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Sleep Timer", fontFamily = FontFamily.Cursive) }, 
+                                    leadingIcon = { Icon(Icons.Default.Timer, null) }, 
+                                    onClick = { showSleepTimerDialog = true; showMoreMenu = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Add to Playlist", fontFamily = FontFamily.Cursive) }, 
+                                    leadingIcon = { Icon(Icons.Default.PlaylistAdd, null) }, 
+                                    onClick = { showAddToPlaylistDialog = true; showMoreMenu = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Song Info", fontFamily = FontFamily.Cursive) }, 
+                                    leadingIcon = { Icon(Icons.Default.Info, null) }, 
+                                    onClick = { showInfoPopup = true; showMoreMenu = false }
+                                )
+                                HorizontalDivider(color = contentColor.copy(alpha = 0.1f))
+                                DropdownMenuItem(
+                                    text = { Text("Delete Device", color = Color.Red, fontFamily = FontFamily.Cursive) }, 
+                                    leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, 
+                                    onClick = { currentTrack?.let { viewModel.bulkDelete(listOf(it)) }; showMoreMenu = false }
+                                )
                             }
                         }
                     }
                 }
-            ) { innerPadding ->
-                Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+
+                // 80% Content / 20% Queue
+                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     if (selectedTab == 0) {
-                        if (isLandscape) {
-                            PlayerLayoutLandscape(
-                                player = player,
-                                viewModel = viewModel,
-                                currentTrack = currentTrack,
-                                imageMode = imageMode,
-                                primaryColor = primaryColor,
-                                isPlaying = isPlaying,
-                                position = position,
-                                duration = duration,
-                                isDragging = isDragging,
-                                dragPosition = dragPosition,
-                                onDragPositionChange = { dragPosition = it },
-                                onDraggingChange = { isDragging = it },
-                                onPositionUpdate = { position = it },
-                                shuffleMode = shuffleMode,
-                                repeatMode = repeatMode,
-                                onInfoClick = { showInfoPopup = true }
-                            )
-                        } else {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                PlayerLayoutPortrait(
+                        Box(modifier = Modifier.weight(0.85f).fillMaxWidth()) {
+                            if (isLandscape) {
+                                PlayerLayoutLandscape(
                                     player = player,
                                     viewModel = viewModel,
                                     currentTrack = currentTrack,
@@ -324,6 +273,67 @@ fun PlayerScreen(
                                     repeatMode = repeatMode,
                                     onInfoClick = { showInfoPopup = true }
                                 )
+                            } else {
+                                PlayerLayoutPortrait(
+                                    player = player,
+                                    viewModel = viewModel,
+                                    currentTrack = currentTrack,
+                                    imageMode = imageMode,
+                                    primaryColor = primaryColor,
+                                    isPlaying = isPlaying,
+                                    position = position,
+                                    duration = duration,
+                                    isDragging = isDragging,
+                                    dragPosition = dragPosition,
+                                    onDragPositionChange = { dragPosition = it },
+                                    onDraggingChange = { isDragging = it },
+                                    onPositionUpdate = { position = it },
+                                    shuffleMode = shuffleMode,
+                                    repeatMode = repeatMode,
+                                    onInfoClick = { showInfoPopup = true },
+                                    sleepTimerRemaining = sleepTimerRemaining
+                                )
+                            }
+                        }
+                        
+                        // 15% Fixed Queue - Decreased Icon Size
+                        Column(modifier = Modifier.weight(0.15f).fillMaxWidth().background(Color.Transparent).padding(bottom = 12.dp)) {
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                contentPadding = PaddingValues(horizontal = 24.dp)
+                            ) {
+                                itemsIndexed(queue) { _, track ->
+                                    val isCurrent = currentTrack?.id == track.id
+                                    val artworkUri = remember(track.id) {
+                                        val path = track.customCoverPath ?: track.localPath
+                                        if (path != null) {
+                                            if (path.startsWith("content://") || path.startsWith("http")) Uri.parse(path) else File(path)
+                                        } else null
+                                    }
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .size(if (isLandscape) 40.dp else 46.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .border(2.dp, if (isCurrent) primaryColor else Color.Transparent, RoundedCornerShape(10.dp))
+                                            .background(if (isCurrent) primaryColor.copy(0.2f) else Color.White.copy(0.05f))
+                                            .clickable { viewModel.playTrack(track) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (artworkUri != null) {
+                                            AsyncImage(
+                                                model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).build(),
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            Icon(Icons.Default.MusicNote, null, tint = Color.Gray, modifier = Modifier.fillMaxSize(0.5f))
+                                        }
+                                    }
+                                }
                             }
                         }
                     } else {
@@ -349,6 +359,24 @@ fun PlayerScreen(
                 }
             }
         }
+    }
+
+    if (showRenameDialog && currentTrack != null) {
+        RenameDialog(initialName = currentTrack!!.displayName, onDismiss = { showRenameDialog = false }, onConfirm = { viewModel.updateTrackMetadata(currentTrack!!.id, it, null, null, null, null); showRenameDialog = false })
+    }
+
+    if (showAddToPlaylistDialog) {
+        val playlists by viewModel.allPlaylists.collectAsState()
+        AddToPlaylistDialog(
+            playlists = playlists,
+            onDismiss = { showAddToPlaylistDialog = false },
+            onPlaylistSelected = { pid -> currentTrack?.let { viewModel.bulkAddTracksToPlaylist(pid, listOf(it.id)) }; showAddToPlaylistDialog = false },
+            onCreateNew = { showAddToPlaylistDialog = false; showCreatePlaylistDialog = true }
+        )
+    }
+
+    if (showCreatePlaylistDialog) {
+        CreatePlaylistDialog(onDismiss = { showCreatePlaylistDialog = false }, onConfirm = { viewModel.createPlaylist(it); showCreatePlaylistDialog = false })
     }
 
     if (showInfoPopup && currentTrack != null) {
@@ -381,7 +409,8 @@ fun PlayerLayoutPortrait(
     onPositionUpdate: (Long) -> Unit,
     shuffleMode: Boolean,
     repeatMode: Int,
-    onInfoClick: () -> Unit
+    onInfoClick: () -> Unit,
+    sleepTimerRemaining: Long?
 ) {
     var rotationAngle by remember { mutableStateOf(0f) }
     LaunchedEffect(isPlaying) {
@@ -397,12 +426,12 @@ fun PlayerLayoutPortrait(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Bottom // Push controls to bottom
     ) {
         Box(
-            modifier = Modifier.size(300.dp)
-                .padding(vertical = 24.dp)
+            modifier = Modifier.weight(1f).fillMaxWidth()
                 .pointerInput(Unit) {
                     var dragOffset = 0f
                     detectHorizontalDragGestures(
@@ -441,7 +470,7 @@ fun PlayerLayoutPortrait(
                             model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).build(),
                             contentDescription = null,
                             modifier = Modifier
-                                .fillMaxSize(0.9f)
+                                .fillMaxSize(0.95f) // INCREASED SIZE
                                 .aspectRatio(1f)
                                 .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(32.dp))
                                 .rotate(if (imageMode == PlayerImageMode.ROTATION) rotationAngle else 0f),
@@ -452,11 +481,20 @@ fun PlayerLayoutPortrait(
                             imageVector = Icons.Default.MusicNote,
                             contentDescription = null,
                             tint = fallbackColor.copy(alpha = 0.5f),
-                            modifier = Modifier.size(240.dp).rotate(rotationAngle)
+                            modifier = Modifier.fillMaxSize(0.7f).rotate(rotationAngle)
                         )
                     }
                 }
             }
+        }
+
+        if (sleepTimerRemaining != null) {
+            Text(
+                text = "Sleep: ${formatSleepTime(sleepTimerRemaining)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = primaryColor,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
         }
 
         PlayerControls(
@@ -477,7 +515,7 @@ fun PlayerLayoutPortrait(
             isLandscape = false,
             onInfoClick = onInfoClick
         )
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -624,17 +662,17 @@ fun PlayerControls(
     ) {
         Text(
             text = "${formatTime(if (isDragging) dragPosition else position)} / ${formatTime(duration)}",
-            style = MaterialTheme.typography.headlineMedium.copy(fontSize = if (isLandscape) 24.sp else 32.sp, fontWeight = FontWeight.Bold),
+            style = MaterialTheme.typography.headlineMedium.copy(fontSize = if (isLandscape) 22.sp else 28.sp, fontWeight = FontWeight.Bold),
             color = contentColor
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             IconButton(onClick = onInfoClick) { Icon(Icons.Default.Info, null, tint = contentColor.copy(alpha = 0.6f)) }
             Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(currentTrack?.displayName ?: "Unknown", style = MaterialTheme.typography.headlineSmall, color = contentColor, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-                Text(currentTrack?.displayArtist ?: "Unknown Artist", style = MaterialTheme.typography.titleMedium, color = secondaryColor, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(currentTrack?.displayName ?: "Unknown", style = MaterialTheme.typography.titleLarge, color = contentColor, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                Text(currentTrack?.displayArtist ?: "Unknown Artist", style = MaterialTheme.typography.bodyMedium, color = secondaryColor, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
             IconButton(onClick = { currentTrack?.let { viewModel.toggleFavorite(it) } }) {
                 Icon(if (currentTrack?.isFavorite == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (currentTrack?.isFavorite == true) Color.Red else contentColor)

@@ -100,9 +100,14 @@ fun TrackOptionsBottomSheet(
                     Triple(Icons.Default.Edit, "Edit Info", "edit"),
                     Triple(Icons.Default.ContentCut, "MP3 Cutter", "cut"),
                     Triple(Icons.Default.Favorite, "Toggle Favorite", "favorite"),
-                    Triple(Icons.Default.Image, "Change cover", "edit"),
-                    Triple(Icons.Default.Lyrics, "Edit lyrics", "edit"),
-                    Triple(Icons.Default.DeleteOutline, "Delete device", "delete")
+                    Triple(Icons.Default.Share, "Share", "share"),
+                    Triple(Icons.Default.Lyrics, "Add Lyrics", "edit"),
+                    Triple(Icons.Default.DeleteOutline, "Delete device", "delete"),
+                    Triple(Icons.Default.CloudUpload, "Upload", "upload"),
+                    Triple(Icons.Default.RemoveCircleOutline, "Remove", "remove"),
+                    Triple(Icons.Default.DriveFileRenameOutline, "Rename", "rename"),
+                    Triple(Icons.AutoMirrored.Filled.PlaylistPlay, "Play Next", "play_next"),
+                    Triple(Icons.Default.NotificationsActive, "Set Ringtone", "ringtone")
                 )
                 
                 // Add Cloud Delete if synced
