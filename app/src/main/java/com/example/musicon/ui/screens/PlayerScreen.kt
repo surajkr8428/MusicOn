@@ -62,6 +62,7 @@ import com.example.musicon.ui.components.LocalIsBackgroundBright
 import com.example.musicon.ui.components.RenameDialog
 import com.example.musicon.ui.components.StellarBackground
 import com.example.musicon.ui.components.TechnicalInfoPopup
+import com.example.musicon.ui.components.SleepTimerDialog
 import java.io.File
 import kotlinx.coroutines.delay
 
@@ -235,14 +236,13 @@ fun PlayerScreen(
                                     onClick = { showAddToPlaylistDialog = true; showMoreMenu = false }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Song Info", fontFamily = FontFamily.Cursive) }, 
-                                    leadingIcon = { Icon(Icons.Default.Info, null) }, 
-                                    onClick = { showInfoPopup = true; showMoreMenu = false }
+                                    text = { Text("Upload to Drive", fontFamily = FontFamily.Cursive) }, 
+                                    leadingIcon = { Icon(Icons.Default.CloudUpload, null) }, 
+                                    onClick = { currentTrack?.let { viewModel.uploadTrack(it) }; showMoreMenu = false }
                                 )
-                                HorizontalDivider(color = contentColor.copy(alpha = 0.1f))
                                 DropdownMenuItem(
-                                    text = { Text("Delete Device", color = Color.Red, fontFamily = FontFamily.Cursive) }, 
-                                    leadingIcon = { Icon(Icons.Default.Delete, null, tint = Color.Red) }, 
+                                    text = { Text("Delete from Device", color = Color.Red, fontFamily = FontFamily.Cursive) }, 
+                                    leadingIcon = { Icon(Icons.Default.DeleteForever, null, tint = Color.Red) }, 
                                     onClick = { currentTrack?.let { viewModel.bulkDelete(listOf(it)) }; showMoreMenu = false }
                                 )
                             }
@@ -250,7 +250,7 @@ fun PlayerScreen(
                     }
                 }
 
-                // 80% Content / 20% Queue
+                // 85% Content / 15% Queue
                 Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     if (selectedTab == 0) {
                         Box(modifier = Modifier.weight(0.85f).fillMaxWidth()) {
@@ -271,7 +271,8 @@ fun PlayerScreen(
                                     onPositionUpdate = { position = it },
                                     shuffleMode = shuffleMode,
                                     repeatMode = repeatMode,
-                                    onInfoClick = { showInfoPopup = true }
+                                    onInfoClick = { showInfoPopup = true },
+                                    sleepTimerRemaining = sleepTimerRemaining
                                 )
                             } else {
                                 PlayerLayoutPortrait(
@@ -470,7 +471,7 @@ fun PlayerLayoutPortrait(
                             model = ImageRequest.Builder(LocalContext.current).data(artworkUri).crossfade(true).build(),
                             contentDescription = null,
                             modifier = Modifier
-                                .fillMaxSize(0.95f) // INCREASED SIZE
+                                .fillMaxSize(0.95f) 
                                 .aspectRatio(1f)
                                 .clip(if (imageMode == PlayerImageMode.ROTATION) CircleShape else RoundedCornerShape(32.dp))
                                 .rotate(if (imageMode == PlayerImageMode.ROTATION) rotationAngle else 0f),
@@ -484,17 +485,25 @@ fun PlayerLayoutPortrait(
                             modifier = Modifier.fillMaxSize(0.7f).rotate(rotationAngle)
                         )
                     }
+
+                    // Display Sleep Timer at the center
+                    if (sleepTimerRemaining != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(100.dp)
+                                .background(Color.Black.copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = formatSleepTime(sleepTimerRemaining),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                                color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                 }
             }
-        }
-
-        if (sleepTimerRemaining != null) {
-            Text(
-                text = "Sleep: ${formatSleepTime(sleepTimerRemaining)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = primaryColor,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
         }
 
         PlayerControls(
@@ -536,7 +545,8 @@ fun PlayerLayoutLandscape(
     onPositionUpdate: (Long) -> Unit,
     shuffleMode: Boolean,
     repeatMode: Int,
-    onInfoClick: () -> Unit
+    onInfoClick: () -> Unit,
+    sleepTimerRemaining: Long?
 ) {
     var rotationAngle by remember { mutableStateOf(0f) }
     LaunchedEffect(isPlaying) {
@@ -602,6 +612,23 @@ fun PlayerLayoutLandscape(
                             tint = fallbackColor.copy(alpha = 0.5f),
                             modifier = Modifier.size(220.dp).rotate(rotationAngle)
                         )
+                    }
+
+                    // Display Sleep Timer at the center
+                    if (sleepTimerRemaining != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .background(Color.Black.copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = formatSleepTime(sleepTimerRemaining),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
+                                color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
@@ -669,7 +696,7 @@ fun PlayerControls(
         Spacer(modifier = Modifier.height(12.dp))
 
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-            IconButton(onClick = onInfoClick) { Icon(Icons.Default.Info, null, tint = contentColor.copy(alpha = 0.6f)) }
+            Spacer(modifier = Modifier.width(48.dp)) // Balanced space for the favorite icon on the right
             Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(currentTrack?.displayName ?: "Unknown", style = MaterialTheme.typography.titleLarge, color = contentColor, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                 Text(currentTrack?.displayArtist ?: "Unknown Artist", style = MaterialTheme.typography.bodyMedium, color = secondaryColor, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)

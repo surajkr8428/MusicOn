@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshotFlow
@@ -20,6 +21,8 @@ import com.example.musicon.data.LibraryViewMode
 import com.example.musicon.data.SettingsRepository
 import com.example.musicon.data.local.Playlist
 import com.example.musicon.data.local.TrackEntity
+import com.example.musicon.data.remote.CloudStorageManager
+import com.example.musicon.service.SyncWorker
 import com.example.musicon.ui.theme.ThemeMode
 import com.google.gson.Gson
 import java.io.File
@@ -256,21 +259,53 @@ class MainViewModel(
     }
 
     fun shareTrack(track: TrackEntity) {
-        val path = track.localPath ?: return
-        val file = java.io.File(path)
+        val path = track.localPath ?: run {
+            Toast.makeText(settingsRepository.context, "Cloud songs must be downloaded before sharing", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val file = File(path)
         if (!file.exists()) return
-        val uri = FileProvider.getUriForFile(settingsRepository.context, "${settingsRepository.context.packageName}.fileprovider", file)
-        val intent = Intent(Intent.ACTION_SEND).apply { type = "audio/*"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK) }
-        settingsRepository.context.startActivity(Intent.createChooser(intent, "Share Song").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            val uri = FileProvider.getUriForFile(settingsRepository.context, "${settingsRepository.context.packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "audio/*"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = Intent.createChooser(intent, "Share Song")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            settingsRepository.context.startActivity(chooser)
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Sharing failed: ${e.message}")
+            Toast.makeText(settingsRepository.context, "Sharing failed", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun shareTracks(tracks: List<TrackEntity>) {
         if (tracks.isEmpty()) return
         val uris = ArrayList<Uri>()
-        tracks.forEach { t -> t.localPath?.let { p -> val f = java.io.File(p); if (f.exists()) uris.add(FileProvider.getUriForFile(settingsRepository.context, "${settingsRepository.context.packageName}.fileprovider", f)) } }
+        tracks.forEach { t -> 
+            t.localPath?.let { p -> 
+                val f = File(p)
+                if (f.exists()) {
+                    uris.add(FileProvider.getUriForFile(settingsRepository.context, "${settingsRepository.context.packageName}.fileprovider", f))
+                }
+            } 
+        }
         if (uris.isEmpty()) return
-        val intent = Intent(if (uris.size == 1) Intent.ACTION_SEND else Intent.ACTION_SEND_MULTIPLE).apply { type = "audio/*"; if (uris.size == 1) putExtra(Intent.EXTRA_STREAM, uris[0]) else putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK) }
-        settingsRepository.context.startActivity(Intent.createChooser(intent, "Share Songs").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            val intent = Intent(if (uris.size == 1) Intent.ACTION_SEND else Intent.ACTION_SEND_MULTIPLE).apply {
+                type = "audio/*"
+                if (uris.size == 1) putExtra(Intent.EXTRA_STREAM, uris[0])
+                else putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = Intent.createChooser(intent, "Share Songs")
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            settingsRepository.context.startActivity(chooser)
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Bulk sharing failed", e)
+        }
     }
 
     fun renamePlaylist(pId: String, name: String) = viewModelScope.launch { val p = allPlaylists.value.find { it.id == pId } ?: return@launch; musicRepository.updatePlaylist(p.copy(name = name)) }
@@ -293,10 +328,50 @@ class MainViewModel(
     }
     fun addToQueueNext(tracks: List<TrackEntity>) { val q = _playbackQueue.value.toMutableList(); val i = q.indexOfFirst { it.id == _currentPlayingTrackId.value }; if (i != -1) q.addAll(i + 1, tracks) else q.addAll(tracks); _playbackQueue.value = q }
 
-    fun bulkAddTracksToPlaylist(pId: String, ids: List<String>) = viewModelScope.launch { ids.forEach { musicRepository.addTrackToPlaylist(pId, it) } }
-    fun bulkDelete(tracks: List<TrackEntity>) = viewModelScope.launch { val ids = tracks.map { it.id }.toSet(); if (_currentPlayingTrackId.value in ids) { _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK); _currentPlayingTrackId.value = null }; tracks.forEach { musicRepository.removeTrack(it) } }
-    fun bulkUpload(tracks: List<TrackEntity>) { val ids = tracks.map { it.id }.toTypedArray(); val data = Data.Builder().putString("sync_type", "bulk_upload").putStringArray("track_ids", ids as Array<String?>).build(); WorkManager.getInstance(settingsRepository.context).enqueue(OneTimeWorkRequestBuilder<com.example.musicon.service.SyncWorker>().setInputData(data).addTag("sync_task").build()) }
-    fun removeFromLibrary(tracks: List<TrackEntity>) = viewModelScope.launch { val ids = tracks.map { it.id }.toSet(); if (_currentPlayingTrackId.value in ids) { _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK); _currentPlayingTrackId.value = null }; tracks.forEach { musicRepository.removeTrack(it) } }
+    fun bulkAddTracksToPlaylist(pId: String, ids: List<String>) = viewModelScope.launch { 
+        ids.forEach { musicRepository.addTrackToPlaylist(pId, it) } 
+    }
+    
+    fun addToQueue(track: TrackEntity) {
+        val q = _playbackQueue.value.toMutableList()
+        if (q.none { it.id == track.id }) {
+            q.add(track)
+            _playbackQueue.value = q
+        }
+    }
+
+    fun bulkDelete(tracks: List<TrackEntity>) = viewModelScope.launch { 
+        val ids = tracks.map { it.id }.toSet()
+        if (_currentPlayingTrackId.value in ids) { 
+            _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK)
+            _currentPlayingTrackId.value = null 
+        }
+        tracks.forEach { musicRepository.removeTrack(it) } 
+    }
+
+    fun bulkUpload(tracks: List<TrackEntity>) { 
+        val ids = tracks.filter { it.localPath != null }.map { it.id }.toTypedArray()
+        if (ids.isEmpty()) return
+        val data = Data.Builder()
+            .putString("sync_type", "bulk_upload")
+            .putStringArray("track_ids", ids as Array<String?>)
+            .build()
+        WorkManager.getInstance(settingsRepository.context).enqueue(
+            OneTimeWorkRequestBuilder<SyncWorker>()
+                .setInputData(data)
+                .addTag("sync_task")
+                .build()
+        )
+    }
+
+    fun removeFromLibrary(tracks: List<TrackEntity>) = viewModelScope.launch { 
+        val ids = tracks.map { it.id }.toSet()
+        if (_currentPlayingTrackId.value in ids) { 
+            _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK)
+            _currentPlayingTrackId.value = null 
+        }
+        tracks.forEach { musicRepository.deleteTrack(it) } // Delete from DB only
+    }
 
     fun syncAllLocalToCloud() = viewModelScope.launch { musicRepository.syncCloudTracks(); val unsynced = musicRepository.allTracks.first().filter { it.localPath != null && it.gDriveId == null }; if (unsynced.isNotEmpty()) { val ids = unsynced.map { it.id }.toTypedArray(); val data = Data.Builder().putString("sync_type", "bulk_upload").putStringArray("track_ids", ids as Array<String?>).build(); WorkManager.getInstance(settingsRepository.context).enqueueUniqueWork("sync_all", androidx.work.ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<com.example.musicon.service.SyncWorker>().setInputData(data).addTag("sync_task").build()) } }
     fun pauseSync() = com.example.musicon.data.remote.CloudSyncManager.setPaused(true)
@@ -343,7 +418,16 @@ class MainViewModel(
     }
 
     fun savePlaybackState(pos: Long) = viewModelScope.launch { settingsRepository.updateLastPlaybackState(_currentPlayingTrackId.value, pos, _currentPlaylistId.value) }
-    fun toggleFavorite(track: TrackEntity) = viewModelScope.launch { musicRepository.toggleFavorite(track); val p = musicRepository.allPlaylists.first().find { it.name == "Favorite" }; if (p != null) { if (!track.isFavorite) musicRepository.addTrackToPlaylist(p.id, track.id) else musicRepository.removeTrackFromPlaylist(p.id, track.id) }; triggerBackup() }
+    fun toggleFavorite(track: TrackEntity) = viewModelScope.launch {
+        val newStatus = !track.isFavorite
+        musicRepository.updateTrack(track.copy(isFavorite = newStatus))
+        val p = musicRepository.allPlaylists.first().find { it.name == "Favorite" }
+        if (p != null) {
+            if (newStatus) musicRepository.addTrackToPlaylist(p.id, track.id)
+            else musicRepository.removeTrackFromPlaylist(p.id, track.id)
+        }
+        triggerBackup()
+    }
     fun createPlaylist(name: String) = viewModelScope.launch { musicRepository.createPlaylist(name); triggerBackup() }
     fun removeTrackFromPlaylist(pId: String, tId: String) = viewModelScope.launch { musicRepository.removeTrackFromPlaylist(pId, tId) }
     fun getTracksForPlaylist(pId: String) = musicRepository.getTracksForPlaylist(pId)
@@ -376,10 +460,54 @@ class MainViewModel(
 
     fun triggerBackup() = viewModelScope.launch { /* logic */ }
     fun restoreFromCloud() = viewModelScope.launch { /* logic */ }
-    fun deleteAllCloudTracks() = viewModelScope.launch { /* logic */ }
-    fun downloadTrack(t: TrackEntity) { /* logic */ }
-    fun uploadTrack(t: TrackEntity) { /* logic */ }
-    fun deleteTrackFromCloud(t: TrackEntity) = viewModelScope.launch { /* logic */ }
+    fun uploadTrack(t: TrackEntity) {
+        if (t.localPath == null) return
+        val data = Data.Builder()
+            .putString("sync_type", "bulk_upload")
+            .putStringArray("track_ids", arrayOf(t.id))
+            .build()
+        WorkManager.getInstance(settingsRepository.context).enqueue(
+            OneTimeWorkRequestBuilder<SyncWorker>()
+                .setInputData(data)
+                .addTag("sync_task")
+                .build()
+        )
+    }
+    
+    fun deleteAllCloudTracks() = viewModelScope.launch {
+        try {
+            val folderId = musicRepository.cloudStorageManager.getOrCreateAppFolder()
+            val files = musicRepository.cloudStorageManager.listAudioFiles(folderId)
+            files.forEach { musicRepository.cloudStorageManager.deleteFile(it.id) }
+            syncCloudTracks()
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Failed to delete all cloud tracks", e)
+        }
+    }
+    
+    fun downloadTrack(t: TrackEntity) {
+        if (t.gDriveId == null) return
+        val data = Data.Builder()
+            .putString("sync_type", "download")
+            .putString("track_id", t.id)
+            .build()
+        WorkManager.getInstance(settingsRepository.context).enqueue(
+            OneTimeWorkRequestBuilder<SyncWorker>()
+                .setInputData(data)
+                .addTag("sync_task")
+                .build()
+        )
+    }
+
+    fun deleteTrackFromCloud(t: TrackEntity) = viewModelScope.launch {
+        if (t.gDriveId == null) return@launch
+        try {
+            CloudStorageManager(settingsRepository.context).deleteFile(t.gDriveId)
+            musicRepository.updateTrack(t.copy(gDriveId = null))
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Cloud delete failed", e)
+        }
+    }
 
     private fun <T> State<T>.asFlow(): Flow<T> = snapshotFlow { value }
 }

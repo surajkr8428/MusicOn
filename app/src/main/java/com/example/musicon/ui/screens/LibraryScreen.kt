@@ -125,7 +125,15 @@ fun LibraryScreen(
     }
 
     if (currentPlaylistDetail != null && addingToPlaylistId == null) {
-        PlaylistDetailScreen(playlist = currentPlaylistDetail!!, viewModel = viewModel, onBack = { currentPlaylistDetail = null }, viewMode = viewMode, isLandscape = isLandscape, onAddSongs = { addingToPlaylistId = currentPlaylistDetail!!.id; scope.launch { pagerState.animateScrollToPage(1) } })
+        PlaylistDetailScreen(
+            playlist = currentPlaylistDetail!!, 
+            viewModel = viewModel, 
+            onBack = { currentPlaylistDetail = null }, 
+            viewMode = viewMode, 
+            isLandscape = isLandscape,
+            onAddSongs = { addingToPlaylistId = currentPlaylistDetail!!.id; scope.launch { pagerState.animateScrollToPage(1) } },
+            onOpenCutter = onOpenCutter
+        )
     } else {
         StellarBackground(themeMode = themeMode, backgroundMode = backgroundMode) {
             Scaffold(
@@ -197,6 +205,7 @@ fun LibraryScreen(
                 "favorite" -> viewModel.toggleFavorite(selectedTrackOptions!!)
                 "play" -> viewModel.playTrack(selectedTrackOptions!!)
                 "play_next" -> viewModel.addToQueueNext(listOf(selectedTrackOptions!!))
+                "add_to_queue" -> viewModel.addToQueue(selectedTrackOptions!!)
                 "info" -> showTrackInfoDialog = selectedTrackOptions
                 "share" -> viewModel.shareTrack(selectedTrackOptions!!)
                 "delete" -> viewModel.bulkDelete(listOf(selectedTrackOptions!!))
@@ -207,6 +216,8 @@ fun LibraryScreen(
                 "cut" -> onOpenCutter(selectedTrackOptions!!)
                 "add_to_playlist" -> showBulkPlaylistDialog = true
                 "edit" -> showEditTrackDialog = selectedTrackOptions
+                "location" -> viewModel.openFileLocation(selectedTrackOptions!!)
+                "cloud_delete" -> viewModel.deleteTrackFromCloud(selectedTrackOptions!!)
             }
             if (action != "add_to_playlist") selectedTrackOptions = null
         })
@@ -223,12 +234,13 @@ fun LibraryScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: () -> Unit, viewMode: LibraryViewMode, isLandscape: Boolean, onAddSongs: () -> Unit) {
+fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: () -> Unit, viewMode: LibraryViewMode, isLandscape: Boolean, onAddSongs: () -> Unit, onOpenCutter: (TrackEntity) -> Unit) {
     val tracks by viewModel.getTracksForPlaylist(playlist.id).collectAsState(emptyList())
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var selectedTrackOptions by remember { mutableStateOf<TrackEntity?>(null) }
     var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.GRID) }
     var showTrackInfoDialog by remember { mutableStateOf<TrackEntity?>(null) }
+    var trackToRename by remember { mutableStateOf<TrackEntity?>(null) }
     val isSelectionMode = selectedIds.isNotEmpty()
     BackHandler(isSelectionMode) { selectedIds = emptySet() }
     StellarBackground {
@@ -259,15 +271,22 @@ fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: (
                     "favorite" -> viewModel.toggleFavorite(selectedTrackOptions!!)
                     "play" -> viewModel.playTrack(selectedTrackOptions!!)
                     "play_next" -> viewModel.addToQueueNext(listOf(selectedTrackOptions!!))
+                    "add_to_queue" -> viewModel.addToQueue(selectedTrackOptions!!)
                     "info" -> showTrackInfoDialog = selectedTrackOptions
                     "share" -> viewModel.shareTrack(selectedTrackOptions!!)
                     "delete" -> viewModel.bulkDelete(listOf(selectedTrackOptions!!))
                     "upload" -> viewModel.uploadTrack(selectedTrackOptions!!)
                     "remove" -> viewModel.removeTrackFromPlaylist(playlist.id, selectedTrackOptions!!.id)
+                    "rename" -> trackToRename = selectedTrackOptions
+                    "ringtone" -> viewModel.setAsRingtone(selectedTrackOptions!!)
+                    "cut" -> onOpenCutter(selectedTrackOptions!!)
+                    "location" -> viewModel.openFileLocation(selectedTrackOptions!!)
+                    "cloud_delete" -> viewModel.deleteTrackFromCloud(selectedTrackOptions!!)
                 }
                 selectedTrackOptions = null
             })
         }
+        if (trackToRename != null) RenameDialog(initialName = trackToRename!!.displayName, onDismiss = { trackToRename = null }, onConfirm = { viewModel.updateTrackMetadata(trackToRename!!.id, it, null, null, null, null); trackToRename = null })
     }
 }
 
@@ -318,7 +337,19 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
             AsyncImage(model = track.customCoverPath ?: track.localPath, contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
             if (track.gDriveId != null) Icon(Icons.Default.Cloud, null, tint = Color.Cyan, modifier = Modifier.size(16.dp).align(Alignment.TopStart).background(Color.Black.copy(0.4f), CircleShape).padding(2.dp))
         }
-        Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) { Text(track.displayName, color = LavenderTitle, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(track.displayArtist, color = Color.Gray, style = MaterialTheme.typography.labelSmall) }
+        Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) { 
+            Text(track.displayName, color = LavenderTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(track.displayArtist, color = Color.Gray, style = MaterialTheme.typography.labelSmall) 
+        }
+        
+        IconButton(onClick = { onToggleFavorite(track) }) {
+            Icon(
+                if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                contentDescription = null,
+                tint = if (track.isFavorite) Color.Red else Color.White.copy(alpha = 0.5f)
+            )
+        }
+
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             IconButton(onClick = { onOptions(track) }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
             Spacer(Modifier.height(8.dp))
@@ -333,6 +364,11 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
         Box {
             AsyncImage(model = track.customCoverPath ?: track.localPath, contentDescription = null, modifier = Modifier.aspectRatio(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
             if (track.gDriveId != null) Icon(Icons.Default.Cloud, null, tint = Color.Cyan, modifier = Modifier.size(20.dp).align(Alignment.TopStart).background(Color.Black.copy(0.4f), CircleShape).padding(4.dp))
+            
+            IconButton(onClick = { onFav(track) }, modifier = Modifier.align(Alignment.TopStart).padding(start = 24.dp).size(28.dp)) {
+                Icon(if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (track.isFavorite) Color.Red else Color.White, modifier = Modifier.size(18.dp))
+            }
+
             IconButton(onClick = { onOptions(track) }, modifier = Modifier.align(Alignment.TopEnd).size(32.dp).padding(4.dp).background(Color.Black.copy(0.3f), CircleShape)) { Icon(Icons.Default.MoreVert, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
             IconButton(onClick = { onInfo(track) }, modifier = Modifier.align(Alignment.BottomEnd).size(32.dp).padding(4.dp).background(Color.Black.copy(0.3f), CircleShape)) { Icon(Icons.Default.Info, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
         }
@@ -360,10 +396,6 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
 
 @Composable fun SortMenu(currentOrder: String, onDismiss: () -> Unit, onSortSelected: (String) -> Unit) { 
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Sort By") }, text = { Column { listOf("Name A-Z" to "NAME_ASC", "Name Z-A" to "NAME_DESC").forEach { (label, value) -> TextButton(onClick = { onSortSelected(value); onDismiss() }) { Text(label, color = if (currentOrder == value) Color.Cyan else Color.White) } } } }, confirmButton = { Button(onClick = onDismiss) { Text("Close") } })
-}
-
-@Composable fun SleepTimerDialog(onDismiss: () -> Unit, onSet: (Int, Int, Int) -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Sleep Timer") }, text = { Text("Set timer") }, confirmButton = { Button(onClick = { onSet(0, 30, 0) }) { Text("30m") } })
 }
 
 private fun getPlaylistIcon(name: String): ImageVector {
