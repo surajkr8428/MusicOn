@@ -244,6 +244,9 @@ class MusicRepository(
     suspend fun getMostPlayed(limit: Int): List<TrackEntity> {
         return trackDao.getMostPlayed(limit)
     }
+
+    suspend fun getAllPlaylistTracks(): List<PlaylistTrack> = playlistDao.getAllPlaylistTracks()
+
     suspend fun insertTrack(track: TrackEntity) = trackDao.insertTrack(track)
     suspend fun updateTrack(track: TrackEntity) = trackDao.updateTrack(track)
     suspend fun deleteTrack(track: TrackEntity) = trackDao.deleteTrack(track)

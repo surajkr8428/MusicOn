@@ -1,6 +1,7 @@
 package com.example.musicon.data.remote
 
 import android.content.Context
+import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
 import com.google.api.client.http.FileContent
@@ -11,6 +12,7 @@ import com.google.api.services.drive.Drive
 import com.google.api.services.drive.DriveScopes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -125,6 +127,45 @@ class CloudStorageManager(private val context: Context) {
         } catch (e: Exception) {
             android.util.Log.e("CloudStorageManager", "Rename failed", e)
         }
+    }
+
+    suspend fun uploadData(name: String, data: String): String? = withContext(Dispatchers.IO) {
+        val folderId = getOrCreateAppFolder()
+        val service = getDriveService() ?: return@withContext null
+        try {
+            val fileMetadata = com.google.api.services.drive.model.File().apply {
+                this.name = name
+                if (folderId != null) this.parents = listOf(folderId)
+            }
+            val content = InputStreamContent("application/json", data.byteInputStream())
+            val result = service.files().create(fileMetadata, content).setFields("id").execute()
+            result.id
+        } catch (e: Exception) {
+            Log.e("CloudStorageManager", "Data upload failed", e)
+            null
+        }
+    }
+
+    suspend fun downloadData(fileId: String): String? = withContext(Dispatchers.IO) {
+        val service = getDriveService() ?: return@withContext null
+        try {
+            val outputStream = ByteArrayOutputStream()
+            service.files().get(fileId).executeMediaAndDownloadTo(outputStream)
+            outputStream.toString("UTF-8")
+        } catch (e: Exception) {
+            Log.e("CloudStorageManager", "Data download failed", e)
+            null
+        }
+    }
+
+    suspend fun deleteFileByName(name: String) = withContext(Dispatchers.IO) {
+        val folderId = getOrCreateAppFolder()
+        val service = getDriveService() ?: return@withContext
+        try {
+            val query = "name = '$name' and '$folderId' in parents and trashed = false"
+            val result = service.files().list().setQ(query).setFields("files(id)").execute()
+            result.files?.forEach { deleteFile(it.id) }
+        } catch (e: Exception) {}
     }
 
     suspend fun uploadFile(filePath: String, name: String): String? = withContext(Dispatchers.IO) {

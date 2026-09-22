@@ -1,5 +1,7 @@
 package com.example.musicon.ui.screens
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
@@ -66,6 +68,7 @@ import com.example.musicon.ui.components.SleepTimerDialog
 import java.io.File
 import kotlinx.coroutines.delay
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlayerScreen(
     viewModel: MainViewModel,
@@ -488,18 +491,32 @@ fun PlayerLayoutPortrait(
 
                     // Display Sleep Timer at the center
                     if (sleepTimerRemaining != null) {
+                        val isSleepPaused by viewModel.isSleepTimerPaused.collectAsState()
                         Box(
                             modifier = Modifier
-                                .size(100.dp)
-                                .background(Color.Black.copy(alpha = 0.5f), CircleShape),
+                                .size(160.dp) // FURTHER INCREASED SIZE
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.7f))
+                                .combinedClickable(
+                                    onClick = { viewModel.toggleSleepTimerPause() },
+                                    onLongClick = { viewModel.resetSleepTimer() }
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = formatSleepTime(sleepTimerRemaining),
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
-                                color = Color.White,
-                                textAlign = TextAlign.Center
-                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = formatSleepTime(sleepTimerRemaining),
+                                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black, fontSize = 28.sp),
+                                    color = if (isSleepPaused) Color.Gray else Color.White,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = if (isSleepPaused) "PAUSED" else "TAP TO PAUSE",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isSleepPaused) Color.Red else Color.White.copy(alpha = 0.8f)
+                                )
+                            }
                         }
                     }
                 }
@@ -616,18 +633,32 @@ fun PlayerLayoutLandscape(
 
                     // Display Sleep Timer at the center
                     if (sleepTimerRemaining != null) {
+                        val isSleepPaused by viewModel.isSleepTimerPaused.collectAsState()
                         Box(
                             modifier = Modifier
-                                .size(80.dp)
-                                .background(Color.Black.copy(alpha = 0.5f), CircleShape),
+                                .size(120.dp) // FURTHER INCREASED SIZE FOR LANDSCAPE
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.7f))
+                                .combinedClickable(
+                                    onClick = { viewModel.toggleSleepTimerPause() },
+                                    onLongClick = { viewModel.resetSleepTimer() }
+                                ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = formatSleepTime(sleepTimerRemaining),
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Black),
-                                color = Color.White,
-                                textAlign = TextAlign.Center
-                            )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = formatSleepTime(sleepTimerRemaining),
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black, fontSize = 22.sp),
+                                    color = if (isSleepPaused) Color.Gray else Color.White,
+                                    textAlign = TextAlign.Center
+                                )
+                                Text(
+                                    text = if (isSleepPaused) "PAUSED" else "TAP TO PAUSE",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isSleepPaused) Color.Red else Color.White.copy(alpha = 0.8f),
+                                    fontSize = 9.sp
+                                )
+                            }
                         }
                     }
                 }

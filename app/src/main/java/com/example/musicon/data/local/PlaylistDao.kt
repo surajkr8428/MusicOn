@@ -33,4 +33,6 @@ interface PlaylistDao {
         ORDER BY pt.addedAt ASC
     """)
     fun getTracksForPlaylist(playlistId: String): Flow<List<TrackEntity>>
+    @Query("SELECT * FROM playlist_tracks")
+    suspend fun getAllPlaylistTracks(): List<PlaylistTrack>
 }

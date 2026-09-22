@@ -20,6 +20,7 @@ import androidx.work.WorkManager
 import com.example.musicon.data.LibraryViewMode
 import com.example.musicon.data.SettingsRepository
 import com.example.musicon.data.local.Playlist
+import com.example.musicon.data.local.PlaylistTrack
 import com.example.musicon.data.local.TrackEntity
 import com.example.musicon.data.remote.CloudStorageManager
 import com.example.musicon.service.SyncWorker
@@ -101,8 +102,7 @@ class MainViewModel(
     val localTracksCount: StateFlow<Int> = allTracks.map { it.count { t -> t.localPath != null } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
-    val cloudTracksCount: StateFlow<Int> = musicRepository.allTracks
-        .map { tracks -> tracks.count { it.gDriveId != null } }
+    val cloudTracksCount: StateFlow<Int> = allTracks.map { it.count { t -> t.gDriveId != null } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     // RESTORED PREFERENCES
@@ -202,11 +202,26 @@ class MainViewModel(
     fun resetSleepTimer() { sleepTimerJob?.cancel(); _sleepTimerRemaining.value = null; _isSleepTimerPaused.value = false }
     private fun startSleepTimerJob() {
         sleepTimerJob = viewModelScope.launch {
+            var lastTick = System.currentTimeMillis()
             while ((_sleepTimerRemaining.value ?: 0) > 0) {
-                if (!_isSleepTimerPaused.value) { delay(1000); _sleepTimerRemaining.value = (_sleepTimerRemaining.value ?: 0) - 1000 }
-                else delay(500)
+                delay(200) // Check pause state frequently
+                if (!_isSleepTimerPaused.value) {
+                    val now = System.currentTimeMillis()
+                    val diff = now - lastTick
+                    if (diff >= 1000) {
+                        _sleepTimerRemaining.value = (_sleepTimerRemaining.value ?: 0) - 1000
+                        lastTick = now
+                    }
+                } else {
+                    lastTick = System.currentTimeMillis() // Reset tick while paused
+                }
             }
-            if (_sleepTimerRemaining.value != null) { _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK); delay(500); _playbackCommand.emit(PlaybackCommand.CLOSE_APP); _sleepTimerRemaining.value = null }
+            if (_sleepTimerRemaining.value != null) { 
+                _playbackCommand.emit(PlaybackCommand.STOP_PLAYBACK)
+                delay(500)
+                _playbackCommand.emit(PlaybackCommand.CLOSE_APP)
+                _sleepTimerRemaining.value = null 
+            }
         }
     }
 
@@ -260,13 +275,27 @@ class MainViewModel(
 
     fun shareTrack(track: TrackEntity) {
         val path = track.localPath ?: run {
-            Toast.makeText(settingsRepository.context, "Cloud songs must be downloaded before sharing", Toast.LENGTH_SHORT).show()
+            viewModelScope.launch(Dispatchers.Main) {
+                Toast.makeText(settingsRepository.context, "Cloud songs must be downloaded before sharing", Toast.LENGTH_SHORT).show()
+            }
             return
         }
-        val file = File(path)
-        if (!file.exists()) return
+        
         try {
-            val uri = FileProvider.getUriForFile(settingsRepository.context, "${settingsRepository.context.packageName}.fileprovider", file)
+            val context = settingsRepository.context
+            val uri = if (path.startsWith("content://")) {
+                Uri.parse(path)
+            } else {
+                val file = File(path)
+                if (!file.exists()) {
+                    viewModelScope.launch(Dispatchers.Main) {
+                        Toast.makeText(context, "File not found on device", Toast.LENGTH_SHORT).show()
+                    }
+                    return
+                }
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            }
+
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "audio/*"
                 putExtra(Intent.EXTRA_STREAM, uri)
@@ -274,24 +303,35 @@ class MainViewModel(
             }
             val chooser = Intent.createChooser(intent, "Share Song")
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            settingsRepository.context.startActivity(chooser)
+            context.startActivity(chooser)
         } catch (e: Exception) {
-            Log.e("MainViewModel", "Sharing failed: ${e.message}")
-            Toast.makeText(settingsRepository.context, "Sharing failed", Toast.LENGTH_SHORT).show()
+            Log.e("MainViewModel", "Sharing failed: ${e.message}", e)
+            viewModelScope.launch(Dispatchers.Main) {
+                Toast.makeText(settingsRepository.context, "Sharing failed", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
     fun shareTracks(tracks: List<TrackEntity>) {
         if (tracks.isEmpty()) return
         val uris = ArrayList<Uri>()
+        val context = settingsRepository.context
         tracks.forEach { t -> 
-            t.localPath?.let { p -> 
-                val f = File(p)
-                if (f.exists()) {
-                    uris.add(FileProvider.getUriForFile(settingsRepository.context, "${settingsRepository.context.packageName}.fileprovider", f))
+            val path = t.localPath ?: return@forEach
+            try {
+                if (path.startsWith("content://")) {
+                    uris.add(Uri.parse(path))
+                } else {
+                    val f = File(path)
+                    if (f.exists()) {
+                        uris.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", f))
+                    }
                 }
-            } 
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Error adding URI for sharing", e)
+            }
         }
+        
         if (uris.isEmpty()) return
         try {
             val intent = Intent(if (uris.size == 1) Intent.ACTION_SEND else Intent.ACTION_SEND_MULTIPLE).apply {
@@ -302,7 +342,7 @@ class MainViewModel(
             }
             val chooser = Intent.createChooser(intent, "Share Songs")
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            settingsRepository.context.startActivity(chooser)
+            context.startActivity(chooser)
         } catch (e: Exception) {
             Log.e("MainViewModel", "Bulk sharing failed", e)
         }
@@ -458,8 +498,49 @@ class MainViewModel(
         Log.d("MainViewModel", "Setting as ringtone: ${track.displayName}")
     }
 
-    fun triggerBackup() = viewModelScope.launch { /* logic */ }
-    fun restoreFromCloud() = viewModelScope.launch { /* logic */ }
+    fun triggerBackup() = viewModelScope.launch(Dispatchers.IO) {
+        if (!isUserSignedIn.value) return@launch
+        try {
+            val playlists = musicRepository.allPlaylists.first()
+            val playlistTracks = musicRepository.getAllPlaylistTracks()
+            
+            val backupData = mapOf(
+                "playlists" to playlists,
+                "links" to playlistTracks
+            )
+            
+            val json = Gson().toJson(backupData)
+            musicRepository.cloudStorageManager.deleteFileByName("nirvaana_backup.json")
+            musicRepository.cloudStorageManager.uploadData("nirvaana_backup.json", json)
+            
+            Log.d("MainViewModel", "Backup successful")
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Backup failed", e)
+        }
+    }
+
+    fun restoreFromCloud() = viewModelScope.launch(Dispatchers.IO) {
+        if (!isUserSignedIn.value) return@launch
+        try {
+            val backupFile = musicRepository.cloudStorageManager.findFileByName("nirvaana_backup.json") ?: return@launch
+            
+            val json = musicRepository.cloudStorageManager.downloadData(backupFile.id) ?: return@launch
+            val backup = Gson().fromJson(json, Map::class.java)
+            
+            val playlistsJson = Gson().toJson(backup["playlists"])
+            val playlists = Gson().fromJson(playlistsJson, Array<Playlist>::class.java).toList()
+            
+            val linksJson = Gson().toJson(backup["links"])
+            val links = Gson().fromJson(linksJson, Array<PlaylistTrack>::class.java).toList()
+            
+            playlists.forEach { musicRepository.updatePlaylist(it) }
+            links.forEach { musicRepository.addTrackToPlaylist(it.playlistId, it.trackId) }
+            
+            Log.d("MainViewModel", "Restore successful")
+        } catch (e: Exception) {
+            Log.e("MainViewModel", "Restore failed", e)
+        }
+    }
     fun uploadTrack(t: TrackEntity) {
         if (t.localPath == null) return
         val data = Data.Builder()

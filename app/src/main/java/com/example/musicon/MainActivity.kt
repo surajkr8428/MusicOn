@@ -491,10 +491,13 @@ fun MusicOnApp(
             ModalNavigationDrawer(
                 drawerState = leftDrawerState,
                 drawerContent = {
-                    ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f), modifier = Modifier.width(adaptiveWidth)) {
+                    ModalDrawerSheet(
+                        drawerContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.95f),
+                        modifier = Modifier.width(adaptiveWidth)
+                    ) {
                         Column(
                             modifier = Modifier
-                                .fillMaxHeight()
+                                .fillMaxSize()
                                 .verticalScroll(rememberScrollState())
                         ) {
                             Spacer(Modifier.height(48.dp))
@@ -546,7 +549,7 @@ fun MusicOnApp(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Smartphone, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
                                     Spacer(Modifier.width(10.dp))
-                                    Text("Local: $localCount Songs", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp), color = Color.White)
+                                    Text("Local Songs: $localCount", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp), color = Color.White)
                                 }
                                 
                                 Spacer(Modifier.height(8.dp))
@@ -554,7 +557,7 @@ fun MusicOnApp(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.CloudQueue, null, tint = Color.Gray, modifier = Modifier.size(20.dp))
                                     Spacer(Modifier.width(10.dp))
-                                    Text("Cloud: $cloudCount Synced", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp), color = Color.White)
+                                    Text("Cloud Songs: $cloudCount", style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp), color = Color.White)
                                     Spacer(Modifier.weight(1f))
                                     
                                     val isSyncing = syncStatus is SyncStatus.Loading
@@ -583,14 +586,6 @@ fun MusicOnApp(
                             // Compact Sidebar Items
                             val sidePadding = Modifier.padding(horizontal = 12.dp)
                             
-                            NavigationDrawerItem(
-                                label = { Text("Create Playlist", fontSize = 14.sp) }, 
-                                selected = false, 
-                                onClick = { scope.launch { leftDrawerState.close() }; showCreatePlaylistDialog = true }, 
-                                icon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null, modifier = Modifier.size(20.dp)) }, 
-                                colors = NavigationDrawerItemDefaults.colors(unselectedContainerColor = Color.Transparent),
-                                modifier = sidePadding.height(40.dp)
-                            )
                             NavigationDrawerItem(
                                 label = { Text("Import Hub (Local)", fontSize = 14.sp) }, 
                                 selected = false, 
@@ -663,7 +658,7 @@ fun MusicOnApp(
                                     Scaffold(
                                         modifier = Modifier.fillMaxSize(),
                                         containerColor = Color.Transparent,
-                                        contentWindowInsets = WindowInsets.statusBars,
+                                        contentWindowInsets = WindowInsets.statusBars, // Restore insets for proper alignment
                                         bottomBar = { 
                                             MiniPlayer(
                                                 onNavigateToPlayer = { isPlayerVisible = true }, 
