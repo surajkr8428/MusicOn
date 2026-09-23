@@ -8,7 +8,8 @@ import androidx.room.ForeignKey
 data class Playlist(
     @PrimaryKey val id: String,
     val name: String,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val userEmail: String? = null
 )
 
 @Entity(

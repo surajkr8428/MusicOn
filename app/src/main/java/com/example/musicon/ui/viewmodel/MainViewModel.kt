@@ -56,6 +56,9 @@ class MainViewModel(
     private val _isUserSignedIn = mutableStateOf(false)
     val isUserSignedIn: State<Boolean> = _isUserSignedIn
 
+    private val _userEmail = MutableStateFlow<String?>(null)
+    val userEmail: StateFlow<String?> = _userEmail.asStateFlow()
+
     private val _isOnline = MutableStateFlow(true)
     val isOnline = _isOnline.asStateFlow()
 
@@ -94,8 +97,10 @@ class MainViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val allPlaylists: StateFlow<List<Playlist>> = musicRepository.allPlaylists
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val allPlaylists: StateFlow<List<Playlist>> = combine(musicRepository.allPlaylists, _userEmail) { playlists, email ->
+        if (email.isNullOrEmpty()) playlists
+        else playlists.filter { it.userEmail == null || it.userEmail == email }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val localTracksCount: StateFlow<Int> = allTracks.map { it.count { t -> t.localPath != null } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
@@ -446,8 +451,9 @@ class MainViewModel(
         }
     }
 
-    fun updateSignInStatus(signedIn: Boolean) { 
+    fun updateSignInStatus(signedIn: Boolean, email: String? = null) { 
         _isUserSignedIn.value = signedIn
+        _userEmail.value = email
         if (signedIn) {
             syncCloudTracks()
             restoreFromCloud()
@@ -461,7 +467,7 @@ class MainViewModel(
 
     init {
         viewModelScope.launch {
-            musicRepository.allPlaylists.first().let { if (it.none { p -> p.name == "Favorite" }) musicRepository.createPlaylist("Favorite") }
+            musicRepository.allPlaylists.first().let { if (it.none { p -> p.name == "Favorite" }) musicRepository.createPlaylist("Favorite", _userEmail.value) }
             allTracks.filter { it.isNotEmpty() }.first().let { tracks ->
                 val lastId = settingsRepository.lastTrackIdFlow.first()
                 val lastPos = settingsRepository.lastPositionFlow.first()
@@ -486,7 +492,7 @@ class MainViewModel(
         }
         triggerBackup()
     }
-    fun createPlaylist(name: String) = viewModelScope.launch { musicRepository.createPlaylist(name); triggerBackup() }
+    fun createPlaylist(name: String) = viewModelScope.launch { musicRepository.createPlaylist(name, _userEmail.value); triggerBackup() }
     fun removeTrackFromPlaylist(pId: String, tId: String) = viewModelScope.launch { musicRepository.removeTrackFromPlaylist(pId, tId) }
     fun getTracksForPlaylist(pId: String) = musicRepository.getTracksForPlaylist(pId)
 
@@ -551,7 +557,10 @@ class MainViewModel(
             val linksJson = Gson().toJson(backup["links"])
             val links = Gson().fromJson(linksJson, Array<PlaylistTrack>::class.java).toList()
             
-            playlists.forEach { musicRepository.updatePlaylist(it) }
+            playlists.forEach { p ->
+                val updatedP = if (_userEmail.value != null && p.userEmail == null) p.copy(userEmail = _userEmail.value) else p
+                musicRepository.insertPlaylist(updatedP)
+            }
             links.forEach { musicRepository.addTrackToPlaylist(it.playlistId, it.trackId) }
             
             Log.d("MainViewModel", "Restore successful")

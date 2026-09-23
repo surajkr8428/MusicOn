@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 class MusicRepository(
     private val context: Context,
@@ -132,6 +133,16 @@ class MusicRepository(
                     trackDao.updateTrack(updatedLocal)
                 }
             }
+
+            val validCloudIds = cloudFiles.map { it.id }.toSet()
+            allLocalTracks.filter { it.gDriveId != null && it.gDriveId !in validCloudIds }.forEach { stale ->
+                if (stale.localPath != null) {
+                    trackDao.updateTrack(stale.copy(gDriveId = null))
+                } else {
+                    trackDao.deleteTrack(stale)
+                }
+            }
+
             android.util.Log.d("MusicRepository", "Cloud sync completed successfully")
         } catch (e: Exception) {
             android.util.Log.e("MusicRepository", "Cloud sync failed", e)
@@ -180,9 +191,9 @@ class MusicRepository(
         trackDao.updateTrack(track.copy(isFavorite = !track.isFavorite))
     }
 
-    suspend fun createPlaylist(name: String): String {
-        val id = java.util.UUID.randomUUID().toString()
-        val playlist = Playlist(id = id, name = name)
+    suspend fun createPlaylist(name: String, userEmail: String? = null): String {
+        val id = UUID.randomUUID().toString()
+        val playlist = Playlist(id = id, name = name, userEmail = userEmail)
         playlistDao.insertPlaylist(playlist)
         return id
     }

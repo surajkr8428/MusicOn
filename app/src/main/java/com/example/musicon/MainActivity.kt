@@ -2,7 +2,6 @@ package com.example.musicon
 
 import android.Manifest
 import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -118,6 +117,7 @@ import com.example.musicon.ui.components.CircularSyncProgressBar
 import com.example.musicon.ui.components.CreatePlaylistDialog
 import com.example.musicon.ui.components.LocalCustomBackground
 import com.example.musicon.ui.components.LocalIsBackgroundBright
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
 import com.google.common.util.concurrent.ListenableFuture
@@ -126,16 +126,16 @@ class MainActivity : ComponentActivity() {
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var mediaController: MediaController? by mutableStateOf(null)
     
-    private var onSignInResult: ((Boolean) -> Unit)? = null
+    private var onSignInResult: ((GoogleSignInAccount?) -> Unit)? = null
 
     private val signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
         try {
             val account = task.getResult(ApiException::class.java)
-            onSignInResult?.invoke(account != null)
+            onSignInResult?.invoke(account)
         } catch (e: Exception) {
             Log.e("MusicOn", "Sign-in failed", e)
-            onSignInResult?.invoke(false)
+            onSignInResult?.invoke(null)
         }
     }
 
@@ -161,7 +161,7 @@ class MainActivity : ComponentActivity() {
             )
 
             LaunchedEffect(Unit) {
-                if (account != null) viewModel.updateSignInStatus(true)
+                if (account != null) viewModel.updateSignInStatus(true, account.email)
                 viewModel.scanLocalStorage()
                 intent?.let { handleIntent(it, viewModel) }
             }
@@ -356,10 +356,10 @@ class MainActivity : ComponentActivity() {
                                 mediaController = mediaController,
                                 isOnline = isOnline,
                                 onSignInClick = { 
-                                    onSignInResult = { success -> if (success) viewModel.updateSignInStatus(true) }
+                                    onSignInResult = { acc -> if (acc != null) viewModel.updateSignInStatus(true, acc.email) }
                                     triggerSignIn() 
                                 },
-                                onSignOutClick = { triggerSignOut(); viewModel.updateSignInStatus(false) }
+                                onSignOutClick = { triggerSignOut(); viewModel.updateSignInStatus(false, null) }
                             )
                         }
                     } else {
