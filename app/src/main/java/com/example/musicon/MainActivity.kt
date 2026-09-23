@@ -658,7 +658,7 @@ fun MusicOnApp(
                                     Scaffold(
                                         modifier = Modifier.fillMaxSize(),
                                         containerColor = Color.Transparent,
-                                        contentWindowInsets = WindowInsets.statusBars, // Restore insets for proper alignment
+                                        contentWindowInsets = WindowInsets(0, 0, 0, 0), // Let TopAppBars handle insets
                                         bottomBar = { 
                                             MiniPlayer(
                                                 onNavigateToPlayer = { isPlayerVisible = true }, 

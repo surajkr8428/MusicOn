@@ -63,6 +63,7 @@ import com.example.musicon.ui.components.RenameDialog
 import com.example.musicon.ui.components.CreatePlaylistDialog
 import com.example.musicon.ui.components.AddToPlaylistDialog
 import com.example.musicon.ui.components.EditTrackDialog
+import com.example.musicon.ui.components.PlaylistOptionsBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -94,6 +95,7 @@ fun LibraryScreen(
     var isSearchActive by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
     var selectedTrackOptions by remember { mutableStateOf<TrackEntity?>(null) }
+    var selectedPlaylistOptions by remember { mutableStateOf<Playlist?>(null) }
     var currentPlaylistDetail by remember { mutableStateOf<Playlist?>(null) }
     var showTrackInfoDialog by remember { mutableStateOf<TrackEntity?>(null) }
     var trackToRename by remember { mutableStateOf<TrackEntity?>(null) }
@@ -179,12 +181,12 @@ fun LibraryScreen(
                         }
                         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                             when (page) {
-                                0 -> SongsTab(viewModel.sessionRecentlyPlayed.collectAsState().value, selectedTrackIds, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(viewModel.sessionRecentlyPlayed.value, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it })
+                                0 -> SongsTab(viewModel.recentlyPlayed.collectAsState().value, selectedTrackIds, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(viewModel.recentlyPlayed.value, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it })
                                 1 -> SongsTab(tracks, selectedTrackIds, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(tracks, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it })
-                                2 -> PlaylistsTab(playlists, selectedPlaylistIds, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isPlaylistSelectionMode) selectedPlaylistIds = if (it.id in selectedPlaylistIds) selectedPlaylistIds - it.id else selectedPlaylistIds + it.id else currentPlaylistDetail = it }, { showCreatePlaylistDialog = true }, { selectedPlaylistIds = setOf(it.id) }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } }, viewModel)
-                                3 -> GroupedTab(allTracks, "Album", viewMode, rememberLazyListState(), { viewModel.playTrackList(allTracks, it.first()) }, viewModel)
-                                4 -> GroupedTab(allTracks, "Artist", viewMode, rememberLazyListState(), { viewModel.playTrackList(allTracks, it.first()) }, viewModel)
-                                5 -> GroupedTab(allTracks, "Genre", viewMode, rememberLazyListState(), { viewModel.playTrackList(allTracks, it.first()) }, viewModel)
+                                2 -> PlaylistsTab(playlists, selectedPlaylistIds, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isPlaylistSelectionMode) selectedPlaylistIds = if (it.id in selectedPlaylistIds) selectedPlaylistIds - it.id else selectedPlaylistIds + it.id else { /* Expansion handles click */ } }, { showCreatePlaylistDialog = true }, { selectedPlaylistIds = setOf(it.id) }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } }, viewModel, selectedTrackIds, { id -> selectedTrackIds = if (id in selectedTrackIds) selectedTrackIds - id else selectedTrackIds + id }, { selectedPlaylistOptions = it }, { selectedTrackOptions = it }, { showTrackInfoDialog = it }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } })
+                                3 -> GroupedTab(allTracks, "Album", viewMode, rememberLazyListState(), { viewModel.playTrackList(allTracks, it.first()) }, viewModel, selectedTrackIds, { id -> selectedTrackIds = if (id in selectedTrackIds) selectedTrackIds - id else selectedTrackIds + id }, { selectedTrackOptions = it }, { showTrackInfoDialog = it })
+                                4 -> GroupedTab(allTracks, "Artist", viewMode, rememberLazyListState(), { viewModel.playTrackList(allTracks, it.first()) }, viewModel, selectedTrackIds, { id -> selectedTrackIds = if (id in selectedTrackIds) selectedTrackIds - id else selectedTrackIds + id }, { selectedTrackOptions = it }, { showTrackInfoDialog = it })
+                                5 -> GroupedTab(allTracks, "Genre", viewMode, rememberLazyListState(), { viewModel.playTrackList(allTracks, it.first()) }, viewModel, selectedTrackIds, { id -> selectedTrackIds = if (id in selectedTrackIds) selectedTrackIds - id else selectedTrackIds + id }, { selectedTrackOptions = it }, { showTrackInfoDialog = it })
                                 else -> {
                                     val path = customFolders[page - 6]
                                     val fTracks = allTracks.filter { it.localPath?.startsWith(path) == true }
@@ -205,12 +207,11 @@ fun LibraryScreen(
                 "favorite" -> viewModel.toggleFavorite(selectedTrackOptions!!)
                 "play" -> viewModel.playTrack(selectedTrackOptions!!)
                 "play_next" -> viewModel.addToQueueNext(listOf(selectedTrackOptions!!))
-                "add_to_queue" -> viewModel.addToQueue(selectedTrackOptions!!)
                 "info" -> showTrackInfoDialog = selectedTrackOptions
                 "share" -> viewModel.shareTrack(selectedTrackOptions!!)
                 "delete" -> viewModel.bulkDelete(listOf(selectedTrackOptions!!))
                 "upload" -> viewModel.uploadTrack(selectedTrackOptions!!)
-                "remove" -> viewModel.removeFromLibrary(listOf(selectedTrackOptions!!))
+                "remove" -> { /* Handled contextually */ }
                 "rename" -> trackToRename = selectedTrackOptions
                 "ringtone" -> viewModel.setAsRingtone(selectedTrackOptions!!)
                 "cut" -> onOpenCutter(selectedTrackOptions!!)
@@ -222,8 +223,17 @@ fun LibraryScreen(
             if (action != "add_to_playlist") selectedTrackOptions = null
         })
     }
+    if (selectedPlaylistOptions != null) {
+        PlaylistOptionsBottomSheet(playlist = selectedPlaylistOptions!!, onDismiss = { selectedPlaylistOptions = null }, onAction = { action ->
+            when (action) {
+                "rename" -> playlistToRename = selectedPlaylistOptions
+                "delete" -> viewModel.bulkDeletePlaylists(listOf(selectedPlaylistOptions!!))
+            }
+            selectedPlaylistOptions = null
+        })
+    }
     if (showBulkPlaylistDialog && selectedTrackOptions != null) {
-        AddToPlaylistDialog(playlists = playlists, onDismiss = { showBulkPlaylistDialog = false; selectedTrackOptions = null }, onPlaylistSelected = { pid -> viewModel.bulkAddTracksToPlaylist(pid, listOf(selectedTrackOptions!!.id)); showBulkPlaylistDialog = false; selectedTrackOptions = null }, onCreateNew = { showBulkPlaylistDialog = false; showCreatePlaylistDialog = true })
+        AddToPlaylistDialog(playlists = playlists, onDismiss = { showBulkPlaylistDialog = false; selectedTrackOptions = null }, onPlaylistSelected = { pid -> viewModel.bulkAddTracksToPlaylist(pid, listOf(selectedTrackOptions!!.id)); showBulkPlaylistDialog = false; selectedTrackOptions = null }, onCreateNew = { showBulkPlaylistDialog = false; showCreatePlaylistDialog = true } )
     }
     if (showTrackInfoDialog != null) TechnicalInfoPopup(track = showTrackInfoDialog!!, onDismiss = { showTrackInfoDialog = null })
     if (trackToRename != null) RenameDialog(initialName = trackToRename!!.displayName, onDismiss = { trackToRename = null }, onConfirm = { viewModel.updateTrackMetadata(trackToRename!!.id, it, null, null, null, null); trackToRename = null })
@@ -259,8 +269,8 @@ fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: (
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (tracks.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Button(onClick = onAddSongs) { Text("Add Songs") } }
                 else {
-                    if (subViewMode == LibraryViewMode.GRID) LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 130.dp), modifier = Modifier.fillMaxSize()) { items(tracks) { track -> StellarGridItem(track, track.id in selectedIds, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = track }, { viewModel.toggleFavorite(track) }, { showTrackInfoDialog = it } ) } }
-                    else LazyColumn(Modifier.fillMaxSize()) { items(tracks) { track -> StellarTrackItem(track, track.id in selectedIds, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = track }, { viewModel.toggleFavorite(track) }, { showTrackInfoDialog = it } ) } }
+                    if (subViewMode == LibraryViewMode.GRID) LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 130.dp), modifier = Modifier.fillMaxSize()) { items(tracks) { track -> StellarGridItem(track, track.id in selectedIds, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it } ) } }
+                    else LazyColumn(Modifier.fillMaxSize()) { items(tracks) { track -> StellarTrackItem(track, track.id in selectedIds, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it } ) } }
                 }
             }
         }
@@ -271,7 +281,6 @@ fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: (
                     "favorite" -> viewModel.toggleFavorite(selectedTrackOptions!!)
                     "play" -> viewModel.playTrack(selectedTrackOptions!!)
                     "play_next" -> viewModel.addToQueueNext(listOf(selectedTrackOptions!!))
-                    "add_to_queue" -> viewModel.addToQueue(selectedTrackOptions!!)
                     "info" -> showTrackInfoDialog = selectedTrackOptions
                     "share" -> viewModel.shareTrack(selectedTrackOptions!!)
                     "delete" -> viewModel.bulkDelete(listOf(selectedTrackOptions!!))
@@ -301,18 +310,19 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
             IconButton(onClick = onMode) { Icon(if (mode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.White) }
             IconButton(onClick = onSettings) { Icon(Icons.Default.Settings, null, tint = Color.White) } 
         }, 
-        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
-        // Removed custom WindowInsets to fix overlap
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+        windowInsets = WindowInsets.statusBars
     )
 }
 
 @Composable fun SongsTab(tracks: List<TrackEntity>, selected: Set<String>, mode: LibraryViewMode, listState: LazyListState, gridState: LazyGridState, onClick: (TrackEntity) -> Unit, onLong: (TrackEntity) -> Unit, onOptions: (TrackEntity) -> Unit, onFav: (TrackEntity) -> Unit, onInfo: (TrackEntity) -> Unit) {
-    if (mode == LibraryViewMode.GRID) LazyVerticalGrid(state = gridState, columns = GridCells.Adaptive(minSize = 110.dp), modifier = Modifier.fillMaxSize()) { items(tracks) { StellarGridItem(it, it.id in selected, { onClick(it) }, { onLong(it) }, onOptions, onFav, onInfo) } }
+    if (mode == LibraryViewMode.GRID) LazyVerticalGrid(state = gridState, columns = GridCells.Fixed(5), modifier = Modifier.fillMaxSize()) { items(tracks) { StellarGridItem(it, it.id in selected, { onClick(it) }, { onLong(it) }, onOptions, onFav, onInfo) } }
     else LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { items(tracks) { StellarTrackItem(it, it.id in selected, { onClick(it) }, { onLong(it) }, onOptions, onFav, onInfo) } }
 }
 
-@Composable fun PlaylistsTab(playlists: List<Playlist>, selected: Set<String>, mode: LibraryViewMode, listState: LazyListState, gridState: LazyGridState, onClick: (Playlist) -> Unit, onCreate: () -> Unit, onLong: (Playlist) -> Unit, onAdd: (String) -> Unit, viewModel: MainViewModel) {
+@Composable fun PlaylistsTab(playlists: List<Playlist>, selected: Set<String>, mode: LibraryViewMode, listState: LazyListState, gridState: LazyGridState, onClick: (Playlist) -> Unit, onCreate: () -> Unit, onLong: (Playlist) -> Unit, onAdd: (String) -> Unit, viewModel: MainViewModel, selectedTrackIds: Set<String>, onTrackClick: (String) -> Unit, onOptions: (Playlist) -> Unit, onTrackOptions: (TrackEntity) -> Unit, onTrackInfo: (TrackEntity) -> Unit, onAddSongsToPlaylist: (String) -> Unit) {
     var expandedPlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
+    var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.LIST) }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
         item { 
@@ -332,7 +342,21 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                     headlineContent = { Text(playlist.name, color = Color.White) }, 
                     leadingContent = { Icon(getPlaylistIcon(playlist.name), null, tint = Color.White) },
                     trailingContent = {
-                        Icon(if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = Color.Gray)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isExpanded) {
+                                val currentTracks by viewModel.getTracksForPlaylist(playlist.id).collectAsState(emptyList())
+                                IconButton(onClick = { viewModel.shareTracks(currentTracks) }) {
+                                    Icon(Icons.Default.Share, "Share All", tint = Color.Gray)
+                                }
+                                IconButton(onClick = { subViewMode = if (subViewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) {
+                                    Icon(if (subViewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.Gray)
+                                }
+                            }
+                            IconButton(onClick = { onOptions(playlist) }) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
+                            IconButton(onClick = { expandedPlaylistId = if (isExpanded) null else playlist.id }) {
+                                Icon(if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = Color.Gray)
+                            }
+                        }
                     },
                     modifier = Modifier.combinedClickable(
                         onClick = { expandedPlaylistId = if (isExpanded) null else playlist.id }, 
@@ -343,20 +367,58 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                 
                 AnimatedVisibility(visible = isExpanded) {
                     val tracks by viewModel.getTracksForPlaylist(playlist.id).collectAsState(emptyList())
-                    Column(Modifier.padding(start = 16.dp).background(Color.White.copy(0.03f))) {
-                        if (tracks.isEmpty()) {
-                            Text("No songs in this playlist", color = Color.Gray, modifier = Modifier.padding(16.dp), fontSize = 12.sp)
-                        } else {
-                            tracks.forEach { track ->
-                                StellarTrackItem(
-                                    track = track,
-                                    isSelected = false,
-                                    onPlay = { viewModel.playTrackList(tracks, track, playlist.id) },
-                                    onLongClick = { },
-                                    onOptions = { },
-                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onInfo = { }
-                                )
+                    Surface(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .fillMaxWidth()
+                            .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                        color = Color.White.copy(alpha = 0.05f),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(Modifier.padding(8.dp)) {
+                            if (tracks.isEmpty()) {
+                                Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("No songs in this playlist", color = Color.Gray, fontSize = 12.sp)
+                                    Spacer(Modifier.height(8.dp))
+                                    Button(onClick = { onAddSongsToPlaylist(playlist.id) }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(0.2f))) {
+                                        Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Add Songs", color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                            } else {
+                                if (subViewMode == LibraryViewMode.GRID) {
+                                    LazyVerticalGrid(
+                                        columns = GridCells.Fixed(5),
+                                        modifier = Modifier.heightIn(max = 2000.dp)
+                                    ) {
+                                        items(tracks) { track ->
+                                            StellarGridItem(
+                                                track = track,
+                                                isSelected = track.id in selectedTrackIds,
+                                                onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(tracks, track, playlist.id) },
+                                                onLongClick = { onTrackClick(track.id) },
+                                                onOptions = onTrackOptions,
+                                                onFav = { viewModel.toggleFavorite(it) },
+                                                onInfo = onTrackInfo
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Column {
+                                        tracks.forEach { track ->
+                                            StellarTrackItem(
+                                                track = track,
+                                                isSelected = track.id in selectedTrackIds,
+                                                onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(tracks, track, playlist.id) },
+                                                onLongClick = { onTrackClick(track.id) },
+                                                onOptions = onTrackOptions,
+                                                onToggleFavorite = { viewModel.toggleFavorite(it) },
+                                                onInfo = onTrackInfo
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -366,7 +428,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
     }
 }
 
-@Composable fun GroupedTab(allTracks: List<TrackEntity>, type: String, mode: LibraryViewMode, listState: LazyListState, onPlay: (List<TrackEntity>) -> Unit, viewModel: MainViewModel) {
+@Composable fun GroupedTab(allTracks: List<TrackEntity>, type: String, mode: LibraryViewMode, listState: LazyListState, onPlay: (List<TrackEntity>) -> Unit, viewModel: MainViewModel, selectedTrackIds: Set<String>, onTrackClick: (String) -> Unit, onTrackOptions: (TrackEntity) -> Unit, onTrackInfo: (TrackEntity) -> Unit) {
     val grouped = remember(allTracks, type) { 
         when(type) { 
             "Album" -> allTracks.groupBy { it.displayAlbum }
@@ -375,6 +437,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
         } 
     }
     var expandedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
+    var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.LIST) }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) { 
         grouped.forEach { (name, gTracks) -> 
@@ -385,23 +448,66 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                         headlineContent = { Text(name ?: "Unknown", color = Color.White) }, 
                         supportingContent = { Text("${gTracks.size} songs") },
                         trailingContent = {
-                            Icon(if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = Color.Gray)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isExpanded) {
+                                    IconButton(onClick = { viewModel.shareTracks(gTracks) }) {
+                                        Icon(Icons.Default.Share, "Share All", tint = Color.Gray)
+                                    }
+                                    IconButton(onClick = { subViewMode = if (subViewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) {
+                                        Icon(if (subViewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.Gray)
+                                    }
+                                }
+                                IconButton(onClick = { expandedGroupName = if (isExpanded) null else name }) {
+                                    Icon(if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = Color.Gray)
+                                }
+                            }
                         },
-                        modifier = Modifier.clickable { expandedGroupName = if (isExpanded) null else name }
+                        modifier = Modifier.clickable { expandedGroupName = if (isExpanded) null else name },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent) // Force transparent background
                     )
                     
                     AnimatedVisibility(visible = isExpanded) {
-                        Column(Modifier.padding(start = 16.dp).background(Color.White.copy(0.03f))) {
-                            gTracks.forEach { track ->
-                                StellarTrackItem(
-                                    track = track,
-                                    isSelected = false,
-                                    onPlay = { viewModel.playTrackList(gTracks, track) },
-                                    onLongClick = { },
-                                    onOptions = { },
-                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                    onInfo = { }
-                                )
+                        Surface(
+                            modifier = Modifier
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                                .fillMaxWidth()
+                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                            color = Color.White.copy(alpha = 0.05f),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(Modifier.padding(8.dp)) {
+                                if (subViewMode == LibraryViewMode.GRID) {
+                                    LazyVerticalGrid(
+                                        columns = GridCells.Fixed(5),
+                                        modifier = Modifier.heightIn(max = 2000.dp)
+                                    ) {
+                                        items(gTracks) { track ->
+                                            StellarGridItem(
+                                                track = track,
+                                                isSelected = track.id in selectedTrackIds,
+                                                onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(gTracks, track) },
+                                                onLongClick = { onTrackClick(track.id) },
+                                                onOptions = onTrackOptions,
+                                                onFav = { viewModel.toggleFavorite(it) },
+                                                onInfo = onTrackInfo
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Column {
+                                        gTracks.forEach { track ->
+                                            StellarTrackItem(
+                                                track = track,
+                                                isSelected = track.id in selectedTrackIds,
+                                                onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(gTracks, track) },
+                                                onLongClick = { onTrackClick(track.id) },
+                                                onOptions = onTrackOptions,
+                                                onToggleFavorite = { viewModel.toggleFavorite(it) },
+                                                onInfo = onTrackInfo
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -417,6 +523,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
         Box {
             AsyncImage(model = track.customCoverPath ?: track.localPath, contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
             if (track.gDriveId != null) Icon(Icons.Default.Cloud, null, tint = Color.Cyan, modifier = Modifier.size(16.dp).align(Alignment.TopStart).background(Color.Black.copy(0.4f), CircleShape).padding(2.dp))
+            if (track.isFavorite) Icon(Icons.Default.Favorite, null, tint = Color.Red, modifier = Modifier.size(14.dp).align(Alignment.BottomStart).background(Color.Black.copy(0.4f), CircleShape).padding(2.dp))
         }
         Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) { 
             Text(track.displayName, color = LavenderTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -445,6 +552,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
         Box {
             AsyncImage(model = track.customCoverPath ?: track.localPath, contentDescription = null, modifier = Modifier.aspectRatio(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
             if (track.gDriveId != null) Icon(Icons.Default.Cloud, null, tint = Color.Cyan, modifier = Modifier.size(20.dp).align(Alignment.TopStart).background(Color.Black.copy(0.4f), CircleShape).padding(4.dp))
+            if (track.isFavorite) Icon(Icons.Default.Favorite, null, tint = Color.Red, modifier = Modifier.size(18.dp).align(Alignment.BottomStart).background(Color.Black.copy(0.4f), CircleShape).padding(4.dp))
             
             IconButton(onClick = { onFav(track) }, modifier = Modifier.align(Alignment.TopStart).padding(start = 24.dp).size(28.dp)) {
                 Icon(if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (track.isFavorite) Color.Red else Color.White, modifier = Modifier.size(18.dp))
@@ -468,7 +576,12 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun SelectionTopBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Unit, title: String) {
-    TopAppBar(title = { Text(if (title == "selected") "$count Selected" else title) }, navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Default.Close, null) } }, actions = { IconButton(onClick = onSelectAll) { Icon(Icons.Default.SelectAll, null) } })
+    TopAppBar(
+        title = { Text(if (title == "selected") "$count Selected" else title) }, 
+        navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.Default.Close, null) } }, 
+        actions = { IconButton(onClick = onSelectAll) { Icon(Icons.Default.SelectAll, null) } },
+        windowInsets = WindowInsets.statusBars // Align below status bar
+    )
 }
 
 @Composable fun SelectionBottomBar(onPlay: () -> Unit, onNext: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit) {
@@ -485,10 +598,22 @@ private fun getPlaylistIcon(name: String): ImageVector {
         Icons.Default.Person, Icons.Default.History, Icons.Default.Audiotrack,
         Icons.Default.Headphones, Icons.Default.LibraryMusic, Icons.Default.Radio,
         Icons.Default.Piano, Icons.Default.Mic, Icons.Default.GraphicEq,
-        Icons.Default.Speaker, Icons.AutoMirrored.Filled.VolumeUp, Icons.Default.MusicVideo
+        Icons.Default.Speaker, Icons.AutoMirrored.Filled.VolumeUp, Icons.Default.MusicVideo,
+        Icons.Default.DiscFull, Icons.AutoMirrored.Filled.LibraryBooks, Icons.Default.Collections,
+        Icons.Default.FolderSpecial, Icons.Default.AutoAwesome, Icons.Default.Celebration,
+        Icons.Default.Nightlife, Icons.Default.SelfImprovement, Icons.Default.Brush,
+        Icons.Default.Explore, Icons.Default.Star, Icons.Default.Favorite,
+        Icons.Default.ThumbUp, Icons.Default.Bolt, Icons.Default.Whatshot
     )
-    if (name.lowercase().contains("fav")) return Icons.Default.Favorite
-    if (name.lowercase().contains("recent")) return Icons.Default.History
-    if (name.lowercase().contains("cloud")) return Icons.Default.Cloud
+    val lowerName = name.lowercase()
+    if (lowerName.contains("fav")) return Icons.Default.Favorite
+    if (lowerName.contains("recent")) return Icons.Default.History
+    if (lowerName.contains("cloud")) return Icons.Default.Cloud
+    if (lowerName.contains("party")) return Icons.Default.Nightlife
+    if (lowerName.contains("relax")) return Icons.Default.SelfImprovement
+    if (lowerName.contains("gym") || lowerName.contains("work")) return Icons.Default.Bolt
+    if (lowerName.contains("top") || lowerName.contains("best")) return Icons.Default.Whatshot
+    
+    // Hash-based unique assignment from a larger pool
     return icons[Math.abs(name.hashCode()) % icons.size]
 }

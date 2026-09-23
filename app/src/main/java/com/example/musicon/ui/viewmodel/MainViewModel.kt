@@ -85,11 +85,9 @@ class MainViewModel(
     val allTracks: StateFlow<List<TrackEntity>> = musicRepository.allTracks
         .map { tracks ->
             tracks.filter { it.localPath != null || it.gDriveId != null }
-                .sortedByDescending { it.localPath != null } // Prefer local entries
                 .distinctBy { 
                     val cleanTitle = (it.customTitle ?: it.title).lowercase().trim().replace(" ", "")
                     val cleanArtist = (it.customArtist ?: it.artist).lowercase().trim().replace(" ", "")
-                    // Include duration to distinguish same name songs
                     "${cleanTitle}_${cleanArtist}_${it.duration / 1000}"
                 }
                 .sortedBy { it.displayName.lowercase() }
@@ -104,6 +102,12 @@ class MainViewModel(
 
     val cloudTracksCount: StateFlow<Int> = allTracks.map { it.count { t -> t.gDriveId != null } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+        
+    val recentlyPlayed: StateFlow<List<TrackEntity>> = allTracks.map { tracks ->
+        tracks.filter { it.lastPlayed > 0 }
+            .sortedByDescending { it.lastPlayed }
+            .take(50)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // RESTORED PREFERENCES
     val pauseOnDetach: StateFlow<Boolean> = settingsRepository.pauseOnDetachFlow
@@ -348,8 +352,15 @@ class MainViewModel(
         }
     }
 
-    fun renamePlaylist(pId: String, name: String) = viewModelScope.launch { val p = allPlaylists.value.find { it.id == pId } ?: return@launch; musicRepository.updatePlaylist(p.copy(name = name)) }
-    fun deletePlaylist(p: Playlist) = viewModelScope.launch { musicRepository.deletePlaylist(p) }
+    fun renamePlaylist(pId: String, name: String) = viewModelScope.launch { 
+        val p = allPlaylists.value.find { it.id == pId } ?: return@launch
+        musicRepository.updatePlaylist(p.copy(name = name))
+        triggerBackup()
+    }
+    fun deletePlaylist(p: Playlist) = viewModelScope.launch { 
+        musicRepository.deletePlaylist(p)
+        triggerBackup()
+    }
 
     fun bulkDeletePlaylists(playlists: List<Playlist>) = viewModelScope.launch {
         playlists.forEach { musicRepository.deletePlaylist(it) }
@@ -369,7 +380,8 @@ class MainViewModel(
     fun addToQueueNext(tracks: List<TrackEntity>) { val q = _playbackQueue.value.toMutableList(); val i = q.indexOfFirst { it.id == _currentPlayingTrackId.value }; if (i != -1) q.addAll(i + 1, tracks) else q.addAll(tracks); _playbackQueue.value = q }
 
     fun bulkAddTracksToPlaylist(pId: String, ids: List<String>) = viewModelScope.launch { 
-        ids.forEach { musicRepository.addTrackToPlaylist(pId, it) } 
+        ids.forEach { musicRepository.addTrackToPlaylist(pId, it) }
+        triggerBackup()
     }
     
     fun addToQueue(track: TrackEntity) {
@@ -434,7 +446,13 @@ class MainViewModel(
         }
     }
 
-    fun updateSignInStatus(signedIn: Boolean) { _isUserSignedIn.value = signedIn; if (signedIn) syncCloudTracks() }
+    fun updateSignInStatus(signedIn: Boolean) { 
+        _isUserSignedIn.value = signedIn
+        if (signedIn) {
+            syncCloudTracks()
+            restoreFromCloud()
+        }
+    }
     fun syncCloudTracks() = viewModelScope.launch { try { musicRepository.syncCloudTracks() } catch (e: Exception) {} }
     fun scanLocalStorage() = viewModelScope.launch { try { musicRepository.scanLocalStorage() } catch (e: Exception) {} }
     fun importLocalTracks(uris: List<Uri>) = viewModelScope.launch { musicRepository.importLocalTracks(uris) }

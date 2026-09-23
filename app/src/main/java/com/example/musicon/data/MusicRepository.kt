@@ -199,6 +199,10 @@ class MusicRepository(
         playlistDao.updatePlaylist(playlist)
     }
 
+    suspend fun insertPlaylist(playlist: Playlist) {
+        playlistDao.insertPlaylist(playlist)
+    }
+
     suspend fun deletePlaylist(playlist: Playlist) {
         playlistDao.deletePlaylist(playlist)
     }
