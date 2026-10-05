@@ -292,6 +292,26 @@ fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: (
     var showTrackInfoDialog by remember { mutableStateOf<TrackEntity?>(null) }
     var trackToRename by remember { mutableStateOf<TrackEntity?>(null) }
     val isSelectionMode = selectedIds.isNotEmpty()
+
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+
+    LaunchedEffect(currentPlayingTrack?.id, tracks) {
+        val targetId = currentPlayingTrack?.id
+        if (targetId != null && tracks.isNotEmpty()) {
+            val targetIndex = tracks.indexOfFirst { it.id == targetId }
+            if (targetIndex >= 0) {
+                try {
+                    if (subViewMode == LibraryViewMode.GRID) {
+                        gridState.animateScrollToItem(targetIndex)
+                    } else {
+                        listState.animateScrollToItem(targetIndex)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     BackHandler(isSelectionMode) { selectedIds = emptySet() }
     StellarBackground {
         Scaffold(
@@ -309,8 +329,8 @@ fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: (
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (tracks.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Button(onClick = onAddSongs) { Text("Add Songs") } }
                 else {
-                    if (subViewMode == LibraryViewMode.GRID) LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxSize()) { items(tracks) { track -> StellarGridItem(track, track.id in selectedIds, track.id == currentPlayingTrack?.id, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) } ) } }
-                    else LazyColumn(Modifier.fillMaxSize()) { items(tracks) { track -> StellarTrackItem(track, track.id in selectedIds, track.id == currentPlayingTrack?.id, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) } ) } }
+                    if (subViewMode == LibraryViewMode.GRID) LazyVerticalGrid(state = gridState, columns = GridCells.Fixed(4), modifier = Modifier.fillMaxSize()) { items(tracks) { track -> StellarGridItem(track, track.id in selectedIds, track.id == currentPlayingTrack?.id, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) } ) } }
+                    else LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { items(tracks) { track -> StellarTrackItem(track, track.id in selectedIds, track.id == currentPlayingTrack?.id, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) } ) } }
                 }
             }
         }
@@ -370,6 +390,22 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
     onUpload: (TrackEntity) -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(currentPlayingTrackId, tracks) {
+        if (currentPlayingTrackId != null && tracks.isNotEmpty()) {
+            val targetIndex = tracks.indexOfFirst { it.id == currentPlayingTrackId }
+            if (targetIndex >= 0) {
+                try {
+                    if (mode == LibraryViewMode.GRID) {
+                        gridState.animateScrollToItem(targetIndex)
+                    } else {
+                        listState.animateScrollToItem(targetIndex)
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         if (mode == LibraryViewMode.GRID) {
             LazyVerticalGrid(
