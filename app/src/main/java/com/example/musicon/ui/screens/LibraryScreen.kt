@@ -3,11 +3,13 @@ package com.example.musicon.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -33,6 +35,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import com.example.musicon.ui.components.MultiSelectSongDialog
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import android.content.res.Configuration
@@ -81,6 +88,7 @@ fun LibraryScreen(
     val searchQuery by viewModel.searchQuery
     val sortOrder by viewModel.songSortOrder.collectAsState()
     val viewMode by viewModel.libraryViewMode.collectAsState()
+    val currentPlayingTrack by viewModel.currentPlayingTrack.collectAsState()
     val isOnline by viewModel.isOnline.collectAsState()
     val syncStatus by CloudSyncManager.status.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
@@ -153,7 +161,20 @@ fun LibraryScreen(
                     if (addingToPlaylistId != null) {
                         Surface(color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.fillMaxWidth().height(70.dp)) {
                             Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                                Button(onClick = { viewModel.bulkAddTracksToPlaylist(addingToPlaylistId!!, selectedTrackIds.toList()); selectedTrackIds = emptySet(); addingToPlaylistId = null }, enabled = selectedTrackIds.isNotEmpty()) { Icon(Icons.Default.Check, null); Spacer(Modifier.width(8.dp)); Text("Add ${selectedTrackIds.size} songs") }
+                                Button(
+                                    onClick = { 
+                                        val targetPid = addingToPlaylistId!!
+                                        viewModel.bulkAddTracksToPlaylist(targetPid, selectedTrackIds.toList())
+                                        selectedTrackIds = emptySet()
+                                        addingToPlaylistId = null 
+                                        playlists.find { it.id == targetPid }?.let { currentPlaylistDetail = it }
+                                    }, 
+                                    enabled = selectedTrackIds.isNotEmpty()
+                                ) { 
+                                    Icon(Icons.Default.Check, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Add ${selectedTrackIds.size} songs") 
+                                }
                             }
                         }
                     } else if (isTrackSelectionMode) {
@@ -180,9 +201,10 @@ fun LibraryScreen(
                             }
                         }
                         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                            val currentTrackId = currentPlayingTrack?.id
                             when (page) {
-                                0 -> SongsTab(viewModel.recentlyPlayed.collectAsState().value, selectedTrackIds, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(viewModel.recentlyPlayed.value, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it })
-                                1 -> SongsTab(tracks, selectedTrackIds, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(tracks, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it })
+                                0 -> SongsTab(viewModel.recentlyPlayed.collectAsState().value, selectedTrackIds, currentTrackId, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(viewModel.recentlyPlayed.value, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) })
+                                1 -> SongsTab(tracks, selectedTrackIds, currentTrackId, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(tracks, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) })
                                 2 -> PlaylistsTab(playlists, selectedPlaylistIds, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isPlaylistSelectionMode) selectedPlaylistIds = if (it.id in selectedPlaylistIds) selectedPlaylistIds - it.id else selectedPlaylistIds + it.id else { /* Expansion handles click */ } }, { showCreatePlaylistDialog = true }, { selectedPlaylistIds = setOf(it.id) }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } }, viewModel, selectedTrackIds, { id -> selectedTrackIds = if (id in selectedTrackIds) selectedTrackIds - id else selectedTrackIds + id }, { selectedPlaylistOptions = it }, { selectedTrackOptions = it }, { showTrackInfoDialog = it }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } })
                                 3 -> GroupedTab(allTracks, "Album", viewMode, rememberLazyListState(), { viewModel.playTrackList(allTracks, it.first()) }, viewModel, selectedTrackIds, { id -> selectedTrackIds = if (id in selectedTrackIds) selectedTrackIds - id else selectedTrackIds + id }, { selectedTrackOptions = it }, { showTrackInfoDialog = it })
                                 4 -> GroupedTab(allTracks, "Artist", viewMode, rememberLazyListState(), { viewModel.playTrackList(allTracks, it.first()) }, viewModel, selectedTrackIds, { id -> selectedTrackIds = if (id in selectedTrackIds) selectedTrackIds - id else selectedTrackIds + id }, { selectedTrackOptions = it }, { showTrackInfoDialog = it })
@@ -190,7 +212,7 @@ fun LibraryScreen(
                                 else -> {
                                     val path = customFolders[page - 6]
                                     val fTracks = allTracks.filter { it.localPath?.startsWith(path) == true }
-                                    SongsTab(fTracks, selectedTrackIds, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(fTracks, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it })
+                                    SongsTab(fTracks, selectedTrackIds, currentTrackId, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(fTracks, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) })
                                 }
                             }
                         }
@@ -226,6 +248,13 @@ fun LibraryScreen(
     if (selectedPlaylistOptions != null) {
         PlaylistOptionsBottomSheet(playlist = selectedPlaylistOptions!!, onDismiss = { selectedPlaylistOptions = null }, onAction = { action ->
             when (action) {
+                "play" -> {
+                    val p = selectedPlaylistOptions!!
+                    scope.launch {
+                        val pt = viewModel.getTracksForPlaylist(p.id).first()
+                        if (pt.isNotEmpty()) viewModel.playTrackList(pt, pt.first(), p.id)
+                    }
+                }
                 "rename" -> playlistToRename = selectedPlaylistOptions
                 "delete" -> viewModel.bulkDeletePlaylists(listOf(selectedPlaylistOptions!!))
             }
@@ -233,7 +262,17 @@ fun LibraryScreen(
         })
     }
     if (showBulkPlaylistDialog && selectedTrackOptions != null) {
-        AddToPlaylistDialog(playlists = playlists, onDismiss = { showBulkPlaylistDialog = false; selectedTrackOptions = null }, onPlaylistSelected = { pid -> viewModel.bulkAddTracksToPlaylist(pid, listOf(selectedTrackOptions!!.id)); showBulkPlaylistDialog = false; selectedTrackOptions = null }, onCreateNew = { showBulkPlaylistDialog = false; showCreatePlaylistDialog = true } )
+        AddToPlaylistDialog(
+            playlists = playlists, 
+            onDismiss = { showBulkPlaylistDialog = false; selectedTrackOptions = null }, 
+            onPlaylistSelected = { pid -> 
+                viewModel.bulkAddTracksToPlaylist(pid, listOf(selectedTrackOptions!!.id))
+                playlists.find { it.id == pid }?.let { currentPlaylistDetail = it }
+                showBulkPlaylistDialog = false
+                selectedTrackOptions = null 
+            }, 
+            onCreateNew = { showBulkPlaylistDialog = false; showCreatePlaylistDialog = true } 
+        )
     }
     if (showTrackInfoDialog != null) TechnicalInfoPopup(track = showTrackInfoDialog!!, onDismiss = { showTrackInfoDialog = null })
     if (trackToRename != null) RenameDialog(initialName = trackToRename!!.displayName, onDismiss = { trackToRename = null }, onConfirm = { viewModel.updateTrackMetadata(trackToRename!!.id, it, null, null, null, null); trackToRename = null })
@@ -246,6 +285,7 @@ fun LibraryScreen(
 @Composable
 fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: () -> Unit, viewMode: LibraryViewMode, isLandscape: Boolean, onAddSongs: () -> Unit, onOpenCutter: (TrackEntity) -> Unit) {
     val tracks by viewModel.getTracksForPlaylist(playlist.id).collectAsState(emptyList())
+    val currentPlayingTrack by viewModel.currentPlayingTrack.collectAsState()
     var selectedIds by remember { mutableStateOf(setOf<String>()) }
     var selectedTrackOptions by remember { mutableStateOf<TrackEntity?>(null) }
     var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.GRID) }
@@ -269,8 +309,8 @@ fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: (
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (tracks.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Button(onClick = onAddSongs) { Text("Add Songs") } }
                 else {
-                    if (subViewMode == LibraryViewMode.GRID) LazyVerticalGrid(columns = GridCells.Adaptive(minSize = 130.dp), modifier = Modifier.fillMaxSize()) { items(tracks) { track -> StellarGridItem(track, track.id in selectedIds, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it } ) } }
-                    else LazyColumn(Modifier.fillMaxSize()) { items(tracks) { track -> StellarTrackItem(track, track.id in selectedIds, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it } ) } }
+                    if (subViewMode == LibraryViewMode.GRID) LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxSize()) { items(tracks) { track -> StellarGridItem(track, track.id in selectedIds, track.id == currentPlayingTrack?.id, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) } ) } }
+                    else LazyColumn(Modifier.fillMaxSize()) { items(tracks) { track -> StellarTrackItem(track, track.id in selectedIds, track.id == currentPlayingTrack?.id, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) } ) } }
                 }
             }
         }
@@ -279,7 +319,7 @@ fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: (
             TrackOptionsBottomSheet(track = selectedTrackOptions!!, onDismiss = { selectedTrackOptions = null }, onAction = { action ->
                 when (action) {
                     "favorite" -> viewModel.toggleFavorite(selectedTrackOptions!!)
-                    "play" -> viewModel.playTrack(selectedTrackOptions!!)
+                    "play" -> viewModel.playTrackList(tracks, selectedTrackOptions!!, playlist.id)
                     "play_next" -> viewModel.addToQueueNext(listOf(selectedTrackOptions!!))
                     "info" -> showTrackInfoDialog = selectedTrackOptions
                     "share" -> viewModel.shareTrack(selectedTrackOptions!!)
@@ -315,9 +355,55 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
     )
 }
 
-@Composable fun SongsTab(tracks: List<TrackEntity>, selected: Set<String>, mode: LibraryViewMode, listState: LazyListState, gridState: LazyGridState, onClick: (TrackEntity) -> Unit, onLong: (TrackEntity) -> Unit, onOptions: (TrackEntity) -> Unit, onFav: (TrackEntity) -> Unit, onInfo: (TrackEntity) -> Unit) {
-    if (mode == LibraryViewMode.GRID) LazyVerticalGrid(state = gridState, columns = GridCells.Fixed(5), modifier = Modifier.fillMaxSize()) { items(tracks) { StellarGridItem(it, it.id in selected, { onClick(it) }, { onLong(it) }, onOptions, onFav, onInfo) } }
-    else LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { items(tracks) { StellarTrackItem(it, it.id in selected, { onClick(it) }, { onLong(it) }, onOptions, onFav, onInfo) } }
+@Composable fun SongsTab(
+    tracks: List<TrackEntity>, 
+    selected: Set<String>, 
+    currentPlayingTrackId: String? = null,
+    mode: LibraryViewMode = LibraryViewMode.LIST, 
+    listState: LazyListState = rememberLazyListState(), 
+    gridState: LazyGridState = rememberLazyGridState(), 
+    onClick: (TrackEntity) -> Unit = {}, 
+    onLong: (TrackEntity) -> Unit = {}, 
+    onOptions: (TrackEntity) -> Unit = {}, 
+    onFav: (TrackEntity) -> Unit = {}, 
+    onInfo: (TrackEntity) -> Unit = {},
+    onUpload: (TrackEntity) -> Unit = {}
+) {
+    val scope = rememberCoroutineScope()
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (mode == LibraryViewMode.GRID) {
+            LazyVerticalGrid(
+                state = gridState, 
+                columns = GridCells.Fixed(4), 
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 80.dp, end = 24.dp)
+            ) { 
+                items(tracks) { track -> 
+                    StellarGridItem(track, track.id in selected, track.id == currentPlayingTrackId, { onClick(track) }, { onLong(track) }, onOptions, onFav, onInfo, onUpload) 
+                } 
+            }
+            AlphabetFastScroller(
+                tracks = tracks,
+                onScrollTo = { targetIndex -> scope.launch { gridState.scrollToItem(targetIndex) } },
+                modifier = Modifier.align(Alignment.CenterEnd)
+            )
+        } else {
+            LazyColumn(
+                state = listState, 
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 80.dp, end = 24.dp)
+            ) { 
+                items(tracks) { track -> 
+                    StellarTrackItem(track, track.id in selected, track.id == currentPlayingTrackId, { onClick(track) }, { onLong(track) }, onOptions, onFav, onInfo, onUpload) 
+                } 
+            }
+            AlphabetFastScroller(
+                tracks = tracks,
+                onScrollTo = { targetIndex -> scope.launch { listState.scrollToItem(targetIndex) } },
+                modifier = Modifier.align(Alignment.CenterEnd)
+            )
+        }
+    }
 }
 
 @Composable fun PlaylistsTab(playlists: List<Playlist>, selected: Set<String>, mode: LibraryViewMode, listState: LazyListState, gridState: LazyGridState, onClick: (Playlist) -> Unit, onCreate: () -> Unit, onLong: (Playlist) -> Unit, onAdd: (String) -> Unit, viewModel: MainViewModel, selectedTrackIds: Set<String>, onTrackClick: (String) -> Unit, onOptions: (Playlist) -> Unit, onTrackOptions: (TrackEntity) -> Unit, onTrackInfo: (TrackEntity) -> Unit, onAddSongsToPlaylist: (String) -> Unit) {
@@ -343,6 +429,9 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                     leadingContent = { Icon(getPlaylistIcon(playlist.name), null, tint = Color.White) },
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { onAddSongsToPlaylist(playlist.id) }) {
+                                Icon(Icons.Default.Add, "Add Songs", tint = MaterialTheme.colorScheme.primary)
+                            }
                             if (isExpanded) {
                                 val currentTracks by viewModel.getTracksForPlaylist(playlist.id).collectAsState(emptyList())
                                 IconButton(onClick = { viewModel.shareTracks(currentTracks) }) {
@@ -389,7 +478,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                             } else {
                                 if (subViewMode == LibraryViewMode.GRID) {
                                     LazyVerticalGrid(
-                                        columns = GridCells.Fixed(5),
+                                        columns = GridCells.Fixed(4),
                                         modifier = Modifier.heightIn(max = 2000.dp)
                                     ) {
                                         items(tracks) { track ->
@@ -400,7 +489,8 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                                                 onLongClick = { onTrackClick(track.id) },
                                                 onOptions = onTrackOptions,
                                                 onFav = { viewModel.toggleFavorite(it) },
-                                                onInfo = onTrackInfo
+                                                onInfo = onTrackInfo,
+                                                onUpload = { viewModel.uploadTrack(it) }
                                             )
                                         }
                                     }
@@ -414,7 +504,8 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                                                 onLongClick = { onTrackClick(track.id) },
                                                 onOptions = onTrackOptions,
                                                 onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                                onInfo = onTrackInfo
+                                                onInfo = onTrackInfo,
+                                                onUpload = { viewModel.uploadTrack(it) }
                                             )
                                         }
                                     }
@@ -438,131 +529,476 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
     }
     var expandedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
     var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.LIST) }
+    var addSongsGroupTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
 
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) { 
-        grouped.forEach { (name, gTracks) -> 
-            val isExpanded = expandedGroupName == name
-            item { 
-                Column {
-                    ListItem(
-                        headlineContent = { Text(name ?: "Unknown", color = Color.White) }, 
-                        supportingContent = { Text("${gTracks.size} songs") },
-                        trailingContent = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (isExpanded) {
-                                    IconButton(onClick = { viewModel.shareTracks(gTracks) }) {
-                                        Icon(Icons.Default.Share, "Share All", tint = Color.Gray)
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) { 
+            grouped.forEach { (name, gTracks) -> 
+                val groupName = name ?: "Unknown"
+                val isExpanded = expandedGroupName == groupName
+                item { 
+                    Column {
+                        ListItem(
+                            headlineContent = { Text(groupName, color = Color.White) }, 
+                            supportingContent = { Text("${gTracks.size} songs") },
+                            trailingContent = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(onClick = { addSongsGroupTarget = Pair(type, groupName) }) {
+                                        Icon(Icons.Default.Add, "Add Songs", tint = MaterialTheme.colorScheme.primary)
                                     }
-                                    IconButton(onClick = { subViewMode = if (subViewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) {
-                                        Icon(if (subViewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.Gray)
-                                    }
-                                }
-                                IconButton(onClick = { expandedGroupName = if (isExpanded) null else name }) {
-                                    Icon(if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = Color.Gray)
-                                }
-                            }
-                        },
-                        modifier = Modifier.clickable { expandedGroupName = if (isExpanded) null else name },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent) // Force transparent background
-                    )
-                    
-                    AnimatedVisibility(visible = isExpanded) {
-                        Surface(
-                            modifier = Modifier
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                                .fillMaxWidth()
-                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
-                            color = Color.White.copy(alpha = 0.05f),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Column(Modifier.padding(8.dp)) {
-                                if (subViewMode == LibraryViewMode.GRID) {
-                                    LazyVerticalGrid(
-                                        columns = GridCells.Fixed(5),
-                                        modifier = Modifier.heightIn(max = 2000.dp)
-                                    ) {
-                                        items(gTracks) { track ->
-                                            StellarGridItem(
-                                                track = track,
-                                                isSelected = track.id in selectedTrackIds,
-                                                onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(gTracks, track) },
-                                                onLongClick = { onTrackClick(track.id) },
-                                                onOptions = onTrackOptions,
-                                                onFav = { viewModel.toggleFavorite(it) },
-                                                onInfo = onTrackInfo
-                                            )
+                                    if (isExpanded) {
+                                        IconButton(onClick = { viewModel.shareTracks(gTracks) }) {
+                                            Icon(Icons.Default.Share, "Share All", tint = Color.Gray)
+                                        }
+                                        IconButton(onClick = { subViewMode = if (subViewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) {
+                                            Icon(if (subViewMode == LibraryViewMode.LIST) Icons.Default.GridView else Icons.AutoMirrored.Filled.List, null, tint = Color.Gray)
                                         }
                                     }
-                                } else {
-                                    Column {
-                                        gTracks.forEach { track ->
-                                            StellarTrackItem(
-                                                track = track,
-                                                isSelected = track.id in selectedTrackIds,
-                                                onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(gTracks, track) },
-                                                onLongClick = { onTrackClick(track.id) },
-                                                onOptions = onTrackOptions,
-                                                onToggleFavorite = { viewModel.toggleFavorite(it) },
-                                                onInfo = onTrackInfo
-                                            )
+                                    IconButton(onClick = { expandedGroupName = if (isExpanded) null else groupName }) {
+                                        Icon(if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, null, tint = Color.Gray)
+                                    }
+                                }
+                            },
+                            modifier = Modifier.clickable { expandedGroupName = if (isExpanded) null else groupName },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                        
+                        AnimatedVisibility(visible = isExpanded) {
+                            Surface(
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                                    .fillMaxWidth()
+                                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                                color = Color.White.copy(alpha = 0.05f),
+                                shape = RoundedCornerShape(16.dp)
+                            ) {
+                                Column(Modifier.padding(8.dp)) {
+                                    if (subViewMode == LibraryViewMode.GRID) {
+                                        LazyVerticalGrid(
+                                            columns = GridCells.Fixed(4),
+                                            modifier = Modifier.heightIn(max = 2000.dp)
+                                        ) {
+                                            items(gTracks) { track ->
+                                                StellarGridItem(
+                                                    track = track,
+                                                    isSelected = track.id in selectedTrackIds,
+                                                    onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(gTracks, track) },
+                                                    onLongClick = { onTrackClick(track.id) },
+                                                    onOptions = onTrackOptions,
+                                                    onFav = { viewModel.toggleFavorite(it) },
+                                                    onInfo = onTrackInfo,
+                                                    onUpload = { viewModel.uploadTrack(it) }
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Column {
+                                            gTracks.forEach { track ->
+                                                StellarTrackItem(
+                                                    track = track,
+                                                    isSelected = track.id in selectedTrackIds,
+                                                    onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(gTracks, track) },
+                                                    onLongClick = { onTrackClick(track.id) },
+                                                    onOptions = onTrackOptions,
+                                                    onToggleFavorite = { viewModel.toggleFavorite(it) },
+                                                    onInfo = onTrackInfo,
+                                                    onUpload = { viewModel.uploadTrack(it) }
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                }
+                } 
             } 
-        } 
+        }
+
+        if (addSongsGroupTarget != null) {
+            val (groupType, groupName) = addSongsGroupTarget!!
+            val existingIds = remember(allTracks, groupType, groupName) {
+                allTracks.filter { 
+                    when (groupType) {
+                        "Album" -> it.displayAlbum == groupName
+                        "Artist" -> it.displayArtist == groupName
+                        else -> (it.genre ?: "Unknown") == groupName
+                    }
+                }.map { it.id }.toSet()
+            }
+            MultiSelectSongDialog(
+                title = "Add Songs to $groupType ($groupName)",
+                allTracks = allTracks,
+                existingTrackIds = existingIds,
+                onDismiss = { addSongsGroupTarget = null },
+                onConfirm = { selectedIds ->
+                    when (groupType) {
+                        "Album" -> viewModel.bulkAssignTracksToAlbum(groupName, selectedIds)
+                        "Artist" -> viewModel.bulkAssignTracksToArtist(groupName, selectedIds)
+                        else -> viewModel.bulkAssignTracksToGenre(groupName, selectedIds)
+                    }
+                    addSongsGroupTarget = null
+                }
+            )
+        }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
-@Composable fun StellarTrackItem(track: TrackEntity, isSelected: Boolean, onPlay: () -> Unit, onLongClick: () -> Unit, onOptions: (TrackEntity) -> Unit, onToggleFavorite: (TrackEntity) -> Unit, onInfo: (TrackEntity) -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().background(if (isSelected) Color.White.copy(0.1f) else Color.Transparent).combinedClickable(onClick = onPlay, onLongClick = onLongClick).padding(16.dp), verticalAlignment = Alignment.CenterVertically) { 
+@Composable fun StellarTrackItem(
+    track: TrackEntity, 
+    isSelected: Boolean, 
+    isPlaying: Boolean = false,
+    onPlay: () -> Unit, 
+    onLongClick: () -> Unit, 
+    onOptions: (TrackEntity) -> Unit, 
+    onToggleFavorite: (TrackEntity) -> Unit, 
+    onInfo: (TrackEntity) -> Unit,
+    onUpload: (TrackEntity) -> Unit = {}
+) {
+    val isUnplayed = track.playCount == 0
+    val activeBg = when {
+        isSelected -> Color.White.copy(0.15f)
+        isPlaying -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+        else -> Color.Transparent
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(activeBg)
+            .combinedClickable(onClick = onPlay, onLongClick = onLongClick)
+            .padding(12.dp), 
+        verticalAlignment = Alignment.CenterVertically
+    ) { 
         Box {
-            AsyncImage(model = track.customCoverPath ?: track.localPath, contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
-            if (track.gDriveId != null) Icon(Icons.Default.Cloud, null, tint = Color.Cyan, modifier = Modifier.size(16.dp).align(Alignment.TopStart).background(Color.Black.copy(0.4f), CircleShape).padding(2.dp))
-            if (track.isFavorite) Icon(Icons.Default.Favorite, null, tint = Color.Red, modifier = Modifier.size(14.dp).align(Alignment.BottomStart).background(Color.Black.copy(0.4f), CircleShape).padding(2.dp))
+            AsyncImage(
+                model = track.customCoverPath ?: track.localPath, 
+                contentDescription = null, 
+                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), 
+                contentScale = ContentScale.Crop
+            )
+            if (isPlaying) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Black.copy(alpha = 0.45f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.GraphicEq, 
+                        contentDescription = "Playing", 
+                        tint = Color.Cyan, 
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            if (track.isFavorite) {
+                Icon(
+                    Icons.Default.Favorite, 
+                    null, 
+                    tint = Color.Red, 
+                    modifier = Modifier.size(14.dp).align(Alignment.BottomStart).background(Color.Black.copy(0.4f), CircleShape).padding(2.dp)
+                )
+            }
         }
-        Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp)) { 
-            Text(track.displayName, color = LavenderTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) { 
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = track.displayName, 
+                    color = if (isPlaying) MaterialTheme.colorScheme.primary else LavenderTitle, 
+                    fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
+                    maxLines = 1, 
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (isUnplayed) {
+                    Spacer(Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(Color.Red, CircleShape)
+                    )
+                }
+            }
             Text(track.displayArtist, color = Color.Gray, style = MaterialTheme.typography.labelSmall) 
         }
         
-        IconButton(onClick = { onToggleFavorite(track) }) {
+        // Cloud Icon (Solid if synced, Empty/Outline if unsynced -> Tapping uploads)
+        IconButton(
+            onClick = {
+                if (track.gDriveId == null) onUpload(track)
+                else onOptions(track)
+            },
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                imageVector = if (track.gDriveId != null) Icons.Default.Cloud else Icons.Default.CloudQueue,
+                contentDescription = if (track.gDriveId != null) "Synced to Cloud" else "Upload to Cloud",
+                tint = if (track.gDriveId != null) Color.Cyan else Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        IconButton(onClick = { onToggleFavorite(track) }, modifier = Modifier.size(32.dp)) {
             Icon(
                 if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 contentDescription = null,
-                tint = if (track.isFavorite) Color.Red else Color.White.copy(alpha = 0.5f)
+                tint = if (track.isFavorite) Color.Red else Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.size(20.dp)
             )
         }
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             IconButton(onClick = { onOptions(track) }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.MoreVert, null, tint = Color.White) }
-            Spacer(Modifier.height(8.dp))
-            IconButton(onClick = { onInfo(track) }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Info, null, tint = Color.Gray, modifier = Modifier.size(18.dp)) }
+            Spacer(Modifier.height(4.dp))
+            IconButton(onClick = { onInfo(track) }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Info, null, tint = Color.Gray, modifier = Modifier.size(16.dp)) }
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
-@Composable fun StellarGridItem(track: TrackEntity, isSelected: Boolean, onPlay: (TrackEntity) -> Unit, onLongClick: (TrackEntity) -> Unit, onOptions: (TrackEntity) -> Unit = {}, onFav: (TrackEntity) -> Unit = {}, onInfo: (TrackEntity) -> Unit = {}) {
-    Column(modifier = Modifier.padding(8.dp).clip(RoundedCornerShape(12.dp)).background(if (isSelected) Color.White.copy(0.05f) else Color.Transparent).combinedClickable(onClick = { onPlay(track) }, onLongClick = { onLongClick(track) }).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) { 
-        Box {
-            AsyncImage(model = track.customCoverPath ?: track.localPath, contentDescription = null, modifier = Modifier.aspectRatio(1f).fillMaxWidth().clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
-            if (track.gDriveId != null) Icon(Icons.Default.Cloud, null, tint = Color.Cyan, modifier = Modifier.size(20.dp).align(Alignment.TopStart).background(Color.Black.copy(0.4f), CircleShape).padding(4.dp))
-            if (track.isFavorite) Icon(Icons.Default.Favorite, null, tint = Color.Red, modifier = Modifier.size(18.dp).align(Alignment.BottomStart).background(Color.Black.copy(0.4f), CircleShape).padding(4.dp))
-            
-            IconButton(onClick = { onFav(track) }, modifier = Modifier.align(Alignment.TopStart).padding(start = 24.dp).size(28.dp)) {
-                Icon(if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null, tint = if (track.isFavorite) Color.Red else Color.White, modifier = Modifier.size(18.dp))
+@Composable fun StellarGridItem(
+    track: TrackEntity, 
+    isSelected: Boolean, 
+    isPlaying: Boolean = false,
+    onPlay: (TrackEntity) -> Unit, 
+    onLongClick: (TrackEntity) -> Unit, 
+    onOptions: (TrackEntity) -> Unit = {}, 
+    onFav: (TrackEntity) -> Unit = {}, 
+    onInfo: (TrackEntity) -> Unit = {},
+    onUpload: (TrackEntity) -> Unit = {}
+) {
+    val isUnplayed = track.playCount == 0
+    val cardBorder = if (isPlaying) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
+
+    Column(
+        modifier = Modifier
+            .padding(4.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (isSelected) Color.White.copy(0.15f) else Color.Transparent)
+            .then(if (cardBorder != null) Modifier.border(cardBorder, RoundedCornerShape(12.dp)) else Modifier)
+            .combinedClickable(onClick = { onPlay(track) }, onLongClick = { onLongClick(track) })
+            .padding(4.dp), 
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) { 
+        Box(modifier = Modifier.aspectRatio(1f).fillMaxWidth()) {
+            AsyncImage(
+                model = track.customCoverPath ?: track.localPath, 
+                contentDescription = null, 
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), 
+                contentScale = ContentScale.Crop
+            )
+
+            if (isPlaying) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.45f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.GraphicEq, 
+                        contentDescription = "Playing", 
+                        tint = Color.Cyan, 
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
             }
 
-            IconButton(onClick = { onOptions(track) }, modifier = Modifier.align(Alignment.TopEnd).size(32.dp).padding(4.dp).background(Color.Black.copy(0.3f), CircleShape)) { Icon(Icons.Default.MoreVert, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
-            IconButton(onClick = { onInfo(track) }, modifier = Modifier.align(Alignment.BottomEnd).size(32.dp).padding(4.dp).background(Color.Black.copy(0.3f), CircleShape)) { Icon(Icons.Default.Info, null, tint = Color.White, modifier = Modifier.size(16.dp)) }
+            // Unplayed Red Dot Badge on Top-Right overlay
+            if (isUnplayed) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 28.dp, end = 6.dp)
+                        .size(8.dp)
+                        .background(Color.Red, CircleShape)
+                )
+            }
+
+            // Top-Left Corner: Heart Icon (Favorite)
+            IconButton(
+                onClick = { onFav(track) }, 
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(4.dp)
+                    .size(26.dp)
+                    .background(Color.Black.copy(0.45f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, 
+                    contentDescription = "Favorite", 
+                    tint = if (track.isFavorite) Color.Red else Color.White, 
+                    modifier = Modifier.size(15.dp)
+                )
+            }
+
+            // Top-Right Corner: 3 Dot Icon (Options)
+            IconButton(
+                onClick = { onOptions(track) }, 
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(4.dp)
+                    .size(26.dp)
+                    .background(Color.Black.copy(0.45f), CircleShape)
+            ) { 
+                Icon(
+                    imageVector = Icons.Default.MoreVert, 
+                    contentDescription = "Options", 
+                    tint = Color.White, 
+                    modifier = Modifier.size(15.dp)
+                ) 
+            }
+
+            // Bottom-Left Corner: Cloud Icon (Solid if synced, Empty if unsynced -> Tapping uploads)
+            IconButton(
+                onClick = { 
+                    if (track.gDriveId == null) onUpload(track)
+                    else onOptions(track)
+                }, 
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(4.dp)
+                    .size(26.dp)
+                    .background(Color.Black.copy(0.45f), CircleShape)
+            ) {
+                Icon(
+                    imageVector = if (track.gDriveId != null) Icons.Default.Cloud else Icons.Default.CloudQueue, 
+                    contentDescription = if (track.gDriveId != null) "Synced to Cloud" else "Upload to Cloud", 
+                    tint = if (track.gDriveId != null) Color.Cyan else Color.White.copy(alpha = 0.6f), 
+                    modifier = Modifier.size(15.dp)
+                )
+            }
+
+            // Bottom-Right Corner: Info Icon ("i")
+            IconButton(
+                onClick = { onInfo(track) }, 
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(4.dp)
+                    .size(26.dp)
+                    .background(Color.Black.copy(0.45f), CircleShape)
+            ) { 
+                Icon(
+                    imageVector = Icons.Default.Info, 
+                    contentDescription = "Info", 
+                    tint = Color.White, 
+                    modifier = Modifier.size(15.dp)
+                ) 
+            }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(track.displayName, color = Color.White, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = track.displayName, 
+                color = if (isPlaying) MaterialTheme.colorScheme.primary else Color.White, 
+                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 11.sp, 
+                maxLines = 1, 
+                overflow = TextOverflow.Ellipsis, 
+                textAlign = TextAlign.Center,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            if (isUnplayed) {
+                Spacer(Modifier.width(4.dp))
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(Color.Red, CircleShape)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AlphabetFastScroller(
+    tracks: List<TrackEntity>,
+    onScrollTo: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (tracks.isEmpty()) return
+    
+    var activeLetter by remember { mutableStateOf<Char?>(null) }
+    
+    val alphabetMap = remember(tracks) {
+        val map = mutableMapOf<Char, Int>()
+        tracks.forEachIndexed { index, track ->
+            val char = track.displayName.trim().firstOrNull()?.uppercaseChar() ?: '#'
+            val key = if (char in 'A'..'Z') char else '#'
+            if (!map.containsKey(key)) {
+                map[key] = index
+            }
+        }
+        map
+    }
+    
+    val letters = remember(alphabetMap) {
+        ('A'..'Z').filter { alphabetMap.containsKey(it) } + if (alphabetMap.containsKey('#')) listOf('#') else emptyList()
+    }
+    
+    if (letters.isEmpty()) return
+
+    Box(modifier = modifier.fillMaxHeight().padding(vertical = 12.dp, horizontal = 1.dp), contentAlignment = Alignment.CenterEnd) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier
+                .width(20.dp)
+                .fillMaxHeight()
+                .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                .padding(vertical = 2.dp)
+                .pointerInput(letters) {
+                    detectTapGestures { offset ->
+                        val itemHeight = size.height / letters.size.toFloat()
+                        val index = (offset.y / itemHeight).toInt().coerceIn(0, letters.size - 1)
+                        val letter = letters[index]
+                        activeLetter = letter
+                        alphabetMap[letter]?.let { targetIndex ->
+                            onScrollTo(targetIndex)
+                        }
+                    }
+                }
+        ) {
+            letters.forEach { char ->
+                Text(
+                    text = char.toString(),
+                    color = if (activeLetter == char) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.8f),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable {
+                        activeLetter = char
+                        alphabetMap[char]?.let { targetIndex ->
+                            onScrollTo(targetIndex)
+                        }
+                    }
+                )
+            }
+        }
+
+        activeLetter?.let { letter ->
+            Box(
+                modifier = Modifier
+                    .padding(end = 32.dp)
+                    .size(44.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = letter.toString(),
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            LaunchedEffect(letter) {
+                delay(1200)
+                if (activeLetter == letter) activeLetter = null
+            }
+        }
     }
 }
 

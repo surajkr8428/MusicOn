@@ -208,6 +208,23 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            val mainLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+            DisposableEffect(mainLifecycleOwner, mediaController) {
+                val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                    if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME || event == androidx.lifecycle.Lifecycle.Event.ON_START) {
+                        mediaController?.currentMediaItem?.mediaId?.let { activeId ->
+                            if (activeId.isNotEmpty()) {
+                                viewModel.updateCurrentTrackById(activeId)
+                            }
+                        }
+                    }
+                }
+                mainLifecycleOwner.lifecycle.addObserver(observer)
+                onDispose {
+                    mainLifecycleOwner.lifecycle.removeObserver(observer)
+                }
+            }
+
             LaunchedEffect(mediaController) {
                 val controller = mediaController ?: return@LaunchedEffect
                 

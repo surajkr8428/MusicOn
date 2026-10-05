@@ -467,6 +467,13 @@ class MainViewModel(
 
     init {
         viewModelScope.launch {
+            settingsRepository.lastTrackIdFlow.collect { lastId ->
+                if (!lastId.isNullOrEmpty() && lastId != _currentPlayingTrackId.value) {
+                    _currentPlayingTrackId.value = lastId
+                }
+            }
+        }
+        viewModelScope.launch {
             musicRepository.allPlaylists.first().let { if (it.none { p -> p.name == "Favorite" }) musicRepository.createPlaylist("Favorite", _userEmail.value) }
             allTracks.filter { it.isNotEmpty() }.first().let { tracks ->
                 val lastId = settingsRepository.lastTrackIdFlow.first()
@@ -495,6 +502,27 @@ class MainViewModel(
     fun createPlaylist(name: String) = viewModelScope.launch { musicRepository.createPlaylist(name, _userEmail.value); triggerBackup() }
     fun removeTrackFromPlaylist(pId: String, tId: String) = viewModelScope.launch { musicRepository.removeTrackFromPlaylist(pId, tId) }
     fun getTracksForPlaylist(pId: String) = musicRepository.getTracksForPlaylist(pId)
+
+    fun bulkAssignTracksToAlbum(albumName: String, trackIds: List<String>) = viewModelScope.launch {
+        trackIds.forEach { id ->
+            musicRepository.updateTrackMetadata(id, null, null, albumName, null, null)
+        }
+    }
+
+    fun bulkAssignTracksToArtist(artistName: String, trackIds: List<String>) = viewModelScope.launch {
+        trackIds.forEach { id ->
+            musicRepository.updateTrackMetadata(id, null, artistName, null, null, null)
+        }
+    }
+
+    fun bulkAssignTracksToGenre(genreName: String, trackIds: List<String>) = viewModelScope.launch {
+        trackIds.forEach { id ->
+            val track = musicRepository.getTrackById(id)
+            if (track != null) {
+                musicRepository.updateTrack(track.copy(genre = genreName))
+            }
+        }
+    }
 
     fun updateTrackMetadata(id: String, t: String?, ar: String?, al: String?, c: String?, l: String?) = viewModelScope.launch { musicRepository.updateTrackMetadata(id, t, ar, al, c, l); val track = allTracks.value.find { it.id == id }; if (track?.gDriveId != null && t != null) try { com.example.musicon.data.remote.CloudStorageManager(settingsRepository.context).renameFile(track.gDriveId, t) } catch (e: Exception) {} }
     

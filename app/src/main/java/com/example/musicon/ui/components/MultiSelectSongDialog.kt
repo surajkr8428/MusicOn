@@ -17,8 +17,9 @@ import com.example.musicon.data.local.TrackEntity
 
 @Composable
 fun MultiSelectSongDialog(
+    title: String = "Add Songs to Playlist",
     allTracks: List<TrackEntity>,
-    existingTrackIds: Set<String>,
+    existingTrackIds: Set<String> = emptySet(),
     onDismiss: () -> Unit,
     onConfirm: (List<String>) -> Unit
 ) {
@@ -29,7 +30,7 @@ fun MultiSelectSongDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add Songs to Playlist", fontWeight = FontWeight.Bold) },
+        title = { Text(title, fontWeight = FontWeight.Bold, color = Color.White) },
         text = {
             Box(modifier = Modifier.sizeIn(maxHeight = 400.dp)) {
                 if (filteredTracks.isEmpty()) {

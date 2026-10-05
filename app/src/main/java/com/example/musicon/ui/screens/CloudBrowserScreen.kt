@@ -142,7 +142,7 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                 PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { refresh() }, modifier = Modifier.padding(padding).fillMaxSize()) {
                     if (isLoading && !isRefreshing) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) } }
                     else if (viewMode == LibraryViewMode.GRID) {
-                        LazyVerticalGrid(columns = GridCells.Adaptive(110.dp), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
+                        LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
                             items(sortedFiles) { file ->
                                 val isSelected = file.id in selectedIds
                                 Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).background(if (isSelected) Color.White.copy(0.15f) else Color.Transparent).combinedClickable(onClick = { if (selectedIds.isNotEmpty()) selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id }, onLongClick = { selectedIds = setOf(file.id) }).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {

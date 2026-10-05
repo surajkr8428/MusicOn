@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -110,29 +111,57 @@ fun MiniPlayer(
                     .padding(8.dp)
                     .padding(bottom = 4.dp) // Leave space for progress indicator
             ) {
-                AsyncImage(
-                    model = currentMediaItem?.mediaMetadata?.artworkUri,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.Gray),
-                    contentScale = ContentScale.Crop
-                )
+                val artworkModel = currentMediaItem?.mediaMetadata?.artworkUri 
+                    ?: currentPlayingTrack?.customCoverPath 
+                    ?: currentPlayingTrack?.localPath
+                val titleText = currentMediaItem?.mediaMetadata?.title?.toString() 
+                    ?: currentPlayingTrack?.displayName 
+                    ?: "No Song"
+                val artistText = currentMediaItem?.mediaMetadata?.artist?.toString() 
+                    ?: currentPlayingTrack?.displayArtist 
+                    ?: "Unknown Artist"
+
+                Box {
+                    AsyncImage(
+                        model = artworkModel,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.Gray),
+                        contentScale = ContentScale.Crop
+                    )
+                    if (isPlaying) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.Black.copy(0.35f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.GraphicEq,
+                                contentDescription = "Playing",
+                                tint = Color.Cyan,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 12.dp)
                 ) {
                     Text(
-                        text = currentMediaItem?.mediaMetadata?.title?.toString() ?: "No Song",
+                        text = titleText,
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                         color = contentColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = currentMediaItem?.mediaMetadata?.artist?.toString() ?: "Unknown Artist",
+                        text = artistText,
                         style = MaterialTheme.typography.bodySmall,
                         color = secondaryColor,
                         maxLines = 1,

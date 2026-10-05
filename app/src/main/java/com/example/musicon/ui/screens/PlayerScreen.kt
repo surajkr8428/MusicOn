@@ -110,6 +110,19 @@ fun PlayerScreen(
     var showAddToPlaylistDialog by remember { mutableStateOf(false) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
 
+    val queueRowState = rememberLazyListState()
+
+    LaunchedEffect(currentTrack?.id, queue) {
+        if (currentTrack != null && queue.isNotEmpty()) {
+            val targetIndex = queue.indexOfFirst { it.id == currentTrack?.id }
+            if (targetIndex >= 0) {
+                try {
+                    queueRowState.animateScrollToItem(targetIndex)
+                } catch (e: Exception) {}
+            }
+        }
+    }
+
     BackHandler(onBack = onBack)
 
     val sleepTimerRemaining by viewModel.sleepTimerRemaining.collectAsState()
@@ -303,6 +316,7 @@ fun PlayerScreen(
                         // 15% Fixed Queue - Decreased Icon Size
                         Column(modifier = Modifier.weight(0.15f).fillMaxWidth().background(Color.Transparent).padding(bottom = 12.dp)) {
                             LazyRow(
+                                state = queueRowState,
                                 modifier = Modifier.fillMaxWidth().fillMaxHeight(),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
