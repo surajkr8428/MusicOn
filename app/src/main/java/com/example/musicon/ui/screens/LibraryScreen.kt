@@ -334,10 +334,14 @@ fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: (
                 }
             }
         ) { padding ->
+            val detailConfig = LocalConfiguration.current
+            val isDetailTablet = detailConfig.screenWidthDp >= 600 || detailConfig.smallestScreenWidthDp >= 600
+            val detailGridColumns = if (isDetailTablet) GridCells.Fixed(20) else GridCells.Fixed(4)
+
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (tracks.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Button(onClick = onAddSongs) { Text("Add Songs") } }
                 else {
-                    if (subViewMode == LibraryViewMode.GRID) LazyVerticalGrid(state = gridState, columns = GridCells.Fixed(4), modifier = Modifier.fillMaxSize()) { items(tracks) { track -> StellarGridItem(track, track.id in selectedIds, track.id == currentPlayingTrack?.id, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) } ) } }
+                    if (subViewMode == LibraryViewMode.GRID) LazyVerticalGrid(state = gridState, columns = detailGridColumns, modifier = Modifier.fillMaxSize()) { items(tracks) { track -> StellarGridItem(track, track.id in selectedIds, track.id == currentPlayingTrack?.id, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) } ) } }
                     else LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) { items(tracks) { track -> StellarTrackItem(track, track.id in selectedIds, track.id == currentPlayingTrack?.id, { if (isSelectionMode) selectedIds = if (track.id in selectedIds) selectedIds - track.id else selectedIds + track.id else viewModel.playTrackList(tracks, track, playlist.id) }, { if (!isSelectionMode) selectedIds = setOf(track.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) } ) } }
                 }
             }
@@ -423,10 +427,14 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        val tabConfig = LocalConfiguration.current
+        val isTabTablet = tabConfig.screenWidthDp >= 600 || tabConfig.smallestScreenWidthDp >= 600
+        val tabGridColumns = if (isTabTablet) GridCells.Fixed(20) else GridCells.Fixed(4)
+
         if (mode == LibraryViewMode.GRID) {
             LazyVerticalGrid(
                 state = gridState, 
-                columns = GridCells.Fixed(4), 
+                columns = tabGridColumns, 
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 80.dp, end = 24.dp)
             ) { 
@@ -528,9 +536,13 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                                     }
                                 }
                             } else {
+                                val playlistConfig = LocalConfiguration.current
+                                val isPlaylistTablet = playlistConfig.screenWidthDp >= 600 || playlistConfig.smallestScreenWidthDp >= 600
+                                val playlistGridCols = if (isPlaylistTablet) GridCells.Fixed(20) else GridCells.Fixed(4)
+
                                 if (subViewMode == LibraryViewMode.GRID) {
                                     LazyVerticalGrid(
-                                        columns = GridCells.Fixed(4),
+                                        columns = playlistGridCols,
                                         modifier = Modifier.heightIn(max = 2000.dp)
                                     ) {
                                         items(tracks) { track ->
@@ -625,9 +637,13 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                                 shape = RoundedCornerShape(16.dp)
                             ) {
                                 Column(Modifier.padding(8.dp)) {
+                                    val groupConfig = LocalConfiguration.current
+                                    val isGroupTablet = groupConfig.screenWidthDp >= 600 || groupConfig.smallestScreenWidthDp >= 600
+                                    val groupGridCols = if (isGroupTablet) GridCells.Fixed(20) else GridCells.Fixed(4)
+
                                     if (subViewMode == LibraryViewMode.GRID) {
                                         LazyVerticalGrid(
-                                            columns = GridCells.Fixed(4),
+                                            columns = groupGridCols,
                                             modifier = Modifier.heightIn(max = 2000.dp)
                                         ) {
                                             items(gTracks) { track ->
@@ -708,6 +724,10 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
     onInfo: (TrackEntity) -> Unit,
     onUpload: (TrackEntity) -> Unit = {}
 ) {
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 600 || configuration.smallestScreenWidthDp >= 600
+    val thumbSize = if (isTablet) 10.dp else 48.dp
+
     val isUnplayed = track.playCount == 0
     val activeBg = when {
         isSelected -> Color.White.copy(0.15f)
@@ -727,14 +747,14 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
             AsyncImage(
                 model = track.customCoverPath ?: track.localPath, 
                 contentDescription = null, 
-                modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), 
+                modifier = Modifier.size(thumbSize).clip(RoundedCornerShape(if (isTablet) 2.dp else 8.dp)), 
                 contentScale = ContentScale.Crop
             )
             if (isPlaying) {
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .size(thumbSize)
+                        .clip(RoundedCornerShape(if (isTablet) 2.dp else 8.dp))
                         .background(Color.Black.copy(alpha = 0.45f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -742,7 +762,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                         imageVector = Icons.Default.GraphicEq, 
                         contentDescription = "Playing", 
                         tint = Color.Cyan, 
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(if (isTablet) 6.dp else 24.dp)
                     )
                 }
             }
@@ -751,7 +771,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                     Icons.Default.Favorite, 
                     null, 
                     tint = Color.Red, 
-                    modifier = Modifier.size(14.dp).align(Alignment.BottomStart).background(Color.Black.copy(0.4f), CircleShape).padding(2.dp)
+                    modifier = Modifier.size(if (isTablet) 4.dp else 14.dp).align(Alignment.BottomStart).background(Color.Black.copy(0.4f), CircleShape).padding(1.dp)
                 )
             }
         }
@@ -822,24 +842,29 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
     onInfo: (TrackEntity) -> Unit = {},
     onUpload: (TrackEntity) -> Unit = {}
 ) {
+    val configuration = LocalConfiguration.current
+    val isTablet = configuration.screenWidthDp >= 600 || configuration.smallestScreenWidthDp >= 600
+    val btnSize = if (isTablet) 12.dp else 26.dp
+    val iconSize = if (isTablet) 7.dp else 15.dp
+
     val isUnplayed = track.playCount == 0
     val cardBorder = if (isPlaying) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
 
     Column(
         modifier = Modifier
-            .padding(4.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .padding(2.dp)
+            .clip(RoundedCornerShape(8.dp))
             .background(if (isSelected) Color.White.copy(0.15f) else Color.Transparent)
-            .then(if (cardBorder != null) Modifier.border(cardBorder, RoundedCornerShape(12.dp)) else Modifier)
+            .then(if (cardBorder != null) Modifier.border(cardBorder, RoundedCornerShape(8.dp)) else Modifier)
             .combinedClickable(onClick = { onPlay(track) }, onLongClick = { onLongClick(track) })
-            .padding(4.dp), 
+            .padding(2.dp), 
         horizontalAlignment = Alignment.CenterHorizontally
     ) { 
         Box(modifier = Modifier.aspectRatio(1f).fillMaxWidth()) {
             AsyncImage(
                 model = track.customCoverPath ?: track.localPath, 
                 contentDescription = null, 
-                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)), 
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)), 
                 contentScale = ContentScale.Crop
             )
 
@@ -847,7 +872,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(8.dp))
                         .background(Color.Black.copy(alpha = 0.45f)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -855,7 +880,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                         imageVector = Icons.Default.GraphicEq, 
                         contentDescription = "Playing", 
                         tint = Color.Cyan, 
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(if (isTablet) 14.dp else 32.dp)
                     )
                 }
             }
@@ -865,8 +890,8 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 28.dp, end = 6.dp)
-                        .size(8.dp)
+                        .padding(top = if (isTablet) 10.dp else 28.dp, end = 2.dp)
+                        .size(if (isTablet) 4.dp else 8.dp)
                         .background(Color.Red, CircleShape)
                 )
             }
@@ -876,15 +901,15 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                 onClick = { onFav(track) }, 
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(4.dp)
-                    .size(26.dp)
+                    .padding(2.dp)
+                    .size(btnSize)
                     .background(Color.Black.copy(0.45f), CircleShape)
             ) {
                 Icon(
                     imageVector = if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, 
                     contentDescription = "Favorite", 
                     tint = if (track.isFavorite) Color.Red else Color.White, 
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(iconSize)
                 )
             }
 
@@ -893,15 +918,15 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                 onClick = { onOptions(track) }, 
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .size(26.dp)
+                    .padding(2.dp)
+                    .size(btnSize)
                     .background(Color.Black.copy(0.45f), CircleShape)
             ) { 
                 Icon(
                     imageVector = Icons.Default.MoreVert, 
                     contentDescription = "Options", 
                     tint = Color.White, 
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(iconSize)
                 ) 
             }
 
@@ -913,15 +938,15 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                 }, 
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(4.dp)
-                    .size(26.dp)
+                    .padding(2.dp)
+                    .size(btnSize)
                     .background(Color.Black.copy(0.45f), CircleShape)
             ) {
                 Icon(
                     imageVector = if (track.gDriveId != null) Icons.Default.Cloud else Icons.Default.CloudQueue, 
                     contentDescription = if (track.gDriveId != null) "Synced to Cloud" else "Upload to Cloud", 
                     tint = if (track.gDriveId != null) Color.Cyan else Color.White.copy(alpha = 0.6f), 
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(iconSize)
                 )
             }
 
@@ -930,35 +955,35 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                 onClick = { onInfo(track) }, 
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(4.dp)
-                    .size(26.dp)
+                    .padding(2.dp)
+                    .size(btnSize)
                     .background(Color.Black.copy(0.45f), CircleShape)
             ) { 
                 Icon(
                     imageVector = Icons.Default.Info, 
                     contentDescription = "Info", 
                     tint = Color.White, 
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(iconSize)
                 ) 
             }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
         Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = track.displayName, 
                 color = if (isPlaying) MaterialTheme.colorScheme.primary else Color.White, 
                 fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
-                fontSize = 11.sp, 
+                fontSize = if (isTablet) 8.sp else 11.sp, 
                 maxLines = 1, 
                 overflow = TextOverflow.Ellipsis, 
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f, fill = false)
             )
             if (isUnplayed) {
-                Spacer(Modifier.width(4.dp))
+                Spacer(Modifier.width(2.dp))
                 Box(
                     modifier = Modifier
-                        .size(6.dp)
+                        .size(if (isTablet) 3.dp else 6.dp)
                         .background(Color.Red, CircleShape)
                 )
             }
