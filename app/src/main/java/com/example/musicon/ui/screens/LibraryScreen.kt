@@ -295,10 +295,17 @@ fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: (
 
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
+    var hasAutoScrolled by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(currentPlayingTrack?.id, tracks) {
+    LaunchedEffect(listState.isScrollInProgress, gridState.isScrollInProgress) {
+        if (listState.isScrollInProgress || gridState.isScrollInProgress) {
+            hasAutoScrolled = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
         val targetId = currentPlayingTrack?.id
-        if (targetId != null && tracks.isNotEmpty()) {
+        if (!hasAutoScrolled && targetId != null && tracks.isNotEmpty()) {
             val targetIndex = tracks.indexOfFirst { it.id == targetId }
             if (targetIndex >= 0) {
                 try {
@@ -307,6 +314,7 @@ fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: (
                     } else {
                         listState.animateScrollToItem(targetIndex)
                     }
+                    hasAutoScrolled = true
                 } catch (_: Exception) {}
             }
         }
@@ -390,9 +398,16 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
     onUpload: (TrackEntity) -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
+    var hasAutoScrolled by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(currentPlayingTrackId, tracks) {
-        if (currentPlayingTrackId != null && tracks.isNotEmpty()) {
+    LaunchedEffect(listState.isScrollInProgress, gridState.isScrollInProgress) {
+        if (listState.isScrollInProgress || gridState.isScrollInProgress) {
+            hasAutoScrolled = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasAutoScrolled && currentPlayingTrackId != null && tracks.isNotEmpty()) {
             val targetIndex = tracks.indexOfFirst { it.id == currentPlayingTrackId }
             if (targetIndex >= 0) {
                 try {
@@ -401,6 +416,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                     } else {
                         listState.animateScrollToItem(targetIndex)
                     }
+                    hasAutoScrolled = true
                 } catch (_: Exception) {}
             }
         }

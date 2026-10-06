@@ -111,14 +111,22 @@ fun PlayerScreen(
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
 
     val queueRowState = rememberLazyListState()
+    var hasAutoScrolledQueue by remember { mutableStateOf(false) }
 
-    LaunchedEffect(currentTrack?.id, queue) {
-        if (currentTrack != null && queue.isNotEmpty()) {
+    LaunchedEffect(queueRowState.isScrollInProgress) {
+        if (queueRowState.isScrollInProgress) {
+            hasAutoScrolledQueue = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (!hasAutoScrolledQueue && currentTrack != null && queue.isNotEmpty()) {
             val targetIndex = queue.indexOfFirst { it.id == currentTrack?.id }
             if (targetIndex >= 0) {
                 try {
                     queueRowState.animateScrollToItem(targetIndex)
-                } catch (e: Exception) {}
+                    hasAutoScrolledQueue = true
+                } catch (_: Exception) {}
             }
         }
     }
