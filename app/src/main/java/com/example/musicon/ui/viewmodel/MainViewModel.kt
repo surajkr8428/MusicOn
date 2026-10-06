@@ -1,6 +1,7 @@
 package com.example.musicon.ui.viewmodel
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.net.Uri
 import android.os.Handler
@@ -437,17 +438,44 @@ class MainViewModel(
     fun shareAppApk() {
         val context = settingsRepository.context
         val sourceFile = java.io.File(context.applicationInfo.sourceDir)
-        val shareDir = java.io.File(context.externalCacheDir, "shared_apk")
+        if (!sourceFile.exists()) {
+            Log.e("MainViewModel", "Source APK file not found")
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                val shareDir = java.io.File(context.cacheDir, "shared_apk")
                 if (shareDir.exists()) shareDir.deleteRecursively()
                 shareDir.mkdirs()
+                
                 val destFile = java.io.File(shareDir, "Nirvaana.apk")
                 sourceFile.copyTo(destFile, true)
+                
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", destFile)
-                val intent = Intent(Intent.ACTION_SEND).apply { type = "application/vnd.android.package-archive"; putExtra(Intent.EXTRA_STREAM, uri); addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK) }
-                withContext(Dispatchers.Main) { context.startActivity(Intent.createChooser(intent, "Share Nirvaana APK").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-            } catch (e: Exception) { android.util.Log.e("MainViewModel", "Failed to share APK", e) }
+                
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/vnd.android.package-archive"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                
+                val chooserIntent = Intent.createChooser(shareIntent, "Share Nirvaana App (APK)").apply {
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+
+                val resInfoList = context.packageManager.queryIntentActivities(chooserIntent, PackageManager.MATCH_DEFAULT_ONLY)
+                for (resolveInfo in resInfoList) {
+                    val packageName = resolveInfo.activityInfo.packageName
+                    context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                
+                withContext(Dispatchers.Main) {
+                    context.startActivity(chooserIntent)
+                }
+            } catch (e: Exception) {
+                Log.e("MainViewModel", "Failed to share APK", e)
+            }
         }
     }
 
@@ -551,28 +579,56 @@ class MainViewModel(
     }
 
     fun triggerBackup() = viewModelScope.launch(Dispatchers.IO) {
-        if (!isUserSignedIn.value) return@launch
+        val currentEmail = _userEmail.value
+        if (!isUserSignedIn.value || currentEmail.isNullOrEmpty()) return@launch
         try {
-            val playlists = musicRepository.allPlaylists.first()
-            val playlistTracks = musicRepository.getAllPlaylistTracks()
+            val allLocalPlaylists = musicRepository.allPlaylists.first()
+            val playlists = allLocalPlaylists.filter { it.userEmail == null || it.userEmail == currentEmail }
+                .map { if (it.userEmail == null) it.copy(userEmail = currentEmail) else it }
+            
+            val playlistIds = playlists.map { it.id }.toSet()
+            val allPlaylistTracks = musicRepository.getAllPlaylistTracks()
+            val playlistTracks = allPlaylistTracks.filter { it.playlistId in playlistIds }
+            
+            val settingsMap = mapOf(
+                "userEmail" to currentEmail,
+                "themeMode" to themeMode.value.name,
+                "libraryViewMode" to libraryViewMode.value.name,
+                "playerImageMode" to playerImageMode.value.name,
+                "accentColor" to accentColor.value,
+                "backgroundMode" to backgroundMode.value,
+                "customBgUri" to (customBgUri.value ?: ""),
+                "autoTheme" to autoTheme.value,
+                "shakeToSkip" to shakeToSkip.value,
+                "keepScreenOn" to keepScreenOn.value,
+                "pauseOnDetach" to pauseOnDetach.value,
+                "showNotifications" to showNotifications.value,
+                "crossfade" to crossfade.value,
+                "eqEnabled" to settingsRepository.eqEnabledFlow.first(),
+                "eqBands" to settingsRepository.eqBandsFlow.first(),
+                "bassBoost" to settingsRepository.bassBoostFlow.first(),
+                "virtualizer" to settingsRepository.virtualizerFlow.first()
+            )
             
             val backupData = mapOf(
                 "playlists" to playlists,
-                "links" to playlistTracks
+                "links" to playlistTracks,
+                "settings" to settingsMap
             )
             
             val json = Gson().toJson(backupData)
             musicRepository.cloudStorageManager.deleteFileByName("nirvaana_backup.json")
             musicRepository.cloudStorageManager.uploadData("nirvaana_backup.json", json)
             
-            Log.d("MainViewModel", "Backup successful")
+            Log.d("MainViewModel", "Backup successful for $currentEmail")
         } catch (e: Exception) {
-            Log.e("MainViewModel", "Backup failed", e)
+            Log.e("MainViewModel", "Backup failed for email", e)
         }
     }
 
     fun restoreFromCloud() = viewModelScope.launch(Dispatchers.IO) {
-        if (!isUserSignedIn.value) return@launch
+        val currentEmail = _userEmail.value
+        if (!isUserSignedIn.value || currentEmail.isNullOrEmpty()) return@launch
         try {
             val backupFile = musicRepository.cloudStorageManager.findFileByName("nirvaana_backup.json") ?: return@launch
             
@@ -580,20 +636,44 @@ class MainViewModel(
             val backup = Gson().fromJson(json, Map::class.java)
             
             val playlistsJson = Gson().toJson(backup["playlists"])
-            val playlists = Gson().fromJson(playlistsJson, Array<Playlist>::class.java).toList()
+            if (playlistsJson != null && playlistsJson != "null") {
+                val playlists = Gson().fromJson(playlistsJson, Array<Playlist>::class.java).toList()
+                playlists.forEach { p ->
+                    val updatedP = p.copy(userEmail = currentEmail)
+                    musicRepository.insertPlaylist(updatedP)
+                }
+            }
             
             val linksJson = Gson().toJson(backup["links"])
-            val links = Gson().fromJson(linksJson, Array<PlaylistTrack>::class.java).toList()
-            
-            playlists.forEach { p ->
-                val updatedP = if (_userEmail.value != null && p.userEmail == null) p.copy(userEmail = _userEmail.value) else p
-                musicRepository.insertPlaylist(updatedP)
+            if (linksJson != null && linksJson != "null") {
+                val links = Gson().fromJson(linksJson, Array<PlaylistTrack>::class.java).toList()
+                links.forEach { musicRepository.addTrackToPlaylist(it.playlistId, it.trackId) }
             }
-            links.forEach { musicRepository.addTrackToPlaylist(it.playlistId, it.trackId) }
+
+            val settingsJson = Gson().toJson(backup["settings"])
+            if (settingsJson != null && settingsJson != "null") {
+                val settingsMap = Gson().fromJson(settingsJson, Map::class.java)
+                settingsMap["themeMode"]?.let { try { settingsRepository.updateThemeMode(ThemeMode.valueOf(it.toString())) } catch(_: Exception) {} }
+                settingsMap["libraryViewMode"]?.let { try { settingsRepository.updateLibraryViewMode(LibraryViewMode.valueOf(it.toString())) } catch(_: Exception) {} }
+                settingsMap["playerImageMode"]?.let { try { settingsRepository.updatePlayerImageMode(com.example.musicon.data.PlayerImageMode.valueOf(it.toString())) } catch(_: Exception) {} }
+                settingsMap["accentColor"]?.let { try { settingsRepository.updateAccentColor((it as Number).toInt()) } catch(_: Exception) {} }
+                settingsMap["backgroundMode"]?.let { settingsRepository.updateBackgroundMode(it.toString()) }
+                settingsMap["customBgUri"]?.let { val uri = it.toString(); if (uri.isNotEmpty()) settingsRepository.updateCustomBgUri(uri) }
+                settingsMap["autoTheme"]?.let { settingsRepository.updateAutoTheme(it as Boolean) }
+                settingsMap["shakeToSkip"]?.let { settingsRepository.updateShakeToSkip(it as Boolean) }
+                settingsMap["keepScreenOn"]?.let { settingsRepository.updateKeepScreenOn(it as Boolean) }
+                settingsMap["pauseOnDetach"]?.let { settingsRepository.updatePauseOnDetach(it as Boolean) }
+                settingsMap["showNotifications"]?.let { settingsRepository.updateShowNotifications(it as Boolean) }
+                settingsMap["crossfade"]?.let { settingsRepository.updateCrossfade(it as Boolean) }
+                settingsMap["eqEnabled"]?.let { settingsRepository.updateEqEnabled(it as Boolean) }
+                settingsMap["eqBands"]?.let { settingsRepository.updateEqBands(it.toString()) }
+                settingsMap["bassBoost"]?.let { settingsRepository.updateBassBoost((it as Number).toInt()) }
+                settingsMap["virtualizer"]?.let { settingsRepository.updateVirtualizer((it as Number).toInt()) }
+            }
             
-            Log.d("MainViewModel", "Restore successful")
+            Log.d("MainViewModel", "Restore successful for $currentEmail")
         } catch (e: Exception) {
-            Log.e("MainViewModel", "Restore failed", e)
+            Log.e("MainViewModel", "Restore failed for email", e)
         }
     }
     fun uploadTrack(t: TrackEntity) {
