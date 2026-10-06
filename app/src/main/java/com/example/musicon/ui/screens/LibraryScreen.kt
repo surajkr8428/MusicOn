@@ -203,7 +203,30 @@ fun LibraryScreen(
                         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                             val currentTrackId = currentPlayingTrack?.id
                             when (page) {
-                                0 -> SongsTab(viewModel.recentlyPlayed.collectAsState().value, selectedTrackIds, currentTrackId, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(viewModel.recentlyPlayed.value, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) })
+                                0 -> Column(Modifier.fillMaxSize()) {
+                                    val recents = viewModel.recentlyPlayed.collectAsState().value
+                                    if (recents.isNotEmpty()) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp, vertical = 2.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "${recents.size} Recently Played", 
+                                                style = MaterialTheme.typography.labelMedium, 
+                                                color = Color.Gray
+                                            )
+                                            TextButton(onClick = { viewModel.clearRecentlyPlayed() }) {
+                                                Icon(Icons.Default.Refresh, contentDescription = "Reset Recents", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                                Spacer(Modifier.width(4.dp))
+                                                Text("Reset Recents", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                    SongsTab(recents, selectedTrackIds, currentTrackId, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(recents, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) })
+                                }
                                 1 -> SongsTab(tracks, selectedTrackIds, currentTrackId, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(tracks, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) })
                                 2 -> PlaylistsTab(playlists, selectedPlaylistIds, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isPlaylistSelectionMode) selectedPlaylistIds = if (it.id in selectedPlaylistIds) selectedPlaylistIds - it.id else selectedPlaylistIds + it.id else { /* Expansion handles click */ } }, { showCreatePlaylistDialog = true }, { selectedPlaylistIds = setOf(it.id) }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } }, viewModel, selectedTrackIds, { id -> selectedTrackIds = if (id in selectedTrackIds) selectedTrackIds - id else selectedTrackIds + id }, { selectedPlaylistOptions = it }, { selectedTrackOptions = it }, { showTrackInfoDialog = it }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } })
                                 3 -> GroupedTab(allTracks, "Album", viewMode, rememberLazyListState(), { viewModel.playTrackList(allTracks, it.first()) }, viewModel, selectedTrackIds, { id -> selectedTrackIds = if (id in selectedTrackIds) selectedTrackIds - id else selectedTrackIds + id }, { selectedTrackOptions = it }, { showTrackInfoDialog = it })

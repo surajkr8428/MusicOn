@@ -495,6 +495,10 @@ class MainViewModel(
 
     init {
         viewModelScope.launch {
+            // Auto reset recent tab content on restart / update / reinstall
+            musicRepository.clearRecentlyPlayed()
+        }
+        viewModelScope.launch {
             settingsRepository.lastTrackIdFlow.collect { lastId ->
                 if (!lastId.isNullOrEmpty() && lastId != _currentPlayingTrackId.value) {
                     _currentPlayingTrackId.value = lastId
@@ -515,6 +519,8 @@ class MainViewModel(
             }
         }
     }
+
+    fun clearRecentlyPlayed() = viewModelScope.launch { musicRepository.clearRecentlyPlayed() }
 
     fun savePlaybackState(pos: Long) = viewModelScope.launch { settingsRepository.updateLastPlaybackState(_currentPlayingTrackId.value, pos, _currentPlaylistId.value) }
     fun toggleFavorite(track: TrackEntity) = viewModelScope.launch {

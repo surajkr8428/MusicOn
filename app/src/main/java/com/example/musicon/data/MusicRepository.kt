@@ -256,6 +256,10 @@ class MusicRepository(
         return trackDao.getRecentlyPlayed(limit)
     }
 
+    suspend fun clearRecentlyPlayed() {
+        trackDao.clearRecentlyPlayed()
+    }
+
     suspend fun getMostPlayed(limit: Int): List<TrackEntity> {
         return trackDao.getMostPlayed(limit)
     }

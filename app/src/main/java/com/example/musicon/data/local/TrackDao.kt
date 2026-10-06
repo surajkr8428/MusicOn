@@ -28,4 +28,7 @@ interface TrackDao {
 
     @Query("SELECT * FROM tracks WHERE playCount > 0 ORDER BY playCount DESC LIMIT :limit")
     suspend fun getMostPlayed(limit: Int): List<TrackEntity>
+
+    @Query("UPDATE tracks SET lastPlayed = 0")
+    suspend fun clearRecentlyPlayed()
 }
