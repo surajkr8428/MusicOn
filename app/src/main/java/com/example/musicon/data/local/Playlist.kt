@@ -16,8 +16,7 @@ data class Playlist(
     tableName = "playlist_tracks",
     primaryKeys = ["playlistId", "trackId"],
     foreignKeys = [
-        ForeignKey(entity = Playlist::class, parentColumns = ["id"], childColumns = ["playlistId"], onDelete = ForeignKey.CASCADE),
-        ForeignKey(entity = TrackEntity::class, parentColumns = ["id"], childColumns = ["trackId"], onDelete = ForeignKey.CASCADE)
+        ForeignKey(entity = Playlist::class, parentColumns = ["id"], childColumns = ["playlistId"], onDelete = ForeignKey.CASCADE)
     ]
 )
 data class PlaylistTrack(

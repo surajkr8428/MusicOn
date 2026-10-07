@@ -218,10 +218,8 @@ fun LibraryScreen(
                                                 style = MaterialTheme.typography.labelMedium, 
                                                 color = Color.Gray
                                             )
-                                            TextButton(onClick = { viewModel.clearRecentlyPlayed() }) {
-                                                Icon(Icons.Default.Refresh, contentDescription = "Reset Recents", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                                Spacer(Modifier.width(4.dp))
-                                                Text("Reset Recents", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp)
+                                            IconButton(onClick = { viewModel.clearRecentlyPlayed() }, modifier = Modifier.size(28.dp)) {
+                                                Icon(Icons.Default.Refresh, contentDescription = "Reset Recents", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                                             }
                                         }
                                     }
