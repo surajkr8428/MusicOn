@@ -483,8 +483,14 @@ class MainViewModel(
         _isUserSignedIn.value = signedIn
         _userEmail.value = email
         if (signedIn) {
-            syncCloudTracks()
-            restoreFromCloud()
+            viewModelScope.launch {
+                if (!email.isNullOrEmpty()) {
+                    val unassigned = musicRepository.allPlaylists.first().filter { it.userEmail == null }
+                    unassigned.forEach { musicRepository.updatePlaylist(it.copy(userEmail = email)) }
+                }
+                syncCloudTracks()
+                restoreFromCloud()
+            }
         }
     }
     fun syncCloudTracks() = viewModelScope.launch { try { musicRepository.syncCloudTracks() } catch (e: Exception) {} }
@@ -534,7 +540,7 @@ class MainViewModel(
         triggerBackup()
     }
     fun createPlaylist(name: String) = viewModelScope.launch { musicRepository.createPlaylist(name, _userEmail.value); triggerBackup() }
-    fun removeTrackFromPlaylist(pId: String, tId: String) = viewModelScope.launch { musicRepository.removeTrackFromPlaylist(pId, tId) }
+    fun removeTrackFromPlaylist(pId: String, tId: String) = viewModelScope.launch { musicRepository.removeTrackFromPlaylist(pId, tId); triggerBackup() }
     fun getTracksForPlaylist(pId: String) = musicRepository.getTracksForPlaylist(pId)
 
     fun bulkAssignTracksToAlbum(albumName: String, trackIds: List<String>) = viewModelScope.launch {
