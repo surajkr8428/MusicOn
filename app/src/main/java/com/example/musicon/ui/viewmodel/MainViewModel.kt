@@ -280,7 +280,7 @@ class MainViewModel(
 
     fun updateCurrentTrackById(trackId: String) {
         _currentPlayingTrackId.value = trackId
-        viewModelScope.launch { musicRepository.recordTrackPlayed(trackId); settingsRepository.updateLastPlaybackState(trackId, 0L, _currentPlaylistId.value) }
+        viewModelScope.launch { settingsRepository.updateLastPlaybackState(trackId, 0L, _currentPlaylistId.value) }
     }
 
     fun shareTrack(track: TrackEntity) {

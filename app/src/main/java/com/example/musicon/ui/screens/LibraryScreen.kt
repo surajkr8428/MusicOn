@@ -359,7 +359,12 @@ fun PlaylistDetailScreen(playlist: Playlist, viewModel: MainViewModel, onBack: (
         ) { padding ->
             val detailConfig = LocalConfiguration.current
             val isDetailTablet = detailConfig.screenWidthDp >= 600 || detailConfig.smallestScreenWidthDp >= 600
-            val detailGridColumns = if (isDetailTablet) GridCells.Fixed(20) else GridCells.Fixed(4)
+            val isDetailLandscape = detailConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
+            val detailGridColumns = when {
+                isDetailTablet && isDetailLandscape -> GridCells.Fixed(12)
+                isDetailTablet -> GridCells.Fixed(8)
+                else -> GridCells.Fixed(4)
+            }
 
             Box(Modifier.fillMaxSize().padding(padding)) {
                 if (tracks.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Button(onClick = onAddSongs) { Text("Add Songs") } }
@@ -452,7 +457,12 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
     Box(modifier = Modifier.fillMaxSize()) {
         val tabConfig = LocalConfiguration.current
         val isTabTablet = tabConfig.screenWidthDp >= 600 || tabConfig.smallestScreenWidthDp >= 600
-        val tabGridColumns = if (isTabTablet) GridCells.Fixed(20) else GridCells.Fixed(4)
+        val isTabLandscape = tabConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val tabGridColumns = when {
+            isTabTablet && isTabLandscape -> GridCells.Fixed(12)
+            isTabTablet -> GridCells.Fixed(8)
+            else -> GridCells.Fixed(4)
+        }
 
         if (mode == LibraryViewMode.GRID) {
             LazyVerticalGrid(
@@ -505,19 +515,33 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
         items(playlists) { playlist -> 
             val isSelected = playlist.id in selected
             val isExpanded = expandedPlaylistId == playlist.id
+            val pTracks by viewModel.getTracksForPlaylist(playlist.id).collectAsState(emptyList())
+            val currentPlayingTrack by viewModel.currentPlayingTrack.collectAsState()
             
             Column {
                 ListItem(
                     headlineContent = { Text(playlist.name, color = Color.White) }, 
-                    leadingContent = { Icon(getPlaylistIcon(playlist.name), null, tint = Color.White) },
+                    leadingContent = {
+                        val firstTrack = pTracks.firstOrNull()
+                        val coverPath = firstTrack?.customCoverPath ?: firstTrack?.localPath
+                        if (coverPath != null) {
+                            AsyncImage(
+                                model = coverPath,
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(getPlaylistIcon(playlist.name), null, tint = Color.White, modifier = Modifier.size(28.dp))
+                        }
+                    },
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(onClick = { onAddSongsToPlaylist(playlist.id) }) {
                                 Icon(Icons.Default.Add, "Add Songs", tint = MaterialTheme.colorScheme.primary)
                             }
                             if (isExpanded) {
-                                val currentTracks by viewModel.getTracksForPlaylist(playlist.id).collectAsState(emptyList())
-                                IconButton(onClick = { viewModel.shareTracks(currentTracks) }) {
+                                IconButton(onClick = { viewModel.shareTracks(pTracks) }) {
                                     Icon(Icons.Default.Share, "Share All", tint = Color.Gray)
                                 }
                                 IconButton(onClick = { subViewMode = if (subViewMode == LibraryViewMode.LIST) LibraryViewMode.GRID else LibraryViewMode.LIST }) {
@@ -538,7 +562,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                 )
                 
                 AnimatedVisibility(visible = isExpanded) {
-                    val tracks by viewModel.getTracksForPlaylist(playlist.id).collectAsState(emptyList())
+                    val tracks = pTracks
                     Surface(
                         modifier = Modifier
                             .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -561,7 +585,12 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                             } else {
                                 val playlistConfig = LocalConfiguration.current
                                 val isPlaylistTablet = playlistConfig.screenWidthDp >= 600 || playlistConfig.smallestScreenWidthDp >= 600
-                                val playlistGridCols = if (isPlaylistTablet) GridCells.Fixed(20) else GridCells.Fixed(4)
+                                val isPlaylistLandscape = playlistConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
+                                val playlistGridCols = when {
+                                    isPlaylistTablet && isPlaylistLandscape -> GridCells.Fixed(12)
+                                    isPlaylistTablet -> GridCells.Fixed(8)
+                                    else -> GridCells.Fixed(4)
+                                }
 
                                 if (subViewMode == LibraryViewMode.GRID) {
                                     LazyVerticalGrid(
@@ -572,6 +601,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                                             StellarGridItem(
                                                 track = track,
                                                 isSelected = track.id in selectedTrackIds,
+                                                isPlaying = track.id == currentPlayingTrack?.id,
                                                 onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(tracks, track, playlist.id) },
                                                 onLongClick = { onTrackClick(track.id) },
                                                 onOptions = onTrackOptions,
@@ -587,6 +617,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                                             StellarTrackItem(
                                                 track = track,
                                                 isSelected = track.id in selectedTrackIds,
+                                                isPlaying = track.id == currentPlayingTrack?.id,
                                                 onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(tracks, track, playlist.id) },
                                                 onLongClick = { onTrackClick(track.id) },
                                                 onOptions = onTrackOptions,
@@ -617,6 +648,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
     var expandedGroupName by rememberSaveable { mutableStateOf<String?>(null) }
     var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.LIST) }
     var addSongsGroupTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val currentPlayingTrack by viewModel.currentPlayingTrack.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) { 
@@ -628,6 +660,29 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                         ListItem(
                             headlineContent = { Text(groupName, color = Color.White) }, 
                             supportingContent = { Text("${gTracks.size} songs") },
+                            leadingContent = {
+                                val firstTrack = gTracks.firstOrNull()
+                                val coverPath = firstTrack?.customCoverPath ?: firstTrack?.localPath
+                                if (coverPath != null) {
+                                    AsyncImage(
+                                        model = coverPath,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        when (type) {
+                                            "Album" -> Icons.Default.Album
+                                            "Artist" -> Icons.Default.Person
+                                            else -> Icons.Default.Category
+                                        },
+                                        null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            },
                             trailingContent = {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(onClick = { addSongsGroupTarget = Pair(type, groupName) }) {
@@ -662,7 +717,12 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                                 Column(Modifier.padding(8.dp)) {
                                     val groupConfig = LocalConfiguration.current
                                     val isGroupTablet = groupConfig.screenWidthDp >= 600 || groupConfig.smallestScreenWidthDp >= 600
-                                    val groupGridCols = if (isGroupTablet) GridCells.Fixed(20) else GridCells.Fixed(4)
+                                    val isGroupLandscape = groupConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
+                                    val groupGridCols = when {
+                                        isGroupTablet && isGroupLandscape -> GridCells.Fixed(12)
+                                        isGroupTablet -> GridCells.Fixed(8)
+                                        else -> GridCells.Fixed(4)
+                                    }
 
                                     if (subViewMode == LibraryViewMode.GRID) {
                                         LazyVerticalGrid(
@@ -673,6 +733,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                                                 StellarGridItem(
                                                     track = track,
                                                     isSelected = track.id in selectedTrackIds,
+                                                    isPlaying = track.id == currentPlayingTrack?.id,
                                                     onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(gTracks, track) },
                                                     onLongClick = { onTrackClick(track.id) },
                                                     onOptions = onTrackOptions,
@@ -688,6 +749,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                                                 StellarTrackItem(
                                                     track = track,
                                                     isSelected = track.id in selectedTrackIds,
+                                                    isPlaying = track.id == currentPlayingTrack?.id,
                                                     onPlay = { if (selectedTrackIds.isNotEmpty()) onTrackClick(track.id) else viewModel.playTrackList(gTracks, track) },
                                                     onLongClick = { onTrackClick(track.id) },
                                                     onOptions = onTrackOptions,
@@ -702,8 +764,8 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                             }
                         }
                     }
-                } 
-            } 
+                }
+            }
         }
 
         if (addSongsGroupTarget != null) {

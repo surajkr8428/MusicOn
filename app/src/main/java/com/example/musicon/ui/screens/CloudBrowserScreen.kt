@@ -22,6 +22,8 @@ import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import android.content.res.Configuration
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -142,7 +144,15 @@ fun CloudBrowserScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                 PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = { refresh() }, modifier = Modifier.padding(padding).fillMaxSize()) {
                     if (isLoading && !isRefreshing) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Color.White) } }
                     else if (viewMode == LibraryViewMode.GRID) {
-                        LazyVerticalGrid(columns = GridCells.Fixed(4), modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
+                        val cloudConfig = LocalConfiguration.current
+                        val isCloudTablet = cloudConfig.screenWidthDp >= 600 || cloudConfig.smallestScreenWidthDp >= 600
+                        val isCloudLandscape = cloudConfig.orientation == Configuration.ORIENTATION_LANDSCAPE
+                        val cloudCols = when {
+                            isCloudTablet && isCloudLandscape -> GridCells.Fixed(12)
+                            isCloudTablet -> GridCells.Fixed(8)
+                            else -> GridCells.Fixed(4)
+                        }
+                        LazyVerticalGrid(columns = cloudCols, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp)) {
                             items(sortedFiles) { file ->
                                 val isSelected = file.id in selectedIds
                                 Column(modifier = Modifier.padding(4.dp).clip(RoundedCornerShape(12.dp)).background(if (isSelected) Color.White.copy(0.15f) else Color.Transparent).combinedClickable(onClick = { if (selectedIds.isNotEmpty()) selectedIds = if (isSelected) selectedIds - file.id else selectedIds + file.id }, onLongClick = { selectedIds = setOf(file.id) }).padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
