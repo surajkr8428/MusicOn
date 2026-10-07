@@ -513,8 +513,8 @@ class MainViewModel(
                 val lastPid = settingsRepository.lastPlaylistIdFlow.first()
                 var finalQ = tracks
                 if (lastPid != null) { val pt = musicRepository.getTracksForPlaylist(lastPid).first(); if (pt.isNotEmpty()) { finalQ = pt; _currentPlaylistId.value = lastPid } }
-                val start = finalQ.find { it.id == lastId } ?: finalQ.first()
-                _currentPlayingTrackId.value = start.id
+                val start = if (!lastId.isNullOrEmpty()) finalQ.find { it.id == lastId } else null
+                _currentPlayingTrackId.value = start?.id
                 _playbackQueue.value = finalQ
             }
         }
