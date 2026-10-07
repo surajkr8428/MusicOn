@@ -203,27 +203,23 @@ fun LibraryScreen(
                         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
                             val currentTrackId = currentPlayingTrack?.id
                             when (page) {
-                                0 -> Column(Modifier.fillMaxSize()) {
+                                0 -> Box(Modifier.fillMaxSize()) {
                                     val recents = viewModel.recentlyPlayed.collectAsState().value
+                                    SongsTab(recents, selectedTrackIds, currentTrackId, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(recents, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) })
                                     if (recents.isNotEmpty()) {
-                                        Row(
+                                        FloatingActionButton(
+                                            onClick = { viewModel.clearRecentlyPlayed() },
                                             modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = 16.dp, vertical = 2.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
+                                                .align(Alignment.BottomEnd)
+                                                .padding(bottom = 90.dp, end = 20.dp)
+                                                .size(48.dp),
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = Color.Black,
+                                            shape = CircleShape
                                         ) {
-                                            Text(
-                                                text = "${recents.size} Recently Played", 
-                                                style = MaterialTheme.typography.labelMedium, 
-                                                color = Color.Gray
-                                            )
-                                            IconButton(onClick = { viewModel.clearRecentlyPlayed() }, modifier = Modifier.size(28.dp)) {
-                                                Icon(Icons.Default.Refresh, contentDescription = "Reset Recents", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                            }
+                                            Icon(Icons.Default.Refresh, contentDescription = "Reset Recents", modifier = Modifier.size(22.dp))
                                         }
                                     }
-                                    SongsTab(recents, selectedTrackIds, currentTrackId, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(recents, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) })
                                 }
                                 1 -> SongsTab(tracks, selectedTrackIds, currentTrackId, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isTrackSelectionMode || addingToPlaylistId != null) selectedTrackIds = if (it.id in selectedTrackIds) selectedTrackIds - it.id else selectedTrackIds + it.id else viewModel.playTrackList(tracks, it) }, { if (!isTrackSelectionMode) selectedTrackIds = setOf(it.id) }, { selectedTrackOptions = it }, { viewModel.toggleFavorite(it) }, { showTrackInfoDialog = it }, { viewModel.uploadTrack(it) })
                                 2 -> PlaylistsTab(playlists, selectedPlaylistIds, viewMode, rememberLazyListState(), rememberLazyGridState(), { if (isPlaylistSelectionMode) selectedPlaylistIds = if (it.id in selectedPlaylistIds) selectedPlaylistIds - it.id else selectedPlaylistIds + it.id else { /* Expansion handles click */ } }, { showCreatePlaylistDialog = true }, { selectedPlaylistIds = setOf(it.id) }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } }, viewModel, selectedTrackIds, { id -> selectedTrackIds = if (id in selectedTrackIds) selectedTrackIds - id else selectedTrackIds + id }, { selectedPlaylistOptions = it }, { selectedTrackOptions = it }, { showTrackInfoDialog = it }, { pid -> addingToPlaylistId = pid; scope.launch { pagerState.animateScrollToPage(1) } })
@@ -501,16 +497,9 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
     var expandedPlaylistId by rememberSaveable { mutableStateOf<String?>(null) }
     var subViewMode by rememberSaveable { mutableStateOf(LibraryViewMode.LIST) }
 
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
-        item { 
-            ListItem(
-                headlineContent = { Text("Create New Playlist", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold) }, 
-                leadingContent = { Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary) }, 
-                modifier = Modifier.clickable { onCreate() }, 
-                colors = ListItemDefaults.colors(containerColor = Color.White.copy(alpha = 0.05f))
-            ) 
-        }
-        items(playlists) { playlist -> 
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 80.dp)) {
+            items(playlists) { playlist -> 
             val isSelected = playlist.id in selected
             val isExpanded = expandedPlaylistId == playlist.id
             val pTracks by viewModel.getTracksForPlaylist(playlist.id).collectAsState(emptyList())
@@ -631,6 +620,19 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                     }
                 }
             }
+        }
+
+        FloatingActionButton(
+            onClick = onCreate,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 90.dp, end = 20.dp)
+                .size(48.dp),
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = Color.Black,
+            shape = CircleShape
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Create Playlist", modifier = Modifier.size(26.dp))
         }
     }
 }

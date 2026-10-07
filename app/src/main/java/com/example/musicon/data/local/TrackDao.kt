@@ -31,4 +31,7 @@ interface TrackDao {
 
     @Query("UPDATE tracks SET lastPlayed = 0")
     suspend fun clearRecentlyPlayed()
+
+    @Query("UPDATE tracks SET playCount = playCount + 1, lastPlayed = :timestamp WHERE id = :trackId")
+    suspend fun recordTrackPlayedDirect(trackId: String, timestamp: Long)
 }

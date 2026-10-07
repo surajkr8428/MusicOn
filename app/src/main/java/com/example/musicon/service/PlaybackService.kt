@@ -26,6 +26,7 @@ class PlaybackService : MediaSessionService() {
     private var effectsManager: AudioEffectsManager? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var cloudManager: CloudStorageManager
+    private val database by lazy { com.example.musicon.data.local.MusicDatabase.getDatabase(applicationContext) }
     private var positionSavingJob: Job? = null
 
     @OptIn(UnstableApi::class)
@@ -82,12 +83,15 @@ class PlaybackService : MediaSessionService() {
             }
 
             override fun onEvents(player: Player, events: Player.Events) {
-                if (events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_PLAY_WHEN_READY_CHANGED)) {
+                if (events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_PLAY_WHEN_READY_CHANGED, Player.EVENT_IS_PLAYING_CHANGED)) {
                     // Save state on any significant event
                     val trackId = player.currentMediaItem?.mediaId
                     if (trackId != null) {
                         serviceScope.launch {
                             settingsRepository.updateLastPlaybackState(trackId, player.currentPosition)
+                            if (player.isPlaying) {
+                                database.trackDao().recordTrackPlayedDirect(trackId, System.currentTimeMillis())
+                            }
                         }
                     }
 
