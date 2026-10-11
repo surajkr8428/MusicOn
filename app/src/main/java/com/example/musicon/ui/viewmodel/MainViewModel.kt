@@ -431,7 +431,20 @@ class MainViewModel(
         tracks.forEach { musicRepository.deleteTrack(it) } // Delete from DB only
     }
 
-    fun syncAllLocalToCloud() = viewModelScope.launch { musicRepository.syncCloudTracks(); val unsynced = musicRepository.allTracks.first().filter { it.localPath != null && it.gDriveId == null }; if (unsynced.isNotEmpty()) { val ids = unsynced.map { it.id }.toTypedArray(); val data = Data.Builder().putString("sync_type", "bulk_upload").putStringArray("track_ids", ids as Array<String?>).build(); WorkManager.getInstance(settingsRepository.context).enqueueUniqueWork("sync_all", androidx.work.ExistingWorkPolicy.REPLACE, OneTimeWorkRequestBuilder<com.example.musicon.service.SyncWorker>().setInputData(data).addTag("sync_task").build()) } }
+    fun syncAllLocalToCloud() = viewModelScope.launch { 
+        musicRepository.syncCloudTracks()
+        val data = Data.Builder()
+            .putString("sync_type", "bulk_upload")
+            .build()
+        WorkManager.getInstance(settingsRepository.context).enqueueUniqueWork(
+            "sync_all",
+            androidx.work.ExistingWorkPolicy.REPLACE,
+            OneTimeWorkRequestBuilder<com.example.musicon.service.SyncWorker>()
+                .setInputData(data)
+                .addTag("sync_task")
+                .build()
+        ) 
+    }
     fun pauseSync() = com.example.musicon.data.remote.CloudSyncManager.setPaused(true)
     fun resumeSync() = com.example.musicon.data.remote.CloudSyncManager.setPaused(false)
 

@@ -9,6 +9,7 @@ import com.example.musicon.data.remote.CloudSyncManager
 import com.example.musicon.data.remote.SyncStatus
 import java.io.File
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 class SyncWorker(
     context: Context,
@@ -80,24 +81,29 @@ class SyncWorker(
                 }
             }
             "bulk_upload" -> {
-                val trackIds = inputData.getStringArray("track_ids") ?: return Result.failure()
-                val total = trackIds.size
+                val trackIdsParam = inputData.getStringArray("track_ids")
+                val tracksToUpload = if (!trackIdsParam.isNullOrEmpty()) {
+                    trackIdsParam.mapNotNull { database.trackDao().getTrackById(it) }
+                } else {
+                    database.trackDao().getAllTracks().first().filter { it.localPath != null && it.gDriveId == null }
+                }
+
+                val total = tracksToUpload.size
                 var uploaded = 0
                 var failed = 0
                 
-                trackIds.forEachIndexed { index, trackId ->
+                tracksToUpload.forEachIndexed { index, track ->
                     // Pause Logic: Wait while isPaused is true
                     while (CloudSyncManager.isPaused.value) {
                         delay(1000)
                     }
 
-                    val track = database.trackDao().getTrackById(trackId)
-                    if (track?.localPath != null) {
+                    if (track.localPath != null) {
                         try {
                             CloudSyncManager.updateStatus(
                                 SyncStatus.Loading(
                                     message = "Uploading ${track.displayName}",
-                                    progress = (index.toFloat() / total),
+                                    progress = if (total > 0) (index.toFloat() / total) else 0f,
                                     current = index + 1,
                                     total = total
                                 )

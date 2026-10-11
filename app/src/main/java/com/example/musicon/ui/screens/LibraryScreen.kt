@@ -866,7 +866,8 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                 Text(
                     text = track.displayName, 
                     color = if (isPlaying) MaterialTheme.colorScheme.primary else LavenderTitle, 
-                    fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
+                    fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.SemiBold,
+                    fontSize = if (isTablet) 15.sp else 18.sp,
                     maxLines = 1, 
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false)
@@ -1058,8 +1059,8 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
             Text(
                 text = track.displayName, 
                 color = if (isPlaying) MaterialTheme.colorScheme.primary else Color.White, 
-                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
-                fontSize = if (isTablet) 8.sp else 11.sp, 
+                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Medium,
+                fontSize = if (isTablet) 11.sp else 14.sp, 
                 maxLines = 1, 
                 overflow = TextOverflow.Ellipsis, 
                 textAlign = TextAlign.Center,
