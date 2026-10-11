@@ -621,6 +621,7 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                 }
             }
         }
+    }
 
         FloatingActionButton(
             onClick = onCreate,
