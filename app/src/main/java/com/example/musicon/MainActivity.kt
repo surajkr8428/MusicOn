@@ -77,6 +77,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import androidx.palette.graphics.Palette
 import coil.compose.LocalImageLoader
+import android.widget.Toast
 import com.example.musicon.data.LibraryViewMode
 import com.example.musicon.data.MusicRepository
 import com.example.musicon.data.SettingsRepository
@@ -135,6 +136,12 @@ class MainActivity : ComponentActivity() {
             onSignInResult?.invoke(account)
         } catch (e: Exception) {
             Log.e("MusicOn", "Sign-in failed", e)
+            if (e is ApiException) {
+                Log.e("MusicOn", "Sign-in status code: ${e.statusCode}")
+                Toast.makeText(this, "Sign-in error code: ${e.statusCode}", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "Sign-in failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
             onSignInResult?.invoke(null)
         }
     }
@@ -408,9 +415,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun triggerSignIn() {
-        val clientId = "214103417571-pgueu7l4qsqrghov47ngetsl48ltiiqh.apps.googleusercontent.com"
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(clientId)
             .requestEmail()
             .requestScopes(
                 Scope("https://www.googleapis.com/auth/drive.file"),
