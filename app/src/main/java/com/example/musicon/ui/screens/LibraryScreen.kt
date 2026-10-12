@@ -931,8 +931,8 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
 ) {
     val configuration = LocalConfiguration.current
     val isTablet = configuration.screenWidthDp >= 600 || configuration.smallestScreenWidthDp >= 600
-    val btnSize = if (isTablet) 12.dp else 26.dp
-    val iconSize = if (isTablet) 7.dp else 15.dp
+    val btnSize = if (isTablet) 20.dp else 34.dp
+    val iconSize = if (isTablet) 12.dp else 22.dp
 
     val isUnplayed = track.playCount == 0
     val cardBorder = if (isPlaying) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null
