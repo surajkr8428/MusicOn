@@ -74,15 +74,29 @@ class CloudStorageManager(private val context: Context) {
             "mimeType contains 'audio/' and trashed = false"
         }
         
+        val allFiles = mutableListOf<com.google.api.services.drive.model.File>()
+        var pageToken: String? = null
+        
         try {
-            val result = service.files().list()
-                .setQ(query)
-                .setFields("files(id, name, mimeType, size, thumbnailLink, hasThumbnail)")
-                .execute()
-            result.files ?: emptyList()
+            do {
+                val request = service.files().list()
+                    .setQ(query)
+                    .setPageSize(1000)
+                    .setFields("nextPageToken, files(id, name, mimeType, size, thumbnailLink, hasThumbnail)")
+                
+                if (pageToken != null) {
+                    request.pageToken = pageToken
+                }
+                
+                val result = request.execute()
+                result.files?.let { allFiles.addAll(it) }
+                pageToken = result.nextPageToken
+            } while (!pageToken.isNullOrEmpty())
+            
+            allFiles
         } catch (e: Exception) {
             android.util.Log.e("CloudStorageManager", "List files failed", e)
-            emptyList()
+            allFiles
         }
     }
 

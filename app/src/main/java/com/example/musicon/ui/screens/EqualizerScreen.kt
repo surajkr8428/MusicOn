@@ -124,15 +124,15 @@ fun EqualizerScreen(
                 }
 
                 item {
-                    Text("5-Band Vertical Equalizer", color = secondaryColor, fontSize = 14.sp)
+                    Text("5-Band Vertical Equalizer", color = secondaryColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(16.dp))
                     val bandFreqs = listOf("60Hz", "230Hz", "910Hz", "3.6kHz", "14kHz")
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(230.dp)
-                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
-                            .padding(12.dp),
+                            .height(380.dp)
+                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
+                            .padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -142,11 +142,11 @@ fun EqualizerScreen(
                                 verticalArrangement = Arrangement.SpaceBetween,
                                 modifier = Modifier.fillMaxHeight()
                             ) {
-                                Text("${level / 100} dB", color = secondaryColor, fontSize = 10.sp)
+                                Text("${level / 100} dB", color = secondaryColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 Box(
                                     modifier = Modifier
-                                        .height(150.dp)
-                                        .width(40.dp),
+                                        .height(290.dp)
+                                        .width(56.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Slider(
@@ -158,17 +158,18 @@ fun EqualizerScreen(
                                         },
                                         valueRange = -1500f..1500f,
                                         modifier = Modifier
-                                            .width(150.dp)
+                                            .width(290.dp)
+                                            .scale(scaleX = 1.6f, scaleY = 1.6f)
                                             .graphicsLayer { rotationZ = -90f },
                                         enabled = eqEnabled,
                                         colors = SliderDefaults.colors(
                                             thumbColor = primaryColor,
                                             activeTrackColor = primaryColor,
-                                            inactiveTrackColor = primaryColor.copy(alpha = 0.2f)
+                                            inactiveTrackColor = primaryColor.copy(alpha = 0.25f)
                                         )
                                     )
                                 }
-                                Text(bandFreqs.getOrElse(index) { "Band ${index + 1}" }, color = contentColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text(bandFreqs.getOrElse(index) { "Band ${index + 1}" }, color = contentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

@@ -91,6 +91,9 @@ class SyncWorker(
                 val total = tracksToUpload.size
                 var uploaded = 0
                 var failed = 0
+
+                val folderId = cloudManager.getOrCreateAppFolder()
+                val existingCloudFiles = cloudManager.listAudioFiles(folderId).associateBy { it.name }
                 
                 tracksToUpload.forEachIndexed { index, track ->
                     // Pause Logic: Wait while isPaused is true
@@ -110,8 +113,8 @@ class SyncWorker(
                             )
                             
                             val fileName = track.displayName
-                            val existingFile = cloudManager.findFileByName(fileName)
-                            val gDriveId = existingFile?.id ?: cloudManager.uploadFile(track.localPath, fileName)
+                            val existingFileId = existingCloudFiles[fileName]?.id
+                            val gDriveId = existingFileId ?: cloudManager.uploadFile(track.localPath, fileName)
                             
                             if (gDriveId != null) {
                                 database.trackDao().updateTrack(track.copy(gDriveId = gDriveId))
