@@ -100,19 +100,19 @@ fun EqualizerScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    Text("Presets", color = secondaryColor, fontSize = 14.sp)
-                    Spacer(Modifier.height(12.dp))
+                    Text("Presets", color = secondaryColor, fontSize = 13.sp)
+                    Spacer(Modifier.height(6.dp))
                     val presets = listOf("Flat", "Rock", "Pop", "Jazz", "Classical", "Heavy Metal", "Hip Hop", "Dance", "Vocal", "Bass Boost")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(presets) { preset ->
                             FilterChip(
                                 selected = false,
                                 onClick = { if (eqEnabled) viewModel.setPreset(preset) },
-                                label = { Text(preset) },
+                                label = { Text(preset, fontSize = 12.sp) },
                                 enabled = eqEnabled,
                                 colors = FilterChipDefaults.filterChipColors(
                                     labelColor = contentColor,
@@ -124,15 +124,15 @@ fun EqualizerScreen(
                 }
 
                 item {
-                    Text("5-Band Vertical Equalizer", color = secondaryColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
+                    Text("5-Band Equalizer", color = secondaryColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
                     val bandFreqs = listOf("60Hz", "230Hz", "910Hz", "3.6kHz", "14kHz")
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(380.dp)
-                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp))
-                            .padding(16.dp),
+                            .height(290.dp)
+                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                            .padding(12.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -142,11 +142,11 @@ fun EqualizerScreen(
                                 verticalArrangement = Arrangement.SpaceBetween,
                                 modifier = Modifier.fillMaxHeight()
                             ) {
-                                Text("${level / 100} dB", color = secondaryColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("${level / 100} dB", color = secondaryColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 Box(
                                     modifier = Modifier
-                                        .height(290.dp)
-                                        .width(56.dp),
+                                        .height(210.dp)
+                                        .width(48.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Slider(
@@ -158,8 +158,8 @@ fun EqualizerScreen(
                                         },
                                         valueRange = -1500f..1500f,
                                         modifier = Modifier
-                                            .width(290.dp)
-                                            .scale(scaleX = 1.6f, scaleY = 1.6f)
+                                            .width(210.dp)
+                                            .scale(scaleX = 1.8f, scaleY = 1.8f)
                                             .graphicsLayer { rotationZ = -90f },
                                         enabled = eqEnabled,
                                         colors = SliderDefaults.colors(
@@ -169,21 +169,21 @@ fun EqualizerScreen(
                                         )
                                     )
                                 }
-                                Text(bandFreqs.getOrElse(index) { "Band ${index + 1}" }, color = contentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(bandFreqs.getOrElse(index) { "Band ${index + 1}" }, color = contentColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
 
                 item {
-                    Text("Audio Effects", color = secondaryColor, fontSize = 14.sp)
-                    Spacer(Modifier.height(16.dp))
+                    Text("Audio Effects", color = secondaryColor, fontSize = 13.sp)
+                    Spacer(Modifier.height(8.dp))
                     
                     EffectSlider("Bass Boost", bassBoost.toFloat(), 0f..1000f, eqEnabled, primaryColor, contentColor, secondaryColor) {
                         viewModel.updateBassBoost(it.toInt())
                     }
                     
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(8.dp))
                     
                     EffectSlider("Virtualizer", virtualizer.toFloat(), 0f..1000f, eqEnabled, primaryColor, contentColor, secondaryColor) {
                         viewModel.updateVirtualizer(it.toInt())
