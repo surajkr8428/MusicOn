@@ -596,7 +596,21 @@ class MainViewModel(
     fun updateEqBands(b: String) = viewModelScope.launch { settingsRepository.updateEqBands(b) }
     fun updateBassBoost(l: Int) = viewModelScope.launch { settingsRepository.updateBassBoost(l) }
     fun updateVirtualizer(l: Int) = viewModelScope.launch { settingsRepository.updateVirtualizer(l) }
-    fun setPreset(name: String) { val bands = when(name) { "Rock" -> "300,200,0,-100,200"; "Pop" -> "-100,100,300,100,-100"; "Jazz" -> "200,100,0,100,200"; "Classical" -> "300,200,0,0,0"; "Bass Boost" -> "500,300,0,0,0"; else -> "0,0,0,0,0" }; updateEqBands(bands) }
+    fun setPreset(name: String) { 
+        val bands = when(name) { 
+            "Rock" -> "400,200,-100,200,400"
+            "Pop" -> "-100,200,400,200,-100"
+            "Jazz" -> "300,200,0,200,300"
+            "Classical" -> "400,300,0,200,300"
+            "Heavy Metal" -> "500,200,0,300,500"
+            "Hip Hop" -> "500,300,0,100,300"
+            "Dance" -> "400,0,200,400,100"
+            "Vocal" -> "-200,0,500,300,-100"
+            "Bass Boost" -> "600,400,0,0,0"
+            else -> "0,0,0,0,0" 
+        }
+        updateEqBands(bands) 
+    }
 
     fun setAsRingtone(track: TrackEntity) {
         // Placeholder for Ringtone logic

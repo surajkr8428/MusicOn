@@ -990,7 +990,6 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                     .align(Alignment.TopStart)
                     .padding(2.dp)
                     .size(btnSize)
-                    .background(Color.Black.copy(0.45f), CircleShape)
             ) {
                 Icon(
                     imageVector = if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, 
@@ -1007,7 +1006,6 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                     .align(Alignment.TopEnd)
                     .padding(2.dp)
                     .size(btnSize)
-                    .background(Color.Black.copy(0.45f), CircleShape)
             ) { 
                 Icon(
                     imageVector = Icons.Default.MoreVert, 
@@ -1027,7 +1025,6 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                     .align(Alignment.BottomStart)
                     .padding(2.dp)
                     .size(btnSize)
-                    .background(Color.Black.copy(0.45f), CircleShape)
             ) {
                 Icon(
                     imageVector = if (track.gDriveId != null) Icons.Default.Cloud else Icons.Default.CloudQueue, 
@@ -1044,7 +1041,6 @@ fun LibraryTopBar(q: String, active: Boolean, onToggle: () -> Unit, onChange: (S
                     .align(Alignment.BottomEnd)
                     .padding(2.dp)
                     .size(btnSize)
-                    .background(Color.Black.copy(0.45f), CircleShape)
             ) { 
                 Icon(
                     imageVector = Icons.Default.Info, 

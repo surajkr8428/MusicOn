@@ -185,7 +185,6 @@ class CloudStorageManager(private val context: Context) {
             
             val mediaContent = if (filePath.startsWith("content://")) {
                 val uri = android.net.Uri.parse(filePath)
-                // Copy to temp file to avoid permission issues in background worker
                 val tempFile = File(context.cacheDir, "upload_temp_${System.currentTimeMillis()}.mp3")
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     tempFile.outputStream().use { output ->
@@ -197,7 +196,12 @@ class CloudStorageManager(private val context: Context) {
                     return@withContext null
                 }
                 val content = FileContent("audio/mpeg", tempFile)
-                val result = service.files().create(fileMetadata, content).setFields("id").execute()
+                val createRequest = service.files().create(fileMetadata, content)
+                createRequest.mediaHttpUploader?.apply {
+                    isDirectUploadEnabled = false
+                    chunkSize = 1024 * 1024 * 2
+                }
+                val result = createRequest.setFields("id").execute()
                 tempFile.delete() // Cleanup
                 result.id
             } else {
@@ -206,8 +210,21 @@ class CloudStorageManager(private val context: Context) {
                     android.util.Log.e("CloudStorageManager", "Local file does not exist: $filePath")
                     return@withContext null
                 }
-                val content = FileContent("audio/mpeg", localFile)
-                val result = service.files().create(fileMetadata, content).setFields("id").execute()
+                val mime = when {
+                    filePath.endsWith(".flac", ignoreCase = true) -> "audio/flac"
+                    filePath.endsWith(".wav", ignoreCase = true) -> "audio/wav"
+                    filePath.endsWith(".m4a", ignoreCase = true) -> "audio/mp4"
+                    filePath.endsWith(".aac", ignoreCase = true) -> "audio/aac"
+                    filePath.endsWith(".ogg", ignoreCase = true) -> "audio/ogg"
+                    else -> "audio/mpeg"
+                }
+                val content = FileContent(mime, localFile)
+                val createRequest = service.files().create(fileMetadata, content)
+                createRequest.mediaHttpUploader?.apply {
+                    isDirectUploadEnabled = false
+                    chunkSize = 1024 * 1024 * 2
+                }
+                val result = createRequest.setFields("id").execute()
                 result.id
             }
             

@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -105,7 +106,7 @@ fun EqualizerScreen(
                 item {
                     Text("Presets", color = secondaryColor, fontSize = 14.sp)
                     Spacer(Modifier.height(12.dp))
-                    val presets = listOf("Flat", "Rock", "Pop", "Jazz", "Classical", "Bass Boost")
+                    val presets = listOf("Flat", "Rock", "Pop", "Jazz", "Classical", "Heavy Metal", "Hip Hop", "Dance", "Vocal", "Bass Boost")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(presets) { preset ->
                             FilterChip(
@@ -123,31 +124,51 @@ fun EqualizerScreen(
                 }
 
                 item {
-                    Text("Bands", color = secondaryColor, fontSize = 14.sp)
+                    Text("5-Band Vertical Equalizer", color = secondaryColor, fontSize = 14.sp)
                     Spacer(Modifier.height(16.dp))
+                    val bandFreqs = listOf("60Hz", "230Hz", "910Hz", "3.6kHz", "14kHz")
                     Row(
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(230.dp)
+                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         bands.forEachIndexed { index, level ->
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Slider(
-                                    value = level.toFloat(),
-                                    onValueChange = { newLevel ->
-                                        val newBands = bands.toMutableList()
-                                        newBands[index] = newLevel.toInt()
-                                        viewModel.updateEqBands(newBands.joinToString(","))
-                                    },
-                                    valueRange = -1500f..1500f,
-                                    modifier = Modifier.weight(1f).width(40.dp),
-                                    enabled = eqEnabled,
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = primaryColor,
-                                        activeTrackColor = primaryColor,
-                                        inactiveTrackColor = primaryColor.copy(alpha = 0.2f)
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxHeight()
+                            ) {
+                                Text("${level / 100} dB", color = secondaryColor, fontSize = 10.sp)
+                                Box(
+                                    modifier = Modifier
+                                        .height(150.dp)
+                                        .width(40.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Slider(
+                                        value = level.toFloat(),
+                                        onValueChange = { newLevel ->
+                                            val newBands = bands.toMutableList()
+                                            newBands[index] = newLevel.toInt()
+                                            viewModel.updateEqBands(newBands.joinToString(","))
+                                        },
+                                        valueRange = -1500f..1500f,
+                                        modifier = Modifier
+                                            .width(150.dp)
+                                            .graphicsLayer { rotationZ = -90f },
+                                        enabled = eqEnabled,
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = primaryColor,
+                                            activeTrackColor = primaryColor,
+                                            inactiveTrackColor = primaryColor.copy(alpha = 0.2f)
+                                        )
                                     )
-                                )
-                                Text("${index + 1}", color = contentColor, fontSize = 12.sp)
+                                }
+                                Text(bandFreqs.getOrElse(index) { "Band ${index + 1}" }, color = contentColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

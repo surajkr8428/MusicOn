@@ -408,11 +408,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun triggerSignIn() {
+        val clientId = "214103417571-pgueu7l4qsqrghov47ngetsl48ltiiqh.apps.googleusercontent.com"
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(clientId)
             .requestEmail()
             .requestScopes(
                 Scope("https://www.googleapis.com/auth/drive.file"),
-                Scope("https://www.googleapis.com/auth/drive.readonly")
+                Scope("https://www.googleapis.com/auth/drive.readonly"),
+                Scope("https://www.googleapis.com/auth/drive.appdata")
             )
             .build()
         val client = GoogleSignIn.getClient(this, gso)
